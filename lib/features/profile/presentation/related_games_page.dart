@@ -84,7 +84,7 @@ class RelatedGamesPage extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => GameDetailPage(game: game),
+                              builder: (context) => GameDetailPage(id: 0),
                             ),
                           );
                         },

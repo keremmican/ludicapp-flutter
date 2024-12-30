@@ -54,7 +54,9 @@ class GameSection extends StatelessWidget {
                     width: 120,
                     decoration: BoxDecoration(
                       image: DecorationImage(
-                        image: AssetImage(game['image']!),
+                        image: game['image']!.startsWith('http') // Eğer URL ağ bağlantısıysa
+                            ? NetworkImage(game['image']!) as ImageProvider
+                            : AssetImage(game['image']!), // Yerel bir dosya ise
                         fit: BoxFit.cover,
                       ),
                       borderRadius: BorderRadius.circular(10),

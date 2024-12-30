@@ -20,14 +20,16 @@ class MainPageGame extends StatelessWidget {
           borderRadius: BorderRadius.circular(20), // Same roundness as SwipeCard
         ),
         child: Container(
-          height: MediaQuery.of(context).size.height * 0.55, // Adjusted height to 60%
+          height: MediaQuery.of(context).size.height * 0.6, // Adjusted height to 60%
           decoration: BoxDecoration(
-            image: DecorationImage(
-              image: AssetImage(game['image']!),
-              fit: BoxFit.cover,
-            ),
-            borderRadius: BorderRadius.circular(20),
-          ),
+  image: DecorationImage(
+    image: game['image']!.startsWith('http') // Eğer URL bir ağ bağlantısıysa
+        ? NetworkImage(game['image']!) as ImageProvider
+        : AssetImage(game['image']!), // Eğer URL değilse yerel dosya
+    fit: BoxFit.cover,
+  ),
+  borderRadius: BorderRadius.circular(20),
+),
           child: Stack(
             children: [
               // Bottom section with game details

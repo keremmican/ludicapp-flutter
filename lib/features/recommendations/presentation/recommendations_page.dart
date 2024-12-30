@@ -253,7 +253,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => GameDetailPage(game: gameDetails),
+                    builder: (context) => GameDetailPage(id: 0,),
                   ),
                 );
               },

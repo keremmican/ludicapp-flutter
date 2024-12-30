@@ -1,215 +1,284 @@
 import 'package:flutter/material.dart';
+import 'package:ludicapp/services/model/response/game_detail.dart';
+import 'package:ludicapp/services/repository/game_repository.dart';
+import 'package:palette_generator/palette_generator.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'dart:ui';
 
-class GameDetailPage extends StatelessWidget {
-  final Map<String, String> game; // Game details passed from RecommendationPage
 
-  const GameDetailPage({Key? key, required this.game}) : super(key: key);
+class GameDetailPage extends StatefulWidget {
+  final int id;
+
+  const GameDetailPage({Key? key, required this.id}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    // Extracting game details
-    String image = game['image'] ?? 'lib/assets/images/mock_games/game1.jpg';
-    String name = game['name'] ?? 'Unknown Game';
-    String genre = game['genre'] ?? 'Unknown Genre';
-    String releaseYear = game['releaseYear'] ?? 'Unknown Year';
-    String developer = game['developer'] ?? 'Unknown Developer';
-    String publisher = game['publisher'] ?? 'Unknown Publisher';
-    String metacritic = game['metacritic'] ?? 'N/A';
-    String imdb = game['imdb'] ?? 'N/A';
-    String matchPoint = game['matchPoint'] ?? '0';
+  _GameDetailPageState createState() => _GameDetailPageState();
+}
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Top Image and Trailer Button
-              Stack(
-                children: [
-                  Image.asset(
-                    image, // Dynamic game image
-                    height: 220, // Reduced height
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                  ),
-                  Positioned(
-                    top: 20,
-                    left: 10,
-                    child: IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.white),
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                    ),
-                  ),
-                  Positioned(
-                    bottom: 20,
-                    left: 20,
-                    child: Row(
-                      children: const [
-                        Icon(Icons.play_circle_fill, size: 40, color: Colors.white),
-                        SizedBox(width: 10),
-                        Text(
-                          'Play Trailer',
-                          style: TextStyle(color: Colors.white, fontSize: 18),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+class _GameDetailPageState extends State<GameDetailPage> {
+  final GameRepository _gameRepository = GameRepository();
+  GameDetail? _gameDetail;
+  bool _isLoading = true;
+  Color? _backgroundColor;
 
-              // Game Info Section
-              Padding(
-                padding: const EdgeInsets.all(15.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Match Percentage
-                    Row(
-                      children: [
-                        Text(
-                          '$matchPoint% Match',
-                          style: TextStyle(
-                            color: Colors.green,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 5),
+  @override
+  void initState() {
+    super.initState();
+    _fetchGameDetail();
+  }
+  final PageController _pageController = PageController();
+int _currentIndex = 0; // Mevcut index
 
-                    // Game Title
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
 
-                    // Genre, Age Rating, and Year
-                    Text(
-                      '$genre • 18+ • $releaseYear',
-                      style: const TextStyle(color: Colors.grey, fontSize: 14),
-                    ),
-
-                    const SizedBox(height: 15),
-
-                    // "Play Game" Button
-                    SizedBox(
-                      width: double.infinity, // Full width button
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          // Action for playing the game
-                          // You can integrate game launching functionality here
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF424242), // Dark gray
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(5),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 0),
-                        ),
-                        icon: const Icon(Icons.play_arrow, color: Colors.white),
-                        label: const Text(
-                          'Play Game',
-                          style: TextStyle(color: Colors.white, fontSize: 16),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 15),
-
-                    // Game Description
-                    const Text(
-                      'In Night City, immerse yourself in a vast, futuristic world filled with intriguing characters, high-tech gadgets, and moral dilemmas.',
-                      style: TextStyle(color: Colors.grey, fontSize: 14),
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    // Starring (Developer and Publisher Info)
-                    Text(
-                      'Developer: $developer\nPublisher: $publisher',
-                      style: const TextStyle(color: Colors.grey, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Action Buttons (Share, Hide, etc.)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 15.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildActionButton(Icons.share, 'Share'),
-                    _buildActionButton(Icons.visibility_off, 'Hide'),
-                    _buildActionButton(Icons.check, 'Played'),
-                    _buildActionButton(Icons.favorite_border, 'Save'),
-                    _buildActionButton(Icons.schedule, 'Playing'),
-                  ],
-                ),
-              ),
-
-              const Divider(color: Colors.grey),
-
-              // Ratings Section
-              Padding(
-                padding: const EdgeInsets.all(15.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildRating(metacritic, 'Metacritic'),
-                    _buildRating(imdb, 'IMDb'),
-                  ],
-                ),
-              ),
-
-              const Divider(color: Colors.grey),
-
-              // Reviews Section
-              Padding(
-                padding: const EdgeInsets.all(15.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Player Reviews',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 10),
-                    _buildReview(
-                        'JohnDoe123', 4, 'Amazing graphics and engaging storyline.'),
-                    const SizedBox(height: 10),
-                    _buildReview(
-                        'GamerGirl89', 5, 'Loved the open-world experience!'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  Future<void> _fetchGameDetail() async {
+    try {
+      final gameDetail = await _gameRepository.fetchGameDetails(widget.id);
+      setState(() {
+        _gameDetail = gameDetail;
+        _isLoading = false;
+      });
+      if (_gameDetail != null && _gameDetail!.screenshots.isNotEmpty) {
+        _generateBackgroundColor(_gameDetail!.screenshots[0]);
+      }
+    } catch (error) {
+      setState(() {
+        _isLoading = false;
+      });
+      print("Error fetching game detail: $error");
+    }
   }
 
-  Widget _buildActionButton(IconData icon, String label) {
-    return Column(
+  Future<void> _generateBackgroundColor(String imageUrl) async {
+  final PaletteGenerator paletteGenerator =
+      await PaletteGenerator.fromImageProvider(NetworkImage(imageUrl));
+  setState(() {
+    final dominantColor = paletteGenerator.dominantColor?.color ?? Colors.black;
+    _backgroundColor = dominantColor.withOpacity(0.5); // Daha belirgin buzlu görünüm
+  });
+}
+
+@override
+Widget build(BuildContext context) {
+  if (_isLoading) {
+    return const Center(child: CircularProgressIndicator());
+  }
+
+  if (_gameDetail == null) {
+    return const Center(child: Text("Game details not available"));
+  }
+
+  return Scaffold(
+    body: Stack(
       children: [
-        Icon(icon, color: Colors.grey),
-        const SizedBox(height: 5),
-        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+        // Arka Plan Görseli
+        Positioned.fill(
+          child: _gameDetail!.screenshots.isNotEmpty
+              ? Image.network(
+                  _gameDetail!.screenshots[0],
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(color: Colors.black);
+                  },
+                )
+              : Container(color: Colors.black),
+        ),
+
+        // Buzlu Arka Plan Efekti
+        Positioned.fill(
+          child: Container(
+            color: Colors.black.withOpacity(0.4), // Daha koyu şeffaf katman
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+              child: Container(color: Colors.black.withOpacity(0.2)),
+            ),
+          ),
+        ),
+
+        // Ana İçerik
+        SafeArea(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Üst Kısım: Yalnızca Ekran Görüntüleri
+                SizedBox(
+  height: 220,
+  child: Stack(
+    alignment: Alignment.center,
+    children: [
+      PageView.builder(
+        itemCount: _gameDetail!.screenshots.length,
+        onPageChanged: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+        itemBuilder: (context, index) {
+          return Image.network(
+            _gameDetail!.screenshots[index],
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: 220,
+            errorBuilder: (context, error, stackTrace) {
+              return const Center(
+                child: Text(
+                  'Screenshot not available',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              );
+            },
+          );
+        },
+      ),
+
+      // Sol ok
+      if (_currentIndex > 0)
+        Positioned(
+          left: 10,
+          child: GestureDetector(
+            onTap: () {
+              _pageController.previousPage(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+              );
+            },
+            child: const Icon(
+              Icons.arrow_back_ios,
+              color: Colors.white,
+              size: 24,
+            ),
+          ),
+        ),
+
+      // Sağ ok
+      if (_currentIndex < _gameDetail!.screenshots.length - 1)
+        Positioned(
+          right: 10,
+          child: GestureDetector(
+            onTap: () {
+              _pageController.nextPage(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+              );
+            },
+            child: const Icon(
+              Icons.arrow_forward_ios,
+              color: Colors.white,
+              size: 24,
+            ),
+          ),
+        ),
+    ],
+  ),
+),
+
+                // Bilgi Bölümü
+                Padding(
+                  padding: const EdgeInsets.all(15.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Başlık
+                      Text(
+                        _gameDetail!.name,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+
+                      // Tür ve Çıkış Tarihi
+                      Text(
+                        '${_gameDetail!.genre} • ${_gameDetail!.releaseFullDate}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 16,
+                        ),
+                      ),
+
+                      const SizedBox(height: 5),
+
+                      // Trailer Butonu
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 15.0, vertical: 10.0),
+                        child: ElevatedButton.icon(
+                          onPressed: _gameDetail!.gameVideo != null
+                              ? () => _launchUrl(_gameDetail!.gameVideo!)
+                              : null,
+                          icon: const Icon(Icons.play_circle_fill),
+                          label: const Text("Watch Trailer"),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _gameDetail!.gameVideo != null
+                                ? Colors.grey[800]
+                                : Colors.grey[500]?.withOpacity(0.7),
+                            minimumSize: const Size(double.infinity, 50),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 5),
+
+                      // Özet
+Text(
+  _truncateText(_gameDetail!.summary, 4),
+  textAlign: TextAlign.center,
+  style: const TextStyle(
+    color: Colors.white, // Daha açık bir beyaz tonu
+    fontSize: 14,
+  ),
+  maxLines: 4, // Maksimum 4 satır
+  overflow: TextOverflow.ellipsis, // Ellipsis ekle
+),
+
+                      const SizedBox(height: 10),
+
+                      // Şirket Bilgisi
+                      Text(
+                        'Company: ${_gameDetail!.company ?? 'Unknown'}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.grey, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const Divider(color: Colors.grey),
+
+                // Puanlama
+                Padding(
+                  padding: const EdgeInsets.all(15.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildRating(
+                          _gameDetail!.totalRatingScore?.toStringAsFixed(1) ??
+                              'N/A',
+                          'Total Rating'),
+                    ],
+                  ),
+                ),
+                const Divider(color: Colors.grey),
+              ],
+            ),
+          ),
+        ),
       ],
-    );
+    ),
+  );
+}
+
+
+  String _truncateText(String text, int maxLines) {
+    final lines = text.split('\n');
+    if (lines.length <= maxLines) return text;
+    return lines.take(maxLines).join(' ') + '...';
   }
 
   Widget _buildRating(String score, String label) {
@@ -225,31 +294,15 @@ class GameDetailPage extends StatelessWidget {
     );
   }
 
-  Widget _buildReview(String username, int stars, String comment) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          username,
-          style:
-              const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        Row(
-          children: List.generate(
-            5,
-            (index) => Icon(
-              index < stars ? Icons.star : Icons.star_border,
-              color: index < stars ? Colors.amber : Colors.grey,
-              size: 16,
-            ),
-          ),
-        ),
-        const SizedBox(height: 5),
-        Text(
-          comment,
-          style: const TextStyle(color: Colors.grey),
-        ),
-      ],
-    );
+  Future<void> _launchUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+    } else {
+      print('Could not launch $url');
+    }
   }
 }
