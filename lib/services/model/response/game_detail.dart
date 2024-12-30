@@ -2,23 +2,27 @@ class GameDetail {
   final int id;
   final String coverUrl;
   final String name;
+  final String slug;
   final String genre;
   final String releaseFullDate;
   final String? gameVideo;
   final String summary;
   final List<String> screenshots;
-  final List<String> websites;
+  final Map<String, String> websites;
   final int? hastilyGameTime;
   final int? normallyGameTime;
   final int? completelyGameTime;
-  final Map<String, String> platforms;
-  final String? company;
+  final List<String> platforms;
+  final List<String>? companies;
   final double? totalRatingScore;
+  final String? ageRating;
+  final List<String> tags;
 
   GameDetail({
     required this.id,
     required this.coverUrl,
     required this.name,
+    required this.slug,
     required this.genre,
     required this.releaseFullDate,
     this.gameVideo,
@@ -29,27 +33,32 @@ class GameDetail {
     this.normallyGameTime,
     this.completelyGameTime,
     required this.platforms,
-    this.company,
+    this.companies,
     this.totalRatingScore,
+    this.ageRating,
+    this.tags = const [],
   });
 
   factory GameDetail.fromJson(Map<String, dynamic> json) {
     return GameDetail(
       id: json['id'],
-      coverUrl: json['coverUrl'] ?? '', // Varsayılan değer
-      name: json['name'] ?? 'Unknown', // Varsayılan değer
-      genre: json['genre'] ?? 'Unknown', // Varsayılan değer
-      releaseFullDate: json['releaseFullDate'] ?? 'Unknown Date', // Varsayılan değer
-      gameVideo: json['gameVideo'], // Nullable
-      summary: json['summary'] ?? 'No summary available.', // Varsayılan değer
-      screenshots: List<String>.from(json['screenshots'] ?? []), // Varsayılan değer
-      websites: List<String>.from(json['websites'] ?? []), // Varsayılan değer
+      coverUrl: json['coverUrl'] ?? '',
+      name: json['name'] ?? 'Unknown',
+      slug: json['slug'] ?? '',
+      genre: json['genre'] ?? 'Unknown',
+      releaseFullDate: json['releaseFullDate'] ?? 'Unknown Date',
+      gameVideo: json['gameVideo'],
+      summary: json['summary'] ?? 'No summary available.',
+      screenshots: List<String>.from(json['screenshots'] ?? []),
+      websites: Map<String, String>.from(json['websites'] ?? {}),
       hastilyGameTime: json['hastilyGameTime'],
       normallyGameTime: json['normallyGameTime'],
       completelyGameTime: json['completelyGameTime'],
-      platforms: Map<String, String>.from(json['platforms'] ?? {}), // Varsayılan değer
-      company: json['company'], // Nullable
-      totalRatingScore: json['totalRatingScore'], // Nullable
+      platforms: List<String>.from(json['platforms'] ?? []),
+      companies: json['companies'] != null ? List<String>.from(json['companies']) : null,
+      totalRatingScore: json['totalRatingScore']?.toDouble(),
+      ageRating: json['ageRating'],
+      tags: json['tags'] != null ? List<String>.from(json['tags']) : [],
     );
   }
 }

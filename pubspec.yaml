@@ -33,6 +33,7 @@ dependencies:
   dio:
   flutter_secure_storage:
   url_launcher:
+  font_awesome_flutter: ^10.1.0
 
 
   # The following adds the Cupertino Icons font to your application.
@@ -79,21 +80,8 @@ flutter:
         - asset: lib/assets/fonts/LeagueSpartan-Regular.ttf
         - asset: lib/assets/fonts/LeagueSpartan-Bold.ttf
   assets:
-    - lib/assets/images/google_logo.png
-    - lib/assets/images/steam_logo.png
-    - lib/assets/images/background1.jpg
-    - lib/assets/images/background2.jpg
-    - lib/assets/images/background3.jpg
-    - lib/assets/images/app_logo.png
-    - lib/assets/images/app_logo_2.png
-    - lib/assets/images/background_profile.jpg
-    - lib/assets/images/profile_photo.jpg
-    - lib/assets/images/mock_games/game1.jpg
-    - lib/assets/images/mock_games/game2.jpg
-    - lib/assets/images/mock_games/game3.jpg
-    - lib/assets/images/mock_games/game4.jpg
-    - lib/assets/images/mock_games/game5.jpg
-    - lib/assets/images/mock_games/game6.jpg
+    - lib/assets/images/
+    - lib/assets/icons/
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
