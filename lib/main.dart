@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ludicapp/features/game/presentation/game_detail_page.dart';
 import 'main_layout.dart';
 
 void main() {
@@ -12,9 +13,9 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Game Discovery',
       theme: ThemeData(
-        fontFamily: 'League Spartan', // Set default font family
-        brightness: Brightness.dark, // Dark theme
-        primaryColor: const Color(0xFFBFE429), // Neon green
+        fontFamily: 'League Spartan',
+        brightness: Brightness.dark,
+        primaryColor: const Color(0xFFBFE429),
         scaffoldBackgroundColor: Colors.black,
         textTheme: const TextTheme(
           displayLarge: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
@@ -25,7 +26,17 @@ class MyApp extends StatelessWidget {
           bodyMedium: TextStyle(fontSize: 14),
         ),
       ),
-      home: MainLayout(),
+      initialRoute: '/',
+      routes: {
+        '/': (context) => MainLayout(),
+        '/game-detail': (context) {
+          final gameId = ModalRoute.of(context)?.settings.arguments as int?;
+          if (gameId == null) {
+            return MainLayout();
+          }
+          return GameDetailPage(id: gameId);
+        },
+      },
     );
   }
 }

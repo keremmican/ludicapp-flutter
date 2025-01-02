@@ -171,7 +171,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 4),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
@@ -187,7 +187,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 8),
                         Text(
                           _gameDetail!.name,
                           textAlign: TextAlign.center,
@@ -210,8 +210,6 @@ class _GameDetailPageState extends State<GameDetailPage> {
                     ),
                   ),
 
-                  const SizedBox(height: 5),
-
                   Padding(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 15.0, vertical: 10.0),
@@ -219,8 +217,11 @@ class _GameDetailPageState extends State<GameDetailPage> {
                       onPressed: _gameDetail!.gameVideo != null
                           ? () => _launchUrl(_gameDetail!.gameVideo!)
                           : null,
-                      icon: const Icon(Icons.play_circle_fill),
-                      label: const Text("Watch Trailer"),
+                      icon: const Icon(Icons.play_circle_fill, color: Colors.white),
+                      label: const Text(
+                        "Watch Trailer",
+                        style: TextStyle(color: Colors.white),
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _gameDetail!.gameVideo != null
                             ? Colors.grey[800]
@@ -233,7 +234,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
                     ),
                   ),
 
-                  const SizedBox(height: 5),
+                  const SizedBox(height: 2),
 
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -341,7 +342,10 @@ class _GameDetailPageState extends State<GameDetailPage> {
                               borderRadius: BorderRadius.circular(8),
                             ),
                           ),
-                          child: const Text("Show All Reviews"),
+                          child: const Text(
+                            "Show All Reviews",
+                            style: TextStyle(color: Colors.white),
+                          ),
                         ),
                       ),
                     ],
@@ -572,7 +576,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
 
                   if (_gameDetail!.ageRating != null)
                     Padding(
-                      padding: const EdgeInsets.all(16.0),
+                      padding: const EdgeInsets.all(8.0),
                       child: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
@@ -600,11 +604,13 @@ class _GameDetailPageState extends State<GameDetailPage> {
                       ),
                     ),
 
+                  const SizedBox(height: 4),
+
                   if (_gameDetail!.websites.entries
                       .where((entry) => ['STEAM', 'EPICGAMES', 'GOG'].contains(entry.key.toUpperCase()))
                       .isNotEmpty)
                     Padding(
-                      padding: const EdgeInsets.all(16.0),
+                      padding: const EdgeInsets.all(8.0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -640,7 +646,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
                                                 _buildStoreIcon(entry.key),
                                                 const SizedBox(width: 8),
                                                 Text(
-                                                  entry.key,
+                                                  _formatStoreName(entry.key),
                                                   style: const TextStyle(
                                                     color: Colors.white70,
                                                     fontSize: 14,
@@ -761,13 +767,21 @@ class _GameDetailPageState extends State<GameDetailPage> {
   }
 
   Widget _buildTimeInfoCard(String label, String time, Color color) {
+    final Map<String, Color> timeColors = {
+      'Hastily': Color(0xFFFFB74D),
+      'Normally': Color(0xFF81C784),
+      'Completely': Color(0xFF9575CD),
+    };
+
+    final cardColor = timeColors[label] ?? color;
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: cardColor.withOpacity(0.08),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: color.withOpacity(0.3),
+          color: cardColor.withOpacity(0.2),
           width: 1,
         ),
       ),
@@ -776,7 +790,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
           Text(
             time,
             style: TextStyle(
-              color: color,
+              color: cardColor.withOpacity(0.9),
               fontSize: 20,
               fontWeight: FontWeight.bold,
             ),
@@ -785,7 +799,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
           Text(
             label,
             style: TextStyle(
-              color: color.withOpacity(0.8),
+              color: cardColor.withOpacity(0.7),
               fontSize: 14,
             ),
           ),
@@ -832,14 +846,14 @@ class _GameDetailPageState extends State<GameDetailPage> {
         children: [
           Icon(
             icon,
-            color: Colors.grey[400],
+            color: Colors.white,
             size: 20,
           ),
           const SizedBox(height: 4),
           Text(
             label,
-            style: TextStyle(
-              color: Colors.grey[400],
+            style: const TextStyle(
+              color: Colors.white,
               fontSize: 12,
             ),
           ),
@@ -921,15 +935,24 @@ class _GameDetailPageState extends State<GameDetailPage> {
   }
 
   Widget _buildStatCard(String label, String value, Color color, double progress, IconData icon) {
+    final statColors = {
+      "Players Completed": Color(0xFF66BB6A),
+      "Average Playtime": Color(0xFF64B5F6),
+      "Achievement Rate": Color(0xFFFFB74D),
+      "Currently Playing": Color(0xFFBA68C8),
+    };
+
+    final cardColor = statColors[label] ?? color;
+
     return Container(
       width: 140,
       margin: const EdgeInsets.only(right: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: cardColor.withOpacity(0.08),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: color.withOpacity(0.3),
+          color: cardColor.withOpacity(0.2),
           width: 1,
         ),
       ),
@@ -938,14 +961,14 @@ class _GameDetailPageState extends State<GameDetailPage> {
         children: [
           Icon(
             icon,
-            color: color,
+            color: cardColor.withOpacity(0.9),
             size: 24,
           ),
           const Spacer(),
           Text(
             value,
             style: TextStyle(
-              color: color,
+              color: cardColor.withOpacity(0.9),
               fontSize: 24,
               fontWeight: FontWeight.bold,
             ),
@@ -954,7 +977,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
           Text(
             label,
             style: TextStyle(
-              color: color.withOpacity(0.8),
+              color: cardColor.withOpacity(0.7),
               fontSize: 12,
             ),
           ),
@@ -963,14 +986,27 @@ class _GameDetailPageState extends State<GameDetailPage> {
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
               value: progress,
-              backgroundColor: color.withOpacity(0.1),
-              valueColor: AlwaysStoppedAnimation<Color>(color),
+              backgroundColor: cardColor.withOpacity(0.1),
+              valueColor: AlwaysStoppedAnimation<Color>(cardColor.withOpacity(0.7)),
               minHeight: 4,
             ),
           ),
         ],
       ),
     );
+  }
+
+  String _formatStoreName(String storeName) {
+    switch (storeName.toUpperCase()) {
+      case 'STEAM':
+        return 'Steam';
+      case 'EPICGAMES':
+        return 'Epic Games';
+      case 'GOG':
+        return 'GoG';
+      default:
+        return storeName;
+    }
   }
 }
 
