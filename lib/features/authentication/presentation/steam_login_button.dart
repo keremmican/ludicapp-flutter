@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 class SteamLoginButton extends StatelessWidget {
+  const SteamLoginButton({super.key});
+
   @override
   Widget build(BuildContext context) {
     return ElevatedButton(

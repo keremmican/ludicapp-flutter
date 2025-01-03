@@ -5,6 +5,8 @@ import 'package:palette_generator/palette_generator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:ui';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:ludicapp/theme/app_theme.dart';
+
 
 class GameDetailPage extends StatefulWidget {
   final int id;
@@ -63,7 +65,84 @@ class _GameDetailPageState extends State<GameDetailPage> {
     }
 
     if (_gameDetail == null) {
-      return const Center(child: Text("Game details not available"));
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceDark,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: AppTheme.accentColor.withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Icon(
+                Icons.videogame_asset_rounded,
+                size: 60,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 24),
+            
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: Text(
+                'We couldn\'t load the game details at this moment. Please check your connection and try again.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.grey[500],
+                  fontSize: 16,
+                ),
+              ),
+            ),
+            const SizedBox(height: 32),
+            
+            SizedBox(
+              width: 200,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => GameDetailPage(id: widget.id),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.accentColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.refresh,
+                      size: 20,
+                      color: Colors.white,
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'Try Again',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
     }
 
     return Scaffold(
@@ -1003,10 +1082,9 @@ class _GameDetailPageState extends State<GameDetailPage> {
       case 'EPICGAMES':
         return 'Epic Games';
       case 'GOG':
-        return 'GoG';
+        return 'GOG';
       default:
         return storeName;
     }
   }
 }
-

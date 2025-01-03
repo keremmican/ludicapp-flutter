@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 class AnimatedBackground extends StatefulWidget {
+  const AnimatedBackground({super.key});
+
   @override
-  _AnimatedBackgroundState createState() => _AnimatedBackgroundState();
+  State<AnimatedBackground> createState() => _AnimatedBackgroundState();
 }
 
 class _AnimatedBackgroundState extends State<AnimatedBackground> {
@@ -35,7 +37,6 @@ class _AnimatedBackgroundState extends State<AnimatedBackground> {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // Background images with fade transition
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 200),
           transitionBuilder: (Widget child, Animation<double> animation) {
@@ -49,8 +50,6 @@ class _AnimatedBackgroundState extends State<AnimatedBackground> {
             height: double.infinity,
           ),
         ),
-
-        // Top gradient overlay for logo area (darker and extends further down)
         Positioned.fill(
           child: Container(
             decoration: BoxDecoration(
@@ -58,17 +57,15 @@ class _AnimatedBackgroundState extends State<AnimatedBackground> {
                 begin: Alignment.topCenter,
                 end: Alignment.center,
                 colors: [
-                  Colors.black.withOpacity(0.8), // Darker at the top
-                  Colors.black.withOpacity(0.6), // Extend darkness downward
+                  Colors.black.withOpacity(0.8),
+                  Colors.black.withOpacity(0.6),
                   Colors.transparent,
                 ],
-                stops: [0.0, 0.5, 1.0], // Adjust gradient spread
+                stops: const [0.0, 0.5, 1.0],
               ),
             ),
           ),
         ),
-
-        // Bottom gradient overlay
         Positioned.fill(
           child: Container(
             decoration: BoxDecoration(
@@ -77,7 +74,7 @@ class _AnimatedBackgroundState extends State<AnimatedBackground> {
                 end: Alignment.bottomCenter,
                 colors: [
                   Colors.transparent,
-                  Colors.black.withOpacity(1), // Fully black
+                  Colors.black.withOpacity(1),
                 ],
               ),
             ),

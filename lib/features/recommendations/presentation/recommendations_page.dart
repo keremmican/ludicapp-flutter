@@ -6,8 +6,10 @@ import 'package:scrumlab_flutter_tindercard/scrumlab_flutter_tindercard.dart';
 import 'package:palette_generator/palette_generator.dart';
 
 class RecommendationPage extends StatefulWidget {
+  const RecommendationPage({super.key});
+
   @override
-  _RecommendationPageState createState() => _RecommendationPageState();
+  State<RecommendationPage> createState() => _RecommendationPageState();
 }
 
 class _RecommendationPageState extends State<RecommendationPage> {
@@ -99,6 +101,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
   late final List<Map<String, String>> _gamesWithDetails;
 
   List<Color?> _dominantColors = []; // List to store dominant colors, nullable
+
   @override
   void initState() {
     super.initState();

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:ludicapp/services/model/response/search_game.dart';
 import 'package:ludicapp/services/repository/search_repository.dart';
 import 'dart:async';
+import 'package:ludicapp/theme/app_theme.dart';
+import 'package:ludicapp/features/game/presentation/game_detail_page.dart';
+import 'package:ludicapp/features/profile/presentation/related_games_page.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
@@ -11,30 +14,94 @@ class SearchPage extends StatefulWidget {
 }
 
 class _SearchPageState extends State<SearchPage> {
-  final TextEditingController _searchController = TextEditingController();
-  final SearchRepository _searchRepository = SearchRepository();
-  final ScrollController _scrollController = ScrollController();
+  static const int _pageSize = 20;
+
+  late final TextEditingController _searchController;
+  late final SearchRepository _searchRepository;
+  late final ScrollController _scrollController;
   
   List<SearchGame> _searchResults = [];
   bool _isLoading = false;
   bool _hasMore = true;
   String? _error;
   int _currentPage = 0;
-  static const int _pageSize = 10;
   Timer? _debounce;
   String _lastQuery = '';
+
+  static const List<String> popularCategories = [
+    'New Releases',
+    'Top Rated',
+    'Most Played',
+    'Trending',
+    'Coming Soon',
+    'Free to Play',
+    'Special Offers',
+    'Award Winners',
+    'Hidden Gems',
+    'Early Access',
+  ];
+
+  static const List<String> genres = [
+    'Point-and-click',
+    'Fighting',
+    'Shooter',
+    'Music',
+    'Platform',
+    'Puzzle',
+    'Racing',
+    'Real Time Strategy (RTS)',
+    'Role-playing (RPG)',
+    'Simulator',
+    'Sport',
+    'Strategy',
+    'Turn-based strategy (TBS)',
+    'Tactical',
+    'Hack and slash/Beat \'em up',
+    'Quiz/Trivia',
+    'Pinball',
+    'Adventure',
+    'Indie',
+    'Arcade',
+    'Visual Novel',
+    'Card & Board Game',
+    'MOBA',
+  ];
+
+  static const List<String> specialInterests = [
+    'Anime',
+    'Asian Dramas',
+    'Blockbuster Movies',
+    'Bollywood Movies',
+    'Documentaries',
+    'Foreign',
+    'Horror',
+    'Reality TV',
+    'Stand-Up Comedy',
+    'Superhero',
+  ];
+
+  static const List<String> attributes = [
+    'Slow-Paced',
+    'Fast-Paced',
+    'Simple Plot',
+    'Complex Plot',
+    'Light Mood',
+    'Dark Mood',
+  ];
 
   @override
   void initState() {
     super.initState();
-    _searchController.addListener(_onSearchChanged);
+    _searchController = TextEditingController();
+    _searchRepository = SearchRepository();
+    _scrollController = ScrollController();
+    
     _scrollController.addListener(_onScroll);
+    _searchController.addListener(_onSearchChanged);
   }
 
   @override
   void dispose() {
-    _searchController.removeListener(_onSearchChanged);
-    _scrollController.removeListener(_onScroll);
     _searchController.dispose();
     _scrollController.dispose();
     _debounce?.cancel();
@@ -98,14 +165,14 @@ class _SearchPageState extends State<SearchPage> {
       );
 
       setState(() {
-        if (response.content.isEmpty || response.last) {
-          _hasMore = false;
-        } else {
-          _searchResults.addAll(response.content);
-        }
+        print('Search Results: ${response.content.length}');
+        
+        _searchResults.addAll(response.content);
+        _hasMore = !response.last;
         _isLoading = false;
       });
     } catch (e) {
+      print('Search Error: $e');
       setState(() {
         _error = e.toString();
         _isLoading = false;
@@ -113,59 +180,61 @@ class _SearchPageState extends State<SearchPage> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        elevation: 0,
-        title: const Text(
-          'Search Games',
-          style: TextStyle(color: Colors.white, fontSize: 24),
+  Widget _buildSection(String title, List<String> items) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Text(
+            title,
+            style: TextStyle(
+              color: Colors.grey[500],
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ),
-        centerTitle: true,
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: TextField(
-                controller: _searchController,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  hintText: 'Search for games...',
-                  hintStyle: const TextStyle(color: Colors.white54),
-                  prefixIcon: const Icon(Icons.search, color: Colors.white54),
-                  filled: true,
-                  fillColor: Colors.grey[800],
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(30.0),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-            ),
-            Expanded(
-              child: _buildContent(),
-            ),
-          ],
+        SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: items.map((item) => _buildChip(item)).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildChip(String label) {
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => RelatedGamesPage(categoryTitle: label),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1C1C1E),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildContent() {
-    if (_searchController.text.isEmpty) {
-      return const Center(
-        child: Text(
-          'Start typing to search games...',
-          style: TextStyle(color: Colors.white54, fontSize: 18),
-        ),
-      );
-    }
-
+  Widget _buildSearchResults() {
     if (_error != null) {
       return Center(
         child: Text(
@@ -202,54 +271,117 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   Widget _buildGameItem(SearchGame game) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      leading: Container(
-        width: 60,
-        height: 80,
-        decoration: BoxDecoration(
-          color: Colors.grey[800],
-          borderRadius: BorderRadius.circular(8.0),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8.0),
-          child: game.imageUrl != null && game.imageUrl!.isNotEmpty
-              ? Image.network(
-                  game.imageUrl!,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const Icon(
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceDark,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(8),
+        leading: Container(
+          width: 60,
+          height: 80,
+          decoration: BoxDecoration(
+            color: AppTheme.primaryDark,
+            borderRadius: BorderRadius.circular(8.0),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8.0),
+            child: game.imageUrl != null && game.imageUrl!.isNotEmpty
+                ? Image.network(
+                    game.imageUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.videogame_asset_rounded,
+                      color: AppTheme.textSecondary,
+                      size: 30,
+                    ),
+                  )
+                : const Icon(
                     Icons.videogame_asset_rounded,
-                    color: Colors.white54,
+                    color: AppTheme.textSecondary,
                     size: 30,
                   ),
-                )
-              : const Icon(
-                  Icons.videogame_asset_rounded,
-                  color: Colors.white54,
-                  size: 30,
-                ),
+          ),
         ),
-      ),
-      title: Text(
-        game.name,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
+        title: Text(
+          game.name,
+          style: const TextStyle(
+            color: AppTheme.textPrimary,
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+          ),
         ),
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
+        trailing: const Icon(
+          Icons.arrow_forward_ios,
+          color: AppTheme.accentColor,
+          size: 18,
+        ),
+        onTap: () {
+          if (game.id != null) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => GameDetailPage(id: game.id!),
+              ),
+            );
+          }
+        },
       ),
-      trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white54, size: 18),
-      onTap: () {
-        if (game.id != null) {
-          Navigator.pushNamed(
-            context,
-            '/game-detail',
-            arguments: game.id,
-          );
-        }
-      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        title: Container(
+          height: 36,
+          decoration: BoxDecoration(
+            color: const Color(0xFF1C1C1E),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: TextField(
+            controller: _searchController,
+            style: const TextStyle(color: Colors.white, fontSize: 15),
+            decoration: InputDecoration(
+              hintText: 'Search',
+              prefixIcon: Icon(Icons.search, color: Colors.grey[600], size: 20),
+              hintStyle: TextStyle(color: Colors.grey[600], fontSize: 15),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: Colors.grey[400], fontSize: 14),
+            ),
+          ),
+        ],
+      ),
+      body: _searchResults.isEmpty && _lastQuery.isEmpty
+          ? SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSection('Popular', popularCategories),
+                  const SizedBox(height: 16),
+                  _buildSection('Genre', genres),
+                  const SizedBox(height: 16),
+                  _buildSection('Attribute', attributes),
+                ],
+              ),
+            )
+          : _buildSearchResults(),
     );
   }
 }

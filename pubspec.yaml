@@ -81,6 +81,7 @@ flutter:
         - asset: lib/assets/fonts/LeagueSpartan-Bold.ttf
   assets:
     - lib/assets/images/
+    - lib/assets/images/mock_games/
     - lib/assets/icons/
 
   # The following line ensures that the Material Icons font is

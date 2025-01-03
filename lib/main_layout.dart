@@ -6,18 +6,14 @@ import 'core/widgets/top_nav_bar.dart';
 import 'core/widgets/bottom_nav_bar.dart';
 
 class MainLayout extends StatefulWidget {
+  const MainLayout({super.key});
+
   @override
-  _MainLayoutState createState() => _MainLayoutState();
+  State<MainLayout> createState() => _MainLayoutState();
 }
 
 class _MainLayoutState extends State<MainLayout> {
   int _currentIndex = 0;
-
-  final List<Widget> _pages = [
-    HomePage(),
-    RecommendationPage(), // Renamed from SwipePage
-    ProfilePage(),
-  ];
 
   void _onTabTapped(int index) {
     setState(() {
@@ -27,14 +23,20 @@ class _MainLayoutState extends State<MainLayout> {
 
   @override
   Widget build(BuildContext context) {
+    final pages = [
+      const HomePage(),
+      const RecommendationPage(),
+      const ProfilePage(),
+    ];
+
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: TopNavBar(), // Fixed Top Navigation Bar
-      body: _pages[_currentIndex], // Current Page
+      appBar: const TopNavBar(),
+      body: pages[_currentIndex],
       bottomNavigationBar: BottomNavBar(
         currentIndex: _currentIndex,
         onTap: _onTabTapped,
-      ), // Fixed Bottom Navigation Bar
+      ),
     );
   }
 }

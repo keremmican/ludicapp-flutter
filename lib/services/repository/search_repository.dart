@@ -9,9 +9,10 @@ class SearchRepository {
     print('Making request to: $url');
     
     final response = await _apiService.get(url);
+    print('Raw Response: ${response.data}');
     
     final searchResponse = SearchResponse.fromJson(response.data);
-    print('Received ${searchResponse.content.length} results for page $page');
+    print('Parsed Response - Content Size: ${searchResponse.content.length}');
     return searchResponse;
   }
 }

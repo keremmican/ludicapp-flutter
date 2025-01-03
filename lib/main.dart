@@ -1,41 +1,42 @@
 import 'package:flutter/material.dart';
-import 'package:ludicapp/features/game/presentation/game_detail_page.dart';
-import 'main_layout.dart';
+import 'package:ludicapp/features/authentication/presentation/login_page.dart';
+import 'package:ludicapp/features/authentication/presentation/register_page.dart';
+import 'package:ludicapp/features/authentication/presentation/verification_page.dart';
+import 'package:ludicapp/main_layout.dart';
+import 'package:ludicapp/theme/app_theme.dart';
 
 void main() {
-  runApp(MyApp());
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Game Discovery',
+      title: 'LudicApp',
       theme: ThemeData(
-        fontFamily: 'League Spartan',
-        brightness: Brightness.dark,
-        primaryColor: const Color(0xFFBFE429),
+        primarySwatch: Colors.blue,
         scaffoldBackgroundColor: Colors.black,
-        textTheme: const TextTheme(
-          displayLarge: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-          displayMedium: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-          displaySmall: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          headlineMedium: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          bodyLarge: TextStyle(fontSize: 16),
-          bodyMedium: TextStyle(fontSize: 14),
-        ),
       ),
-      initialRoute: '/',
+      initialRoute: '/login',
       routes: {
-        '/': (context) => MainLayout(),
-        '/game-detail': (context) {
-          final gameId = ModalRoute.of(context)?.settings.arguments as int?;
-          if (gameId == null) {
-            return MainLayout();
-          }
-          return GameDetailPage(id: gameId);
-        },
+        '/login': (context) => const LoginPage(),
+        '/register': (context) => const RegisterPage(),
+        '/main': (context) => const MainLayout(),
+      },
+      onGenerateRoute: (settings) {
+        if (settings.name == '/verification') {
+          final args = settings.arguments as Map<String, dynamic>;
+          return MaterialPageRoute(
+            builder: (context) => VerificationPage(
+              email: args['email'] as String,
+              verificationCode: args['verificationCode'] as String,
+            ),
+          );
+        }
+        return null;
       },
     );
   }

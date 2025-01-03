@@ -1,145 +1,160 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:ludicapp/theme/app_theme.dart';
 import 'package:ludicapp/core/widgets/animated_background.dart';
-import 'package:ludicapp/features/authentication/presentation/register_page.dart';
-import 'package:ludicapp/main_layout.dart';
-import 'google_login_button.dart';
-import 'steam_login_button.dart';
+import 'package:ludicapp/core/utils/validators.dart';
 
-class LoginPage extends StatelessWidget {
+class LoginPage extends StatefulWidget {
+  const LoginPage({super.key});
+
+  @override
+  State<LoginPage> createState() => _LoginPageState();
+}
+
+class _LoginPageState extends State<LoginPage> {
+  final _emailController = TextEditingController();
+  String? _emailError;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Dynamic background with darker gradients
-          Positioned.fill(
-            child: AnimatedBackground(),
-          ),
-
-          // Logo in the center of the screen
-          Align(
-            alignment: Alignment(0, -0.6), // Center the logo vertically above the inputs
-            child: SizedBox(
-              height: 250,
-              child: Image.asset(
-                'lib/assets/images/app_logo.png',
-                fit: BoxFit.contain,
-              ),
-            ),
-          ),
-
-          // Full black background at the bottom with rounded upper corners
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 30.0),
-              decoration: BoxDecoration(
-                color: Colors.black, // Pure black background
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(30.0),
-                  topRight: Radius.circular(30.0),
-                ),
-              ),
+          const AnimatedBackground(),
+          SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24.0),
               child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Google and Steam logos in the center row with separator
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Google Button with reduced padding
-                      Padding(
-                        padding: EdgeInsets.zero, // Reduced padding
-                        child: GoogleLoginButton(),
-                      ),
-                      const SizedBox(width: 15), // Padding before separator
-                      Container(
-                        width: 1,
-                        height: 50,
-                        color: Colors.white.withOpacity(0.5), // Separator line
-                      ),
-                      const SizedBox(width: 15), // Padding after separator
-                      // Steam Button with reduced padding
-                      Padding(
-                        padding: EdgeInsets.zero, // Reduced padding
-                        child: SteamLoginButton(),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Divider line
-                  Divider(
-                    color: Colors.white.withOpacity(0.5), // Slight white line
-                    thickness: 1,
-                  ),
-                  const SizedBox(height: 10),
-
-                  // Email input and sign-in button in the same row
-                  Row(
-                    children: [
-                      // Email input
-                      Expanded(
-                        child: TextField(
-                          decoration: InputDecoration(
-                            labelText: 'Email',
-                            filled: true,
-                            fillColor: const Color(0xFF2A2A2A), // Dark gray
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10.0), // Slight roundness
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-
-                      // Sign in button with icon
-                      ElevatedButton(
-                        onPressed: () {
-                                  Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(builder: (context) => MainLayout()),
-  );
-},
-
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFBFE429), // Neon green (#bfe429)
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10.0), // Slight roundness
-                          ),
-                          padding: const EdgeInsets.all(15),
-                        ),
-                        child: const Icon(
-                          Icons.arrow_forward,
-                          color: Colors.black,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Register now link
+                  const SizedBox(height: 40),
                   Center(
+                    child: Image.asset(
+                      'lib/assets/images/app_logo_2.png',
+                      height: 120,
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                  const Text(
+                    'Sign In',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Discover your next gaming adventure',
+                    style: TextStyle(
+                      color: Colors.grey[400],
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                  _buildTextField('Email', Icons.email_outlined),
+                  const SizedBox(height: 16),
+                  _buildTextField('Password', Icons.lock_outline, isPassword: true),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerRight,
                     child: TextButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => RegisterPage(),
-                          ),
-                        );
-                      },
-                      child: const Text(
-                        'Register Now',
+                      onPressed: () {},
+                      child: Text(
+                        'Forgot Password?',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: Colors.grey[400],
+                          fontSize: 14,
                         ),
                       ),
                     ),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pushReplacementNamed(context, '/main');
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.accentColor,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Sign In',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Divider(color: Colors.grey[800], thickness: 1),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          'Or continue with',
+                          style: TextStyle(color: Colors.grey[400]),
+                        ),
+                      ),
+                      Expanded(
+                        child: Divider(color: Colors.grey[800], thickness: 1),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildSocialButton(
+                        icon: FontAwesomeIcons.google,
+                        onPressed: () {},
+                      ),
+                      const SizedBox(width: 20),
+                      _buildSocialButton(
+                        icon: FontAwesomeIcons.steam,
+                        onPressed: () {},
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Don\'t have an account? ',
+                        style: TextStyle(color: Colors.grey[400]),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pushNamed(context, '/register');
+                        },
+                        child: const Text(
+                          'Sign Up',
+                          style: TextStyle(
+                            color: AppTheme.accentColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -149,4 +164,54 @@ class LoginPage extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildTextField(String hint, IconData icon, {bool isPassword = false}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceDark,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: TextField(
+        controller: hint == 'Email' ? _emailController : null,
+        style: const TextStyle(color: Colors.white),
+        obscureText: isPassword,
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(color: Colors.grey[400]),
+          prefixIcon: Icon(icon, color: Colors.grey[400]),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.all(16),
+          errorText: hint == 'Email' ? _emailError : null,
+        ),
+        onChanged: (value) {
+          if (hint == 'Email') {
+            setState(() {
+              _emailError = Validators.isValidEmail(value) 
+                  ? null 
+                  : 'Please enter a valid email';
+            });
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _buildSocialButton({
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
+    return Container(
+      width: 60,
+      height: 60,
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceDark,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: IconButton(
+        icon: FaIcon(icon, color: Colors.white),
+        onPressed: onPressed,
+      ),
+    );
+  }
 }
+

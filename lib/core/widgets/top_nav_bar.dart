@@ -3,6 +3,8 @@ import 'package:ludicapp/features/search/presentation/search_page.dart';
 import 'package:ludicapp/features/notifications/presentation/notifications_page.dart';
 
 class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
+  const TopNavBar({super.key});
+
   @override
   Widget build(BuildContext context) {
     return AppBar(
@@ -18,7 +20,9 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => NotificationsPage()),
+                MaterialPageRoute(
+                  builder: (context) => const NotificationsPage(),
+                ),
               );
             },
           ),
@@ -39,7 +43,9 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => SearchPage()),
+                MaterialPageRoute(
+                  builder: (context) => const SearchPage(),
+                ),
               );
             },
           ),
@@ -49,5 +55,5 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
   }
 
   @override
-  Size get preferredSize => const Size.fromHeight(60);
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 }
