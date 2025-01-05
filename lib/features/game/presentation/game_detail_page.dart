@@ -605,44 +605,38 @@ class _GameDetailPageState extends State<GameDetailPage> {
                     ),
                   ),
 
-                  if (_gameDetail!.tags.isNotEmpty)
-                    Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[900]?.withOpacity(0.6),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: Colors.grey[800]!,
-                          width: 1,
-                        ),
-                      ),
+                  if (_gameDetail!.themes.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'Tags',
+                            'Themes',
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: 20,
+                              fontSize: 18,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 8),
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,
-                            children: _gameDetail!.tags.map((tag) => 
+                            children: _gameDetail!.themes.map((theme) => 
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
                                 decoration: BoxDecoration(
                                   color: Colors.grey[800],
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Text(
-                                  tag,
+                                  theme,
                                   style: const TextStyle(
-                                    color: Colors.white70,
+                                    color: Colors.white,
                                     fontSize: 14,
                                   ),
                                 ),

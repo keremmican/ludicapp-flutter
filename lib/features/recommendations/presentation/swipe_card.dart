@@ -18,11 +18,10 @@ class SwipeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Increased frosted area height
-    const double frostedHeight = 160.0; // Artırıldı: 150'dan 160'a
+    const double frostedHeight = 160.0;
 
     return GestureDetector(
-      onTap: onTap, // Handle tap on the entire card
+      onTap: onTap,
       child: Card(
         elevation: 4,
         shape: RoundedRectangleBorder(
@@ -54,8 +53,7 @@ class SwipeCard extends StatelessWidget {
                   filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                   child: Container(
                     height: frostedHeight,
-                    padding: const EdgeInsets.symmetric(
-                        vertical: 8, horizontal: 15), // İsteğe bağlı: 8 ve 15 olarak bırakıldı
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 15),
                     decoration: BoxDecoration(
                       color: dominantColor.withOpacity(0.8),
                       borderRadius: const BorderRadius.only(
@@ -66,29 +64,42 @@ class SwipeCard extends StatelessWidget {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Left column with match point, title, genre-year, and review
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: [
-                              // Match Point
-                              Text(
-                                '${game['matchPoint']}% Match',
-                                style: const TextStyle(
-                                  color: Colors.greenAccent,
-                                  fontSize: 15, // Orijinal: 14'tan 15'e yükseltildi
-                                  fontWeight: FontWeight.bold,
+                              // Game Title
+                              Flexible(
+                                child: Text(
+                                  game['name']!,
+                                  style: const TextStyle(
+                                    fontFamily: 'Roboto',
+                                    color: Colors.white,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              // Game Title
-                              Text(
-                                game['name']!,
-                                style: const TextStyle(
-                                  fontFamily: 'Roboto',
-                                  color: Colors.white,
-                                  fontSize: 17, // Orijinal: 16'dan 17'ye yükseltildi
-                                  fontWeight: FontWeight.bold,
+                              // Match Point
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.greenAccent.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  '${game['matchPoint']}% Match',
+                                  style: const TextStyle(
+                                    color: Colors.greenAccent,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                               // Genre and Release Year
@@ -97,50 +108,48 @@ class SwipeCard extends StatelessWidget {
                                 style: const TextStyle(
                                   fontFamily: 'Roboto',
                                   color: Colors.white70,
-                                  fontSize: 13, // Orijinal: 12'den 13'e yükseltildi
+                                  fontSize: 13,
                                 ),
                               ),
-                              const SizedBox(height: 1), // Azaltılmadı
-
+                              const SizedBox(height: 1),
                               // Horizontal Grey Line
                               Divider(
                                 color: Colors.grey[700],
                                 thickness: 1,
                                 height: 8,
                               ),
-                              const SizedBox(height: 1), // Azaltılmadı
-
+                              const SizedBox(height: 1),
                               // User Review
                               Text(
-                                '"${game['userReview']}"',
+                                game['userReview']!,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   color: Colors.white70,
-                                  fontSize: 15, // Orijinal: 14'ten 15'e yükseltildi
+                                  fontSize: 15,
                                   fontStyle: FontStyle.italic,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        // Transparent Tick Icon in Grey Circle
+                        // Tick Icon
                         GestureDetector(
-                          onTap: onTick, // Handle tick action
+                          onTap: onTick,
                           child: Container(
-                            width: 34, // 32'den 34'e artırıldı
-                            height: 34, // 32'den 34'e artırıldı
+                            width: 34,
+                            height: 34,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: Colors.grey, // Grey border color
-                                width: 2, // Border thickness
+                                color: Colors.grey,
+                                width: 2,
                               ),
                             ),
                             child: const Icon(
                               Icons.check,
-                              color: Colors.grey, // Grey check icon
-                              size: 20, // Orijinal: 18'den 20'ye artırıldı
+                              color: Colors.grey,
+                              size: 20,
                             ),
                           ),
                         ),

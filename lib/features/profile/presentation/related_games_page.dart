@@ -4,6 +4,11 @@ import 'package:ludicapp/services/repository/game_repository.dart';
 import 'package:ludicapp/services/model/response/game_summary.dart';
 import 'package:ludicapp/services/model/response/top_games_cover.dart';
 
+enum SortOption {
+  topRated,
+  recentlyAdded,
+}
+
 class RelatedGamesPage extends StatefulWidget {
   final String categoryTitle;
 
@@ -17,42 +22,324 @@ class RelatedGamesPage extends StatefulWidget {
 class _RelatedGamesPageState extends State<RelatedGamesPage> {
   final GameRepository _gameRepository = GameRepository();
   List<dynamic> games = [];
-  bool isLoading = true;
-  String? error;
+  bool _isLoading = false;
+  bool _hasMore = true;
+  int _currentPage = 0;
+  static const int _pageSize = 20;
+  final ScrollController _scrollController = ScrollController();
+  SortOption _currentSort = SortOption.topRated;
 
   @override
   void initState() {
     super.initState();
+    print('Initializing RelatedGamesPage for: ${widget.categoryTitle}');
     _loadGames();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _initialLoad() async {
+    print('Starting initial load for: ${widget.categoryTitle}');
+    setState(() {
+      games = [];
+      _currentPage = 0;
+      _hasMore = true;
+    });
+    return _loadGames();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    final threshold = maxScroll * 0.9;
+
+    if (currentScroll >= threshold && !_isLoading && _hasMore) {
+      print('Scroll threshold reached. Loading next page.');
+      _currentPage++;
+      _loadGames();
+    }
   }
 
   Future<void> _loadGames() async {
-    try {
-      setState(() {
-        isLoading = true;
-        error = null;
-      });
+    if (_isLoading || !_hasMore) {
+      print('Skipping load: isLoading=$_isLoading, hasMore=$_hasMore');
+      return;
+    }
 
+    print('Loading games for ${widget.categoryTitle} - Page: $_currentPage');
+    
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
       if (widget.categoryTitle == 'New Releases') {
-        final newReleases = await _gameRepository.fetchNewReleases();
+        print('Fetching new releases - Page: $_currentPage');
+        final response = await _gameRepository.fetchNewReleases(
+          page: _currentPage,
+          size: _pageSize,
+        );
+        
+        if (!mounted) return;
+        handleResponse(response);
+      } 
+      else if (widget.categoryTitle == 'Top Rated') {
+        print('Fetching top rated games - Page: $_currentPage');
+        final response = await _gameRepository.fetchTopRatedGames(
+          page: _currentPage,
+          size: _pageSize,
+        );
+
+        if (!mounted) return;
+        handleResponse(response);
+      }
+      else if (genres.contains(widget.categoryTitle)) {
+        print('Fetching games for genre: ${widget.categoryTitle} - Page: $_currentPage');
+        final response = await _gameRepository.fetchGamesByGenre(
+          genre: widget.categoryTitle,
+          page: _currentPage,
+          size: _pageSize,
+          sortByRating: _currentSort == SortOption.topRated,
+        );
+
+        if (!mounted) return;
+        handleResponse(response);
+      }
+      else if (themes.contains(widget.categoryTitle)) {
+        print('Fetching games for theme: ${widget.categoryTitle} - Page: $_currentPage');
+        final response = await _gameRepository.fetchGamesByTheme(
+          theme: widget.categoryTitle,
+          page: _currentPage,
+          size: _pageSize,
+          sortByRating: _currentSort == SortOption.topRated,
+        );
+
+        if (!mounted) return;
+        handleResponse(response);
+      }
+      else {
+        print('Unknown category: ${widget.categoryTitle}');
         setState(() {
-          games = newReleases;
-        });
-      } else if (widget.categoryTitle == 'Top Rated') {
-        final topRated = await _gameRepository.fetchTopRatedGames();
-        setState(() {
-          games = topRated;
+          _isLoading = false;
+          _hasMore = false;
         });
       }
-    } catch (e) {
-      setState(() {
-        error = e.toString();
-      });
-    } finally {
-      setState(() {
-        isLoading = false;
-      });
+    } catch (error) {
+      print('Error loading games: $error');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasMore = false;
+        });
+      }
     }
+  }
+
+  void handleResponse(PageableResponse response) {
+    setState(() {
+      games.addAll(response.content);
+      _hasMore = !response.last;
+      _isLoading = false;
+    });
+    
+    print('Response received: ${response.content.length} items');
+    print('Updated state - Total games: ${games.length}, hasMore: $_hasMore');
+  }
+
+  static const List<String> genres = [
+    'Point-and-click',
+    'Fighting',
+    'Shooter',
+    'Music',
+    'Platform',
+    'Puzzle',
+    'Racing',
+    'Real Time Strategy (RTS)',
+    'Role-playing (RPG)',
+    'Simulator',
+    'Sport',
+    'Strategy',
+    'Turn-based strategy (TBS)',
+    'Tactical',
+    'Hack and slash/Beat \'em up',
+    'Quiz/Trivia',
+    'Pinball',
+    'Adventure',
+    'Indie',
+    'Arcade',
+    'Visual Novel',
+    'Card & Board Game',
+    'MOBA',
+  ];
+
+  static const List<String> themes = [
+    'Drama',
+    'Non-fiction',
+    'Sandbox',
+    'Educational',
+    'Kids',
+    'Open world',
+    'Warfare',
+    'Party',
+    '4X (explore, expand, exploit, and exterminate)',
+    'Erotic',
+    'Mystery',
+    'Action',
+    'Fantasy',
+    'Science fiction',
+    'Horror',
+    'Thriller',
+    'Survival',
+    'Historical',
+    'Stealth',
+    'Comedy',
+    'Business',
+    'Romance',
+  ];
+
+  Widget _buildFilterRow() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        child: Row(
+          children: [
+            // Sıralama Butonu
+            Container(
+              margin: const EdgeInsets.only(right: 12),
+              decoration: BoxDecoration(
+                color: Colors.grey[850],
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: Colors.grey[800]!,
+                  width: 1,
+                ),
+              ),
+              child: PopupMenuButton<SortOption>(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                color: Colors.grey[900],
+                offset: const Offset(0, 40),
+                onSelected: (SortOption result) {
+                  setState(() {
+                    _currentSort = result;
+                    _currentPage = 0;
+                    games = [];
+                    _hasMore = true;
+                    _loadGames();
+                  });
+                },
+                itemBuilder: (BuildContext context) => <PopupMenuEntry<SortOption>>[
+                  const PopupMenuItem<SortOption>(
+                    value: SortOption.topRated,
+                    child: Row(
+                      children: [
+                        Icon(Icons.star, color: Colors.amber, size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          'Top Rated',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem<SortOption>(
+                    value: SortOption.recentlyAdded,
+                    child: Row(
+                      children: [
+                        Icon(Icons.access_time, 
+                          color: Colors.blue[300], 
+                          size: 20
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Recently Added',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _currentSort == SortOption.topRated 
+                          ? Icons.star 
+                          : Icons.access_time,
+                        color: _currentSort == SortOption.topRated 
+                          ? Colors.amber 
+                          : Colors.blue[300],
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _currentSort == SortOption.topRated 
+                          ? 'Top Rated' 
+                          : 'Recently Added',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.arrow_drop_down,
+                        color: Colors.white54,
+                        size: 20,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            // Diğer Filtre Butonları
+            _buildFilterButton('Available to Play'),
+            _buildFilterButton('Hide Rated'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterButton(String title, {bool isSelected = false}) {
+    return Container(
+      margin: const EdgeInsets.only(right: 8),
+      child: ElevatedButton(
+        onPressed: () {
+          print('$title filter selected');
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: isSelected ? Colors.grey[700] : Colors.grey[850],
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(
+              color: Colors.grey[800]!,
+              width: 1,
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        ),
+        child: Text(
+          title,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.white70,
+            fontSize: 14,
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -70,88 +357,45 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Filter Buttons
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10.0),
-              child: Row(
-                children: [
-                  _buildFilterButton('Recently Added', isSelected: true),
-                  _buildFilterButton('Available to Play'),
-                  _buildFilterButton('Hide Rated'),
-                ],
-              ),
-            ),
+          _buildFilterRow(), // Yeni filtre satırı
+          const SizedBox(height: 16),
+          Expanded(
+            child: games.isEmpty && !_isLoading
+              ? const Center(
+                  child: Text(
+                    'No games available in this category.',
+                    style: TextStyle(color: Colors.white, fontSize: 16),
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _initialLoad,
+                  color: Colors.white,
+                  backgroundColor: Colors.grey[900],
+                  child: GridView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(16),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 0.53,
+                    ),
+                    itemCount: games.length + (_hasMore ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index >= games.length) {
+                        return const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(16.0),
+                            child: CircularProgressIndicator(color: Colors.white),
+                          ),
+                        );
+                      }
+                      return _buildGameCard(games[index]);
+                    },
+                  ),
+                ),
           ),
-          const SizedBox(height: 10),
-
-          if (isLoading)
-            const Expanded(
-              child: Center(
-                child: CircularProgressIndicator(color: Colors.white),
-              ),
-            )
-          else if (error != null)
-            Expanded(
-              child: Center(
-                child: Text(
-                  'Error: $error',
-                  style: const TextStyle(color: Colors.red),
-                ),
-              ),
-            )
-          else if (games.isEmpty)
-            const Expanded(
-              child: Center(
-                child: Text(
-                  'No games available in this category.',
-                  style: TextStyle(color: Colors.white, fontSize: 16),
-                ),
-              ),
-            )
-          else
-            // Game Grid
-            Expanded(
-              child: GridView.builder(
-                padding: const EdgeInsets.all(16),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 0.53,
-                ),
-                itemCount: games.length,
-                itemBuilder: (context, index) {
-                  final game = games[index];
-                  return _buildGameCard(game);
-                },
-              ),
-            ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildFilterButton(String title, {bool isSelected = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 5.0),
-      child: ElevatedButton(
-        onPressed: () {
-          print('$title filter selected');
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor:
-              isSelected ? Colors.grey.shade700 : Colors.grey.shade900,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        ),
-        child: Text(
-          title,
-          style: const TextStyle(color: Colors.white, fontSize: 14),
-        ),
       ),
     );
   }

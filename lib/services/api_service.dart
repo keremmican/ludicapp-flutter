@@ -21,8 +21,20 @@ class ApiService {
     ));
   }
 
-  Future<Response> get(String endpoint) async {
-    return await _dio.get(endpoint);
+  Future<Response> get(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+  }) async {
+    try {
+      final response = await _dio.get(
+        path,
+        queryParameters: queryParameters,
+      );
+      return response;
+    } catch (e) {
+      // Hata yönetimi...
+      rethrow;
+    }
   }
 
   Future<Response> post(String endpoint, Map<String, dynamic> data) async {

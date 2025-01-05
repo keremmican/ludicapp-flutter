@@ -157,26 +157,13 @@ class _RecommendationPageState extends State<RecommendationPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Define the maximum overlay opacity
-    const double maxOverlayOpacity = 0.15; // Lighter opacity
-
-    // Define the swipe threshold
-    const double swipeThreshold = 0.1; // Start showing overlay after 10% swipe
-
-    // Determine if initial loading is still ongoing (only first two cards loaded)
-    bool initialLoading = _dominantColors[0] == null || (_gamesWithDetails.length > 1 && _dominantColors[1] == null);
-
-    if (initialLoading) {
-      return Scaffold(
-        backgroundColor: Colors.black, // Set the page background to black
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+    if (_dominantColors[0] == null || 
+        (_gamesWithDetails.length > 1 && _dominantColors[1] == null)) {
+      return _buildLoadingScreen();
     }
 
     return Scaffold(
-      backgroundColor: Colors.black, // Set the page background to black
+      backgroundColor: Colors.black,
       body: SafeArea(
         child: Stack(
           children: [
@@ -184,113 +171,62 @@ class _RecommendationPageState extends State<RecommendationPage> {
             Positioned.fill(
               child: Container(color: Colors.black),
             ),
-            // Red Overlay for Swiping Left
-            if (_swipeDirection < -swipeThreshold)
-              Positioned.fill(
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Container(
-                    width: MediaQuery.of(context).size.width / 2,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                        colors: [
-                          Colors.red.withOpacity(
-                              ((_swipeDirection.abs() - swipeThreshold) / (1.0 - swipeThreshold))
-                                  .clamp(0.0, 1.0) *
-                                  maxOverlayOpacity),
-                          Colors.transparent,
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            // Green Overlay for Swiping Right
-            if (_swipeDirection > swipeThreshold)
-              Positioned.fill(
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: Container(
-                    width: MediaQuery.of(context).size.width / 2,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.centerRight,
-                        end: Alignment.centerLeft,
-                        colors: [
-                          Colors.green.withOpacity(
-                              ((_swipeDirection - swipeThreshold) / (1.0 - swipeThreshold))
-                                  .clamp(0.0, 1.0) *
-                                  maxOverlayOpacity),
-                          Colors.transparent,
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+            // Swipe Overlays
+            _buildSwipeOverlays(),
             // Swipeable Cards
-            Center(
-  child: _currentCardIndex < _gamesWithDetails.length
-      ? TinderSwapCard(
-          orientation: AmassOrientation.bottom,
-          totalNum: _gamesWithDetails.length - _currentCardIndex,
-          stackNum: 3,
-          swipeEdge: 4.0,
-          maxWidth: MediaQuery.of(context).size.width * 0.92, // Slightly wider
-          maxHeight: MediaQuery.of(context).size.height * 0.85,
-          minWidth: MediaQuery.of(context).size.width * 0.88, // Increased width
-          minHeight: MediaQuery.of(context).size.height * 0.8,
-          cardBuilder: (context, index) {
-            final gameDetails = _gamesWithDetails[_currentCardIndex + index];
-            final color = _dominantColors[_currentCardIndex + index] ?? Colors.grey.withOpacity(0.5);
-            return SwipeCard(
-              game: gameDetails,
-              dominantColor: color,
-              onTick: () {
-                print('Tick button pressed for ${gameDetails['name']}');
-                _cardController.triggerRight();
-              },
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => GameDetailPage(id: 0,),
-                  ),
-                );
-              },
-            );
-          },
-          cardController: _cardController,
-          swipeUpdateCallback:
-              (DragUpdateDetails details, Alignment align) {
-            setState(() {
-              _swipeDirection = align.x;
-            });
-          },
-          swipeCompleteCallback:
-              (CardSwipeOrientation orientation, int index) {
-            setState(() {
-              _swipeDirection = 0.0;
-              _currentCardIndex++;
-            });
-
-            _preloadNextColors(_currentCardIndex - 1);
-
-            if (orientation == CardSwipeOrientation.right) {
-              print('Swiped Right on card ${_currentCardIndex - 1}');
-            } else if (orientation == CardSwipeOrientation.left) {
-              print('Swiped Left on card ${_currentCardIndex - 1}');
-            }
-          },
-        )
-      : _buildNoMoreCards(),
-),
-
+            _buildCardStack(),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildCardStack() {
+    return Center(
+      child: _currentCardIndex < _gamesWithDetails.length
+          ? TinderSwapCard(
+              orientation: AmassOrientation.bottom,
+              totalNum: _gamesWithDetails.length - _currentCardIndex,
+              stackNum: 3,
+              swipeEdge: 4.0,
+              maxWidth: MediaQuery.of(context).size.width * 0.92,
+              maxHeight: MediaQuery.of(context).size.height * 0.85,
+              minWidth: MediaQuery.of(context).size.width * 0.88,
+              minHeight: MediaQuery.of(context).size.height * 0.8,
+              cardBuilder: (context, index) {
+                final gameDetails = _gamesWithDetails[_currentCardIndex + index];
+                final color = _dominantColors[_currentCardIndex + index] ?? Colors.grey.withOpacity(0.5);
+                return SwipeCard(
+                  game: gameDetails,
+                  dominantColor: color,
+                  onTick: () {
+                    _cardController.triggerRight();
+                  },
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => GameDetailPage(id: 0,),
+                      ),
+                    );
+                  },
+                );
+              },
+              cardController: _cardController,
+              swipeUpdateCallback: (DragUpdateDetails details, Alignment align) {
+                setState(() {
+                  _swipeDirection = align.x;
+                });
+              },
+              swipeCompleteCallback: (CardSwipeOrientation orientation, int index) {
+                setState(() {
+                  _swipeDirection = 0.0;
+                  _currentCardIndex++;
+                });
+                _preloadNextColors(_currentCardIndex - 1);
+              },
+            )
+          : _buildNoMoreCards(),
     );
   }
 
@@ -305,6 +241,69 @@ class _RecommendationPageState extends State<RecommendationPage> {
           fontWeight: FontWeight.bold,
         ),
       ),
+    );
+  }
+
+  Widget _buildLoadingScreen() {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+  }
+
+  Widget _buildSwipeOverlays() {
+    const double maxOverlayOpacity = 0.15;
+    const double swipeThreshold = 0.1;
+
+    return Stack(
+      children: [
+        if (_swipeDirection < -swipeThreshold)
+          Positioned.fill(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Container(
+                width: MediaQuery.of(context).size.width / 2,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [
+                      Colors.red.withOpacity(
+                        ((_swipeDirection.abs() - swipeThreshold) / (1.0 - swipeThreshold))
+                            .clamp(0.0, 1.0) *
+                            maxOverlayOpacity),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        if (_swipeDirection > swipeThreshold)
+          Positioned.fill(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Container(
+                width: MediaQuery.of(context).size.width / 2,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.centerRight,
+                    end: Alignment.centerLeft,
+                    colors: [
+                      Colors.green.withOpacity(
+                        ((_swipeDirection - swipeThreshold) / (1.0 - swipeThreshold))
+                            .clamp(0.0, 1.0) *
+                            maxOverlayOpacity),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

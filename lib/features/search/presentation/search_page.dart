@@ -80,13 +80,29 @@ class _SearchPageState extends State<SearchPage> {
     'Superhero',
   ];
 
-  static const List<String> attributes = [
-    'Slow-Paced',
-    'Fast-Paced',
-    'Simple Plot',
-    'Complex Plot',
-    'Light Mood',
-    'Dark Mood',
+  static const List<String> themes = [
+    'Drama',
+    'Non-fiction',
+    'Sandbox',
+    'Educational',
+    'Kids',
+    'Open world',
+    'Warfare',
+    'Party',
+    '4X (explore, expand, exploit, and exterminate)',
+    'Erotic',
+    'Mystery',
+    'Action',
+    'Fantasy',
+    'Science fiction',
+    'Horror',
+    'Thriller',
+    'Survival',
+    'Historical',
+    'Stealth',
+    'Comedy',
+    'Business',
+    'Romance',
   ];
 
   @override
@@ -377,7 +393,7 @@ class _SearchPageState extends State<SearchPage> {
                   const SizedBox(height: 16),
                   _buildSection('Genre', genres),
                   const SizedBox(height: 16),
-                  _buildSection('Attribute', attributes),
+                  _buildSection('Themes', themes),
                 ],
               ),
             )

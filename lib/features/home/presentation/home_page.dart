@@ -43,10 +43,10 @@ class _HomePageState extends State<HomePage> {
       setState(() {
         _isLoading = true;
       });
-      final newReleases = await _gameRepository.fetchNewReleases();
+      final response = await _gameRepository.fetchNewReleases();
       setState(() {
-        _newReleases = newReleases;
-        _randomGame = newReleases.isNotEmpty ? newReleases.first : null;
+        _newReleases = response.content;
+        _randomGame = response.content.isNotEmpty ? response.content.first : null;
         _hasFetchedData = true;
         _isLoading = false;
       });
@@ -60,9 +60,9 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _fetchTopRatedGames() async {
     try {
-      final topRatedGames = await _gameRepository.fetchTopRatedGames();
+      final response = await _gameRepository.fetchTopRatedGames();
       setState(() {
-        _topRatedGames = topRatedGames;
+        _topRatedGames = response.content;
         _hasFetchedData = true;
         _isLoading = false;
       });
