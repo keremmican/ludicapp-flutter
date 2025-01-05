@@ -34,6 +34,9 @@ dependencies:
   flutter_secure_storage:
   url_launcher:
   font_awesome_flutter: ^10.1.0
+  photo_view: ^0.14.0
+  flutter_svg: ^2.0.9
+  smooth_page_indicator: ^1.1.0
 
 
   # The following adds the Cupertino Icons font to your application.
@@ -75,10 +78,12 @@ flutter_native_splash:
 # The following section is specific to Flutter packages.
 flutter:
   fonts:
-    - family: League Spartan
+    - family: LeagueSpartan
       fonts:
         - asset: lib/assets/fonts/LeagueSpartan-Regular.ttf
+          weight: 400
         - asset: lib/assets/fonts/LeagueSpartan-Bold.ttf
+          weight: 700
   assets:
     - lib/assets/images/
     - lib/assets/images/mock_games/

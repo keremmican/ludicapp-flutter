@@ -6,6 +6,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'dart:ui';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:ludicapp/theme/app_theme.dart';
+import 'package:photo_view/photo_view.dart';
+import 'package:photo_view/photo_view_gallery.dart';
 
 
 class GameDetailPage extends StatefulWidget {
@@ -22,14 +24,36 @@ class _GameDetailPageState extends State<GameDetailPage> {
   GameDetail? _gameDetail;
   bool _isLoading = true;
   Color? _backgroundColor;
+  final List<Image> _cachedImages = [];
+  bool _areImagesLoaded = false;
+  bool _isExpandedSummary = false;
 
   @override
   void initState() {
     super.initState();
     _fetchGameDetail();
   }
-  final PageController _pageController = PageController();
-  int _currentIndex = 0;
+
+  Future<void> _preloadImages() async {
+    if (_gameDetail != null && _gameDetail!.screenshots.isNotEmpty) {
+      for (String imageUrl in _gameDetail!.screenshots) {
+        final image = Image.network(
+          imageUrl,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: 220,
+        );
+        _cachedImages.add(image);
+      }
+      // Preload images after UI is shown
+      for (Image image in _cachedImages) {
+        await precacheImage(image.image, context);
+      }
+      setState(() {
+        _areImagesLoaded = true;
+      });
+    }
+  }
 
   Future<void> _fetchGameDetail() async {
     try {
@@ -40,6 +64,8 @@ class _GameDetailPageState extends State<GameDetailPage> {
       });
       if (_gameDetail != null && _gameDetail!.screenshots.isNotEmpty) {
         _generateBackgroundColor(_gameDetail!.screenshots[0]);
+        // Start preloading images after UI is shown
+        _preloadImages();
       }
     } catch (error) {
       setState(() {
@@ -49,6 +75,9 @@ class _GameDetailPageState extends State<GameDetailPage> {
     }
   }
 
+  final PageController _pageController = PageController();
+  int _currentIndex = 0;
+
   Future<void> _generateBackgroundColor(String imageUrl) async {
     final PaletteGenerator paletteGenerator =
         await PaletteGenerator.fromImageProvider(NetworkImage(imageUrl));
@@ -56,6 +85,43 @@ class _GameDetailPageState extends State<GameDetailPage> {
       final dominantColor = paletteGenerator.dominantColor?.color ?? Colors.black;
       _backgroundColor = dominantColor.withOpacity(0.5);
     });
+  }
+
+  void _openImageGallery(BuildContext context, int initialIndex) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+          body: PhotoViewGallery.builder(
+            scrollPhysics: const BouncingScrollPhysics(),
+            builder: (BuildContext context, int index) {
+              return PhotoViewGalleryPageOptions(
+                imageProvider: NetworkImage(_gameDetail!.screenshots[index]),
+                initialScale: PhotoViewComputedScale.contained,
+                minScale: PhotoViewComputedScale.contained,
+                maxScale: PhotoViewComputedScale.covered * 2,
+              );
+            },
+            itemCount: _gameDetail!.screenshots.length,
+            loadingBuilder: (context, event) => const Center(
+              child: CircularProgressIndicator(),
+            ),
+            backgroundDecoration: const BoxDecoration(
+              color: Colors.black,
+            ),
+            pageController: PageController(initialPage: initialIndex),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -175,72 +241,80 @@ class _GameDetailPageState extends State<GameDetailPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  SizedBox(
+                  Container(
                     height: 220,
+                    width: double.infinity,
                     child: Stack(
-                      alignment: Alignment.center,
                       children: [
-                        PageView.builder(
-                          controller: _pageController,
-                          itemCount: _gameDetail!.screenshots.length,
-                          onPageChanged: (index) {
-                            setState(() {
-                              _currentIndex = index;
-                            });
-                          },
-                          itemBuilder: (context, index) {
-                            return Image.network(
-                              _gameDetail!.screenshots[index],
-                              fit: BoxFit.cover,
-                              width: double.infinity,
-                              height: 220,
-                              errorBuilder: (context, error, stackTrace) {
-                                return const Center(
-                                  child: Text(
-                                    'Screenshot not available',
-                                    style: TextStyle(color: Colors.grey),
-                                  ),
-                                );
-                              },
-                            );
-                          },
+                        // Background blur image
+                        Positioned.fill(
+                          child: Image.network(
+                            _gameDetail!.coverUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(color: Colors.black);
+                            },
+                          ),
                         ),
-
-                        if (_currentIndex > 0)
-                          Positioned(
-                            left: 10,
-                            child: GestureDetector(
-                              onTap: () {
-                                _pageController.previousPage(
-                                  duration: const Duration(milliseconds: 300),
-                                  curve: Curves.easeInOut,
-                                );
-                              },
-                              child: const Icon(
-                                Icons.arrow_back_ios,
-                                color: Colors.white,
-                                size: 24,
+                        // Blur overlay
+                        Positioned.fill(
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                            child: Container(
+                              color: Colors.black.withOpacity(0.5),
+                            ),
+                          ),
+                        ),
+                        // Cover image in center
+                        Center(
+                          child: Container(
+                            height: 180,
+                            width: 135,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.3),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.network(
+                                _gameDetail!.coverUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    color: Colors.grey[900],
+                                    child: const Icon(Icons.error_outline, color: Colors.white),
+                                  );
+                                },
                               ),
                             ),
                           ),
-
-                        if (_currentIndex < _gameDetail!.screenshots.length - 1)
-                          Positioned(
-                            right: 10,
-                            child: GestureDetector(
-                              onTap: () {
-                                _pageController.nextPage(
-                                  duration: const Duration(milliseconds: 300),
-                                  curve: Curves.easeInOut,
-                                );
-                              },
+                        ),
+                        // Back button
+                        Positioned(
+                          top: 16,
+                          left: 16,
+                          child: GestureDetector(
+                            onTap: () => Navigator.pop(context),
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.5),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
                               child: const Icon(
-                                Icons.arrow_forward_ios,
+                                Icons.arrow_back_ios_new,
                                 color: Colors.white,
-                                size: 24,
+                                size: 20,
                               ),
                             ),
                           ),
+                        ),
                       ],
                     ),
                   ),
@@ -317,15 +391,36 @@ class _GameDetailPageState extends State<GameDetailPage> {
 
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                    child: Text(
-                      _truncateText(_gameDetail!.summary, 4),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                      ),
-                      maxLines: 4,
-                      overflow: TextOverflow.ellipsis,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          _gameDetail!.summary,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                          maxLines: _isExpandedSummary ? null : 3,
+                          overflow: _isExpandedSummary ? null : TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _isExpandedSummary = !_isExpandedSummary;
+                            });
+                          },
+                          child: Text(
+                            _isExpandedSummary ? 'See less' : 'Read more',
+                            style: TextStyle(
+                              color: Colors.blue[300],
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
 
@@ -380,6 +475,98 @@ class _GameDetailPageState extends State<GameDetailPage> {
 
                   const SizedBox(height: 16),
 
+                  // Screenshots Section
+                  if (_gameDetail!.screenshots.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[900]?.withOpacity(0.6),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Colors.grey[800]!,
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.purple[400]?.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  Icons.photo_library_outlined,
+                                  color: Colors.purple[400],
+                                  size: 24,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              const Text(
+                                'Screenshots',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            height: 180,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _gameDetail!.screenshots.length,
+                              itemBuilder: (context, index) {
+                                return GestureDetector(
+                                  onTap: () => _openImageGallery(context, index),
+                                  child: Container(
+                                    width: 280,
+                                    margin: const EdgeInsets.only(right: 12),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Stack(
+                                        children: [
+                                          Image.network(
+                                            _gameDetail!.screenshots[index],
+                                            fit: BoxFit.cover,
+                                            width: double.infinity,
+                                            height: double.infinity,
+                                          ),
+                                          // Add gradient overlay
+                                          Positioned.fill(
+                                            child: Container(
+                                              decoration: BoxDecoration(
+                                                gradient: LinearGradient(
+                                                  begin: Alignment.topCenter,
+                                                  end: Alignment.bottomCenter,
+                                                  colors: [
+                                                    Colors.transparent,
+                                                    Colors.black.withOpacity(0.5),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  const SizedBox(height: 24),
+
                   // User Reviews Section
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -432,142 +619,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
 
                   const SizedBox(height: 24),
 
-                  // Stats Section
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 16),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[900]?.withOpacity(0.6),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: Colors.grey[800]!,
-                        width: 1,
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          "Stats",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          height: 160,
-                          child: ListView(
-                            scrollDirection: Axis.horizontal,
-                            children: [
-                              _buildStatCard(
-                                "Players Completed",
-                                "68%",
-                                Colors.green,
-                                0.68,
-                                Icons.check_circle_outline,
-                              ),
-                              _buildStatCard(
-                                "Average Playtime",
-                                "32.5h",
-                                Colors.blue,
-                                0.75,
-                                Icons.timer_outlined,
-                              ),
-                              _buildStatCard(
-                                "Achievement Rate",
-                                "45%",
-                                Colors.amber,
-                                0.45,
-                                Icons.emoji_events_outlined,
-                              ),
-                              _buildStatCard(
-                                "Currently Playing",
-                                "1.2K",
-                                Colors.purple,
-                                0.82,
-                                Icons.sports_esports,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  if (_gameDetail!.hastilyGameTime != null || 
-                      _gameDetail!.normallyGameTime != null || 
-                      _gameDetail!.completelyGameTime != null)
-                    Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[900]?.withOpacity(0.6),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: Colors.grey[800]!,
-                          width: 1,
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue[400]?.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(
-                                  Icons.timer_outlined,
-                                  color: Colors.blue[400],
-                                  size: 24,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              const Text(
-                                'Time to Beat',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
-                            children: [
-                              if (_gameDetail!.hastilyGameTime != null)
-                                _buildTimeInfoCard(
-                                  'Hastily',
-                                  (_gameDetail!.hastilyGameTime! / 3600).toStringAsFixed(1) + 'h',
-                                  Colors.red[400]!,
-                                ),
-                              if (_gameDetail!.normallyGameTime != null)
-                                _buildTimeInfoCard(
-                                  'Normally',
-                                  (_gameDetail!.normallyGameTime! / 3600).toStringAsFixed(1) + 'h',
-                                  Colors.green[400]!,
-                                ),
-                              if (_gameDetail!.completelyGameTime != null)
-                                _buildTimeInfoCard(
-                                  'Completely',
-                                  (_gameDetail!.completelyGameTime! / 3600).toStringAsFixed(1) + 'h',
-                                  Colors.purple[400]!,
-                                ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-
+                  // Game Details Section
                   Container(
                     margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     padding: const EdgeInsets.all(16),
@@ -595,28 +647,85 @@ class _GameDetailPageState extends State<GameDetailPage> {
                         const SizedBox(height: 12),
                         _buildDetailRow('Genre', _gameDetail!.genre),
                         const SizedBox(height: 12),
-                        _buildDetailRow('Publisher/Developer', _gameDetail!.companies?.join(', ') ?? 'Unknown'),
-                        if (_gameDetail!.websites['OFFICIAL'] != null) ...[
-                          const SizedBox(height: 12),
-                          _buildDetailRow('Website', _gameDetail!.websites['OFFICIAL']!,
-                              isLink: true, onTap: () => _launchUrl(_gameDetail!.websites['OFFICIAL']!)),
-                        ],
-                      ],
-                    ),
-                  ),
+                        _buildDetailRow(
+                          'Publisher/Developer', 
+                          _gameDetail!.companies?.join('\n') ?? 'Unknown',
+                          useWrap: true
+                        ),
 
-                  if (_gameDetail!.themes.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
+                        // Websites Section (including social media and official)
+                        if (_gameDetail!.websites.entries.where((entry) => 
+                          ['OFFICIAL', 'INSTAGRAM', 'DISCORD', 'REDDIT', 'YOUTUBE', 'TWITCH', 'TWITTER']
+                          .contains(entry.key.toUpperCase())).isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Websites',
+                            style: TextStyle(
+                              color: Colors.grey,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              if (_gameDetail!.websites['OFFICIAL'] != null)
+                                _buildSocialButton(
+                                  'Official',
+                                  FontAwesomeIcons.globe,
+                                  _gameDetail!.websites['OFFICIAL']!,
+                                ),
+                              if (_gameDetail!.websites['INSTAGRAM'] != null)
+                                _buildSocialButton(
+                                  'Instagram',
+                                  FontAwesomeIcons.instagram,
+                                  _gameDetail!.websites['INSTAGRAM']!,
+                                ),
+                              if (_gameDetail!.websites['DISCORD'] != null)
+                                _buildSocialButton(
+                                  'Discord',
+                                  FontAwesomeIcons.discord,
+                                  _gameDetail!.websites['DISCORD']!,
+                                ),
+                              if (_gameDetail!.websites['REDDIT'] != null)
+                                _buildSocialButton(
+                                  'Reddit',
+                                  FontAwesomeIcons.reddit,
+                                  _gameDetail!.websites['REDDIT']!,
+                                ),
+                              if (_gameDetail!.websites['YOUTUBE'] != null)
+                                _buildSocialButton(
+                                  'YouTube',
+                                  FontAwesomeIcons.youtube,
+                                  _gameDetail!.websites['YOUTUBE']!,
+                                ),
+                              if (_gameDetail!.websites['TWITCH'] != null)
+                                _buildSocialButton(
+                                  'Twitch',
+                                  FontAwesomeIcons.twitch,
+                                  _gameDetail!.websites['TWITCH']!,
+                                ),
+                              if (_gameDetail!.websites['TWITTER'] != null)
+                                _buildSocialButton(
+                                  'Twitter',
+                                  FontAwesomeIcons.twitter,
+                                  _gameDetail!.websites['TWITTER']!,
+                                ),
+                            ],
+                          ),
+                        ],
+
+                        // Themes Section
+                        if (_gameDetail!.themes.isNotEmpty) ...[
+                          const SizedBox(height: 16),
                           const Text(
                             'Themes',
                             style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
+                              color: Colors.grey,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -644,57 +753,53 @@ class _GameDetailPageState extends State<GameDetailPage> {
                             ).toList(),
                           ),
                         ],
-                      ),
-                    ),
 
-                  if (_gameDetail!.ageRating != null)
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[800],
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.warning_amber_rounded,
-                              color: Colors.white70,
-                              size: 20,
+                        // Age Rating Section
+                        if (_gameDetail!.ageRating != null) ...[
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Age Rating',
+                            style: TextStyle(
+                              color: Colors.grey,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Age Rating: ${_gameDetail!.ageRating}',
-                              style: const TextStyle(
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.warning_amber_rounded,
                                 color: Colors.white70,
-                                fontSize: 14,
+                                size: 20,
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                              const SizedBox(width: 8),
+                              Text(
+                                _gameDetail!.ageRating!,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
 
-                  const SizedBox(height: 4),
-
-                  if (_gameDetail!.websites.entries
-                      .where((entry) => ['STEAM', 'EPICGAMES', 'GOG'].contains(entry.key.toUpperCase()))
-                      .isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
+                        // Where to Buy Section
+                        if (_gameDetail!.websites.entries
+                            .where((entry) => ['STEAM', 'EPICGAMES', 'GOG']
+                                .contains(entry.key.toUpperCase()))
+                            .isNotEmpty) ...[
+                          const SizedBox(height: 16),
                           const Text(
                             'Where to Buy',
                             style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 16,
+                              color: Colors.grey,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 8),
                           SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
                             child: Row(
@@ -734,8 +839,9 @@ class _GameDetailPageState extends State<GameDetailPage> {
                             ),
                           ),
                         ],
-                      ),
+                      ],
                     ),
+                  ),
                 ],
               ),
             ),
@@ -881,7 +987,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
     );
   }
 
-  Widget _buildDetailRow(String label, String value, {bool isLink = false, VoidCallback? onTap}) {
+  Widget _buildDetailRow(String label, String value, {bool isLink = false, VoidCallback? onTap, bool useWrap = false}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -894,17 +1000,27 @@ class _GameDetailPageState extends State<GameDetailPage> {
           ),
         ),
         const SizedBox(height: 4),
-        GestureDetector(
-          onTap: onTap,
-          child: Text(
+        if (useWrap)
+          Text(
             value,
             style: TextStyle(
               color: isLink ? Colors.blue[300] : Colors.white,
               fontSize: 16,
               decoration: isLink ? TextDecoration.underline : null,
             ),
+          )
+        else
+          GestureDetector(
+            onTap: onTap,
+            child: Text(
+              value,
+              style: TextStyle(
+                color: isLink ? Colors.blue[300] : Colors.white,
+                fontSize: 16,
+                decoration: isLink ? TextDecoration.underline : null,
+              ),
+            ),
           ),
-        ),
       ],
     );
   }
@@ -1080,5 +1196,39 @@ class _GameDetailPageState extends State<GameDetailPage> {
       default:
         return storeName;
     }
+  }
+
+  Widget _buildSocialButton(String platform, IconData icon, String url) {
+    return GestureDetector(
+      onTap: () => _launchUrl(url),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 6,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.grey[800],
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: Colors.white,
+              size: 14,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              platform,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

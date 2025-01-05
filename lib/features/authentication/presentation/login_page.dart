@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/gestures.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:ludicapp/theme/app_theme.dart';
-import 'package:ludicapp/core/widgets/animated_background.dart';
 import 'package:ludicapp/core/utils/validators.dart';
 
 class LoginPage extends StatefulWidget {
@@ -26,172 +24,128 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          const AnimatedBackground(),
-          SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 40),
-                  Center(
-                    child: Image.asset(
-                      'lib/assets/images/app_logo_2.png',
-                      height: 120,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Spacer(),
+              Center(
+                child: Image.asset(
+                  'lib/assets/images/app_logo_2.png',
+                  height: 80,
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Find what to\nplay next!',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                  height: 1.2,
+                ),
+              ),
+              const SizedBox(height: 32),
+              Image.asset(
+                'lib/assets/images/landingpage.png',
+                height: 250,
+              ),
+              const Spacer(),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/onboarding');
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  const SizedBox(height: 40),
-                  const Text(
+                  child: const Text(
+                    'Get Started',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: OutlinedButton(
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/login_verification');
+                  },
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.white38),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
                     'Sign In',
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Discover your next gaming adventure',
-                    style: TextStyle(
-                      color: Colors.grey[400],
                       fontSize: 16,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 40),
-                  _buildTextField('Email', Icons.email_outlined),
-                  const SizedBox(height: 16),
-                  _buildTextField('Password', Icons.lock_outline, isPassword: true),
-                  const SizedBox(height: 12),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () {},
-                      child: Text(
-                        'Forgot Password?',
-                        style: TextStyle(
-                          color: Colors.grey[400],
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildSocialButton(
+                    icon: FontAwesomeIcons.google,
+                    onPressed: () {},
                   ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pushReplacementNamed(context, '/main');
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.accentColor,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        'Sign In',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Divider(color: Colors.grey[800], thickness: 1),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
-                          'Or continue with',
-                          style: TextStyle(color: Colors.grey[400]),
-                        ),
-                      ),
-                      Expanded(
-                        child: Divider(color: Colors.grey[800], thickness: 1),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _buildSocialButton(
-                        icon: FontAwesomeIcons.google,
-                        onPressed: () {},
-                      ),
-                      const SizedBox(width: 20),
-                      _buildSocialButton(
-                        icon: FontAwesomeIcons.steam,
-                        onPressed: () {},
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Don\'t have an account? ',
-                        style: TextStyle(color: Colors.grey[400]),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pushNamed(context, '/register');
-                        },
-                        child: const Text(
-                          'Sign Up',
-                          style: TextStyle(
-                            color: AppTheme.accentColor,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
+                  const SizedBox(width: 16),
+                  _buildSocialButton(
+                    icon: FontAwesomeIcons.steam,
+                    onPressed: () {},
                   ),
                 ],
               ),
-            ),
+              const SizedBox(height: 16),
+              RichText(
+                textAlign: TextAlign.center,
+                text: TextSpan(
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  children: [
+                    const TextSpan(text: 'By signing up you agree to the '),
+                    TextSpan(
+                      text: 'Terms of Use',
+                      style: TextStyle(
+                        color: AppTheme.accentColor,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                    const TextSpan(text: ' and '),
+                    TextSpan(
+                      text: 'Privacy Policy',
+                      style: TextStyle(
+                        color: AppTheme.accentColor,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                    const TextSpan(text: '.'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTextField(String hint, IconData icon, {bool isPassword = false}) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceDark,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: TextField(
-        controller: hint == 'Email' ? _emailController : null,
-        style: const TextStyle(color: Colors.white),
-        obscureText: isPassword,
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: TextStyle(color: Colors.grey[400]),
-          prefixIcon: Icon(icon, color: Colors.grey[400]),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.all(16),
-          errorText: hint == 'Email' ? _emailError : null,
         ),
-        onChanged: (value) {
-          if (hint == 'Email') {
-            setState(() {
-              _emailError = Validators.isValidEmail(value) 
-                  ? null 
-                  : 'Please enter a valid email';
-            });
-          }
-        },
       ),
     );
   }
@@ -201,14 +155,14 @@ class _LoginPageState extends State<LoginPage> {
     required VoidCallback onPressed,
   }) {
     return Container(
-      width: 60,
-      height: 60,
+      width: 48,
+      height: 48,
       decoration: BoxDecoration(
-        color: AppTheme.surfaceDark,
+        border: Border.all(color: Colors.white38),
         borderRadius: BorderRadius.circular(12),
       ),
       child: IconButton(
-        icon: FaIcon(icon, color: Colors.white),
+        icon: FaIcon(icon, color: Colors.white, size: 20),
         onPressed: onPressed,
       ),
     );
