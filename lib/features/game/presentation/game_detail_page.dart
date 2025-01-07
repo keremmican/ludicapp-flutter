@@ -27,6 +27,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
   final List<Image> _cachedImages = [];
   bool _areImagesLoaded = false;
   bool _isExpandedSummary = false;
+  int? _userRating;
 
   @override
   void initState() {
@@ -247,13 +248,35 @@ class _GameDetailPageState extends State<GameDetailPage> {
                     child: Stack(
                       children: [
                         // Background blur image
-                        Positioned.fill(
-                          child: Image.network(
-                            _gameDetail!.coverUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(color: Colors.black);
-                            },
+                        Positioned(
+                          top: -MediaQuery.of(context).size.height * 0.15,
+                          left: 0,
+                          right: 0,
+                          child: Container(
+                            foregroundDecoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.4),
+                            ),
+                            child: ShaderMask(
+                              shaderCallback: (Rect bounds) {
+                                return LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.transparent,
+                                    Colors.black.withOpacity(0.95),
+                                    Colors.black,
+                                  ],
+                                  stops: const [0.3, 0.8, 1.0],
+                                ).createShader(bounds);
+                              },
+                              blendMode: BlendMode.darken,
+                              child: Image.network(
+                                _gameDetail!.coverUrl,
+                                height: MediaQuery.of(context).size.height * 0.9,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
                           ),
                         ),
                         // Blur overlay
@@ -647,6 +670,8 @@ class _GameDetailPageState extends State<GameDetailPage> {
                         const SizedBox(height: 12),
                         _buildDetailRow('Genre', _gameDetail!.genre),
                         const SizedBox(height: 12),
+                        _buildDetailRow('Release Date', _gameDetail!.releaseFullDate),
+                        const SizedBox(height: 12),
                         _buildDetailRow(
                           'Publisher/Developer', 
                           _gameDetail!.companies?.join('\n') ?? 'Unknown',
@@ -1026,27 +1051,69 @@ class _GameDetailPageState extends State<GameDetailPage> {
   }
 
   Widget _buildActionButton(IconData icon, String label) {
-    return InkWell(
-      onTap: () {
-        // TODO: Implement action
-      },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: Colors.white,
-            size: 20,
+    if (label == 'Seen') {
+      final hasRating = _userRating != null;
+      final ratingColor = hasRating ? _getRatingColor(_userRating!) : Colors.white;
+      final ratingIcon = hasRating ? _getRatingIcon(_userRating!) : icon;
+      
+      return InkWell(
+        onTap: () {
+          if (hasRating) {
+            _showReviewDialog();
+          } else {
+            _showRatingDialog();
+          }
+        },
+        child: SizedBox(
+          width: 60, // Sabit genişlik
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                ratingIcon,
+                color: ratingColor,
+                size: 20,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                hasRating ? _getRatingLabel(_userRating!) : label,
+                style: TextStyle(
+                  color: ratingColor,
+                  fontSize: 12,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: const TextStyle(
+        ),
+      );
+    }
+
+    return SizedBox(
+      width: 60, // Sabit genişlik
+      child: InkWell(
+        onTap: () {
+          // TODO: Implement other actions
+        },
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
               color: Colors.white,
-              fontSize: 12,
+              size: 20,
             ),
-          ),
-        ],
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1229,6 +1296,538 @@ class _GameDetailPageState extends State<GameDetailPage> {
           ],
         ),
       ),
+    );
+  }
+
+  void _showReviewDialog() {
+    final TextEditingController reviewController = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.8,
+              decoration: BoxDecoration(
+                color: Colors.grey[900],
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Stack(
+                children: [
+                  // Game Cover Image (blur)
+                  Positioned(
+                    top: -MediaQuery.of(context).size.height * 0.15,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      foregroundDecoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.4),
+                      ),
+                      child: ShaderMask(
+                        shaderCallback: (Rect bounds) {
+                          return LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.95),
+                              Colors.black,
+                            ],
+                            stops: const [0.3, 0.8, 1.0],
+                          ).createShader(bounds);
+                        },
+                        blendMode: BlendMode.darken,
+                        child: Image.network(
+                          _gameDetail!.coverUrl,
+                          height: MediaQuery.of(context).size.height * 0.9,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Content
+                  Column(
+                    children: [
+                      // Pull indicator
+                      Container(
+                        margin: const EdgeInsets.only(top: 12),
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+
+                      // Rating Info
+                      Container(
+                        margin: const EdgeInsets.only(top: 24),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _getRatingColor(_userRating!).withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _getRatingIcon(_userRating!),
+                              color: _getRatingColor(_userRating!),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _getRatingLabel(_userRating!),
+                              style: TextStyle(
+                                color: _getRatingColor(_userRating!),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+                      
+                      // Game Title
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Text(
+                          _gameDetail!.name,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 32),
+
+                      // Review Input
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Write your review',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Expanded(
+                                child: TextField(
+                                  controller: reviewController,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                  ),
+                                  maxLines: null,
+                                  decoration: InputDecoration(
+                                    hintText: 'Share your thoughts about the game...',
+                                    hintStyle: TextStyle(
+                                      color: Colors.grey[400],
+                                      fontSize: 16,
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(
+                                        color: Colors.grey[700]!,
+                                      ),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(
+                                        color: Colors.grey[700]!,
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(
+                                        color: _getRatingColor(_userRating!),
+                                      ),
+                                    ),
+                                    filled: true,
+                                    fillColor: Colors.black.withOpacity(0.3),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextButton(
+                                      onPressed: () => Navigator.of(context).pop(),
+                                      style: TextButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(vertical: 16),
+                                      ),
+                                      child: Text(
+                                        'Maybe Later',
+                                        style: TextStyle(
+                                          color: Colors.grey[400],
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: () {
+                                        // TODO: Submit review
+                                        Navigator.of(context).pop();
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: const Row(
+                                              children: [
+                                                Icon(
+                                                  FontAwesomeIcons.circleCheck,
+                                                  color: Colors.white,
+                                                  size: 16,
+                                                ),
+                                                SizedBox(width: 8),
+                                                Text('Review submitted!'),
+                                              ],
+                                            ),
+                                            backgroundColor: _getRatingColor(_userRating!),
+                                            behavior: SnackBarBehavior.floating,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            margin: const EdgeInsets.all(16),
+                                          ),
+                                        );
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: _getRatingColor(_userRating!),
+                                        padding: const EdgeInsets.symmetric(vertical: 16),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                      ),
+                                      child: const Text(
+                                        'Submit Review',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: MediaQuery.of(context).padding.bottom),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _getRatingLabel(int rating) {
+    switch (rating) {
+      case 1:
+        return 'Poor';
+      case 2:
+        return 'Fair';
+      case 3:
+        return 'Good';
+      case 4:
+        return 'Amazing';
+      default:
+        return '';
+    }
+  }
+
+  IconData _getRatingIcon(int rating) {
+    switch (rating) {
+      case 1:
+        return FontAwesomeIcons.faceFrown;
+      case 2:
+        return FontAwesomeIcons.faceMeh;
+      case 3:
+        return FontAwesomeIcons.faceSmile;
+      case 4:
+        return FontAwesomeIcons.faceGrinStars;
+      default:
+        return FontAwesomeIcons.question;
+    }
+  }
+
+  Color _getRatingColor(int rating) {
+    switch (rating) {
+      case 1:
+        return const Color(0xFFE57373); // Soft Red
+      case 2:
+        return const Color(0xFFFFB74D); // Soft Orange
+      case 3:
+        return const Color(0xFF81C784); // Soft Green
+      case 4:
+        return const Color(0xFF9575CD); // Soft Purple
+      default:
+        return Colors.grey[400]!;
+    }
+  }
+
+  String _getRatingActionText(int rating) {
+    switch (rating) {
+      case 1:
+        return 'Not My Type';
+      case 2:
+        return 'It Was Okay';
+      case 3:
+        return 'Really Enjoyed It';
+      case 4:
+        return 'Absolutely Loved It!';
+      default:
+        return 'Maybe Later';
+    }
+  }
+
+  void _showRatingDialog() {
+    int selectedRating = 0;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.6,
+              decoration: BoxDecoration(
+                color: Colors.grey[900],
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Stack(
+                children: [
+                  // Game Cover Image
+                  Positioned(
+                    top: -MediaQuery.of(context).size.height * 0.15,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      foregroundDecoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.4),
+                      ),
+                      child: ShaderMask(
+                        shaderCallback: (Rect bounds) {
+                          return LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.95),
+                              Colors.black,
+                            ],
+                            stops: const [0.3, 0.8, 1.0],
+                          ).createShader(bounds);
+                        },
+                        blendMode: BlendMode.darken,
+                        child: Image.network(
+                          _gameDetail!.coverUrl,
+                          height: MediaQuery.of(context).size.height * 0.9,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Content
+                  Column(
+                    children: [
+                      // Pull indicator
+                      Container(
+                        margin: const EdgeInsets.only(top: 12),
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+
+                      const Spacer(),
+
+                      // Rating Section
+                      Container(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.3),
+                              Colors.black.withOpacity(0.8),
+                            ],
+                            stops: const [0.0, 0.2, 1.0],
+                          ),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _gameDetail!.name,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            const Text(
+                              'How would you rate this game?',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 20),
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                final itemWidth = (constraints.maxWidth - 48) / 4;
+                                return Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                  children: List.generate(4, (index) {
+                                    final rating = index + 1;
+                                    final isSelected = selectedRating == rating;
+                                    final ratingColor = _getRatingColor(rating);
+                                    return GestureDetector(
+                                      onTap: () {
+                                        setState(() {
+                                          selectedRating = rating;
+                                        });
+                                        Future.delayed(const Duration(milliseconds: 300), () {
+                                          setState(() {
+                                            _userRating = selectedRating;
+                                          });
+                                          Navigator.of(context).pop();
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Row(
+                                                children: [
+                                                  Icon(
+                                                    FontAwesomeIcons.circleCheck,
+                                                    color: Colors.white,
+                                                    size: 16,
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Text('Rated ${_getRatingLabel(selectedRating)}!'),
+                                                ],
+                                              ),
+                                              backgroundColor: ratingColor,
+                                              behavior: SnackBarBehavior.floating,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(10),
+                                              ),
+                                              margin: const EdgeInsets.all(16),
+                                            ),
+                                          );
+                                        });
+                                      },
+                                      child: SizedBox(
+                                        width: itemWidth,
+                                        height: 90,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            color: isSelected 
+                                                ? ratingColor.withOpacity(0.15)
+                                                : Colors.black.withOpacity(0.3),
+                                            borderRadius: BorderRadius.circular(16),
+                                            border: Border.all(
+                                              color: ratingColor.withOpacity(isSelected ? 1 : 0.5),
+                                              width: 2,
+                                            ),
+                                          ),
+                                          child: Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                _getRatingIcon(rating),
+                                                color: isSelected 
+                                                    ? ratingColor
+                                                    : ratingColor.withOpacity(0.7),
+                                                size: 28,
+                                              ),
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                _getRatingLabel(rating),
+                                                style: TextStyle(
+                                                  color: isSelected 
+                                                      ? ratingColor
+                                                      : ratingColor.withOpacity(0.7),
+                                                  fontSize: 12,
+                                                  fontWeight: isSelected 
+                                                      ? FontWeight.bold
+                                                      : FontWeight.normal,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }),
+                                );
+                              }
+                            ),
+                            const SizedBox(height: 20),
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
+                              child: Text(
+                                'Not Now',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.7),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: MediaQuery.of(context).padding.bottom),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

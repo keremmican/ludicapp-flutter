@@ -22,19 +22,13 @@ class GameSection extends StatelessWidget {
           // Section Title
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Icon(Icons.arrow_forward, color: Colors.white),
-              ],
+            child: Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
           const SizedBox(height: 10),
@@ -48,17 +42,11 @@ class GameSection extends StatelessWidget {
               itemBuilder: (context, index) {
                 final game = games[index];
                 return GestureDetector(
-                  onTap: () => onGameTap(game), // Handle card tap
+                  onTap: () => onGameTap(game),
                   child: Container(
                     margin: const EdgeInsets.symmetric(horizontal: 10.0),
                     width: 120,
                     decoration: BoxDecoration(
-                      image: DecorationImage(
-                        image: game['image']!.startsWith('http') // Eğer URL ağ bağlantısıysa
-                            ? NetworkImage(game['image']!) as ImageProvider
-                            : AssetImage(game['image']!), // Yerel bir dosya ise
-                        fit: BoxFit.cover,
-                      ),
                       borderRadius: BorderRadius.circular(10),
                       boxShadow: [
                         BoxShadow(
@@ -67,6 +55,25 @@ class GameSection extends StatelessWidget {
                           offset: const Offset(0, 5),
                         ),
                       ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: game['image']!.startsWith('http')
+                          ? Image.network(
+                              game['image']!,
+                              fit: BoxFit.cover,
+                              gaplessPlayback: true,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: Colors.grey[900],
+                                  child: const Icon(Icons.error, color: Colors.white),
+                                );
+                              },
+                            )
+                          : Image.asset(
+                              game['image']!,
+                              fit: BoxFit.cover,
+                            ),
                     ),
                   ),
                 );

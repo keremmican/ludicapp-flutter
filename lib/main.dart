@@ -4,6 +4,7 @@ import 'package:ludicapp/features/authentication/presentation/login_verification
 import 'package:ludicapp/features/authentication/presentation/register_page.dart';
 import 'package:ludicapp/features/authentication/presentation/verification_page.dart';
 import 'package:ludicapp/features/onboarding/presentation/onboarding_page.dart';
+import 'package:ludicapp/features/splash/presentation/splash_screen.dart';
 import 'package:ludicapp/main_layout.dart';
 import 'package:ludicapp/theme/app_theme.dart';
 
@@ -13,6 +14,12 @@ void main() {
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
+
+  // Mock login kontrolü - şimdilik her zaman true dönüyor
+  Future<bool> _checkIfLoggedIn() async {
+    await Future.delayed(const Duration(milliseconds: 500)); // Gerçekçi olması için kısa bir delay
+    return true; // Her zaman login olmuş gibi davran
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,13 +36,30 @@ class MyApp extends StatelessWidget {
           child: child ?? const SizedBox(),
         );
       },
-      initialRoute: '/login',
+      home: FutureBuilder<bool>(
+        future: _checkIfLoggedIn(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              backgroundColor: Colors.black,
+              body: Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+            );
+          }
+
+          return const SplashScreen(); // Her zaman splash screen'e git
+        },
+      ),
       routes: {
         '/login': (context) => const LoginPage(),
         '/register': (context) => const RegisterPage(),
         '/main': (context) => const MainLayout(),
         '/onboarding': (context) => const OnboardingPage(),
         '/login_verification': (context) => const LoginVerificationPage(),
+        '/splash': (context) => const SplashScreen(),
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/verification') {

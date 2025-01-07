@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 class MainPageGame extends StatelessWidget {
-  final Map<String, String> game; // Pass game data
-  final VoidCallback onTap; // Callback for click action
+  final Map<String, String> game;
+  final VoidCallback onTap;
 
   const MainPageGame({
     Key? key,
@@ -13,25 +13,41 @@ class MainPageGame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap, // Handle tap on the card
+      onTap: onTap,
       child: Card(
         elevation: 4,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20), // Same roundness as SwipeCard
+          borderRadius: BorderRadius.circular(20),
         ),
         child: Container(
-          height: MediaQuery.of(context).size.height * 0.6, // Adjusted height to 60%
-          decoration: BoxDecoration(
-  image: DecorationImage(
-    image: game['image']!.startsWith('http') // Eğer URL bir ağ bağlantısıysa
-        ? NetworkImage(game['image']!) as ImageProvider
-        : AssetImage(game['image']!), // Eğer URL değilse yerel dosya
-    fit: BoxFit.cover,
-  ),
-  borderRadius: BorderRadius.circular(20),
-),
+          height: MediaQuery.of(context).size.height * 0.6,
           child: Stack(
             children: [
+              // Game Image
+              ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: double.infinity,
+                  child: game['image']!.startsWith('http')
+                      ? Image.network(
+                          game['image']!,
+                          fit: BoxFit.cover,
+                          gaplessPlayback: true,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              color: Colors.grey[900],
+                              child: const Icon(Icons.error, color: Colors.white),
+                            );
+                          },
+                        )
+                      : Image.asset(
+                          game['image']!,
+                          fit: BoxFit.cover,
+                        ),
+                ),
+              ),
+
               // Bottom section with game details
               Positioned(
                 bottom: 0,
@@ -57,7 +73,6 @@ class MainPageGame extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      // Game Name
                       Text(
                         game['name']!,
                         style: const TextStyle(
@@ -68,7 +83,6 @@ class MainPageGame extends StatelessWidget {
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 5),
-                      // Genre and Release Year
                       Text(
                         '${game['genre']} • ${game['releaseYear']}',
                         style: const TextStyle(
