@@ -8,6 +8,8 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:ludicapp/theme/app_theme.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
+import 'package:ludicapp/core/widgets/rating_modal.dart';
+import 'package:ludicapp/features/profile/presentation/related_games_page.dart';
 
 
 class GameDetailPage extends StatefulWidget {
@@ -271,7 +273,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
                               },
                               blendMode: BlendMode.darken,
                               child: Image.network(
-                                _gameDetail!.coverUrl,
+                                _gameDetail!.coverUrl ?? '',
                                 height: MediaQuery.of(context).size.height * 0.9,
                                 width: double.infinity,
                                 fit: BoxFit.cover,
@@ -306,7 +308,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(8),
                               child: Image.network(
-                                _gameDetail!.coverUrl,
+                                _gameDetail!.coverUrl ?? '',
                                 fit: BoxFit.cover,
                                 errorBuilder: (context, error, stackTrace) {
                                   return Container(
@@ -348,6 +350,16 @@ class _GameDetailPageState extends State<GameDetailPage> {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         const SizedBox(height: 4),
+                        Text(
+                          _gameDetail!.name,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
@@ -361,25 +373,6 @@ class _GameDetailPageState extends State<GameDetailPage> {
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                             ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _gameDetail!.name,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '${_gameDetail!.genre} • ${_gameDetail!.releaseFullDate}',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.grey,
-                            fontSize: 16,
                           ),
                         ),
                       ],
@@ -668,8 +661,50 @@ class _GameDetailPageState extends State<GameDetailPage> {
                         const SizedBox(height: 16),
                         _buildDetailRow('Platforms', _gameDetail!.platforms.join(', ')),
                         const SizedBox(height: 12),
-                        _buildDetailRow('Genre', _gameDetail!.genre),
-                        const SizedBox(height: 12),
+                        if (_gameDetail!.genres.isNotEmpty) ...[
+                          const Text(
+                            'Genres',
+                            style: TextStyle(
+                              color: Colors.grey,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _gameDetail!.genres.map((genre) => 
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => RelatedGamesPage(
+                                        categoryTitle: genre,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[800],
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    genre,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ).toList(),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
                         _buildDetailRow('Release Date', _gameDetail!.releaseFullDate),
                         const SizedBox(height: 12),
                         _buildDetailRow(
@@ -758,20 +793,32 @@ class _GameDetailPageState extends State<GameDetailPage> {
                             spacing: 8,
                             runSpacing: 8,
                             children: _gameDetail!.themes.map((theme) => 
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[800],
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  theme,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 14,
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => RelatedGamesPage(
+                                        categoryTitle: theme,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[800],
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    theme,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -1340,7 +1387,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
                         },
                         blendMode: BlendMode.darken,
                         child: Image.network(
-                          _gameDetail!.coverUrl,
+                          _gameDetail!.coverUrl ?? '',
                           height: MediaQuery.of(context).size.height * 0.9,
                           width: double.infinity,
                           fit: BoxFit.cover,
@@ -1608,225 +1655,16 @@ class _GameDetailPageState extends State<GameDetailPage> {
   }
 
   void _showRatingDialog() {
-    int selectedRating = 0;
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return Container(
-              height: MediaQuery.of(context).size.height * 0.6,
-              decoration: BoxDecoration(
-                color: Colors.grey[900],
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: Stack(
-                children: [
-                  // Game Cover Image
-                  Positioned(
-                    top: -MediaQuery.of(context).size.height * 0.15,
-                    left: 0,
-                    right: 0,
-                    child: Container(
-                      foregroundDecoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.4),
-                      ),
-                      child: ShaderMask(
-                        shaderCallback: (Rect bounds) {
-                          return LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.transparent,
-                              Colors.black.withOpacity(0.95),
-                              Colors.black,
-                            ],
-                            stops: const [0.3, 0.8, 1.0],
-                          ).createShader(bounds);
-                        },
-                        blendMode: BlendMode.darken,
-                        child: Image.network(
-                          _gameDetail!.coverUrl,
-                          height: MediaQuery.of(context).size.height * 0.9,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Content
-                  Column(
-                    children: [
-                      // Pull indicator
-                      Container(
-                        margin: const EdgeInsets.only(top: 12),
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.3),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-
-                      const Spacer(),
-
-                      // Rating Section
-                      Container(
-                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.transparent,
-                              Colors.black.withOpacity(0.3),
-                              Colors.black.withOpacity(0.8),
-                            ],
-                            stops: const [0.0, 0.2, 1.0],
-                          ),
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _gameDetail!.name,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            const Text(
-                              'How would you rate this game?',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 20),
-                            LayoutBuilder(
-                              builder: (context, constraints) {
-                                final itemWidth = (constraints.maxWidth - 48) / 4;
-                                return Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                  children: List.generate(4, (index) {
-                                    final rating = index + 1;
-                                    final isSelected = selectedRating == rating;
-                                    final ratingColor = _getRatingColor(rating);
-                                    return GestureDetector(
-                                      onTap: () {
-                                        setState(() {
-                                          selectedRating = rating;
-                                        });
-                                        Future.delayed(const Duration(milliseconds: 300), () {
-                                          setState(() {
-                                            _userRating = selectedRating;
-                                          });
-                                          Navigator.of(context).pop();
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(
-                                              content: Row(
-                                                children: [
-                                                  Icon(
-                                                    FontAwesomeIcons.circleCheck,
-                                                    color: Colors.white,
-                                                    size: 16,
-                                                  ),
-                                                  const SizedBox(width: 8),
-                                                  Text('Rated ${_getRatingLabel(selectedRating)}!'),
-                                                ],
-                                              ),
-                                              backgroundColor: ratingColor,
-                                              behavior: SnackBarBehavior.floating,
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius: BorderRadius.circular(10),
-                                              ),
-                                              margin: const EdgeInsets.all(16),
-                                            ),
-                                          );
-                                        });
-                                      },
-                                      child: SizedBox(
-                                        width: itemWidth,
-                                        height: 90,
-                                        child: Container(
-                                          padding: const EdgeInsets.all(12),
-                                          decoration: BoxDecoration(
-                                            color: isSelected 
-                                                ? ratingColor.withOpacity(0.15)
-                                                : Colors.black.withOpacity(0.3),
-                                            borderRadius: BorderRadius.circular(16),
-                                            border: Border.all(
-                                              color: ratingColor.withOpacity(isSelected ? 1 : 0.5),
-                                              width: 2,
-                                            ),
-                                          ),
-                                          child: Column(
-                                            mainAxisAlignment: MainAxisAlignment.center,
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(
-                                                _getRatingIcon(rating),
-                                                color: isSelected 
-                                                    ? ratingColor
-                                                    : ratingColor.withOpacity(0.7),
-                                                size: 28,
-                                              ),
-                                              const SizedBox(height: 8),
-                                              Text(
-                                                _getRatingLabel(rating),
-                                                style: TextStyle(
-                                                  color: isSelected 
-                                                      ? ratingColor
-                                                      : ratingColor.withOpacity(0.7),
-                                                  fontSize: 12,
-                                                  fontWeight: isSelected 
-                                                      ? FontWeight.bold
-                                                      : FontWeight.normal,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  }),
-                                );
-                              }
-                            ),
-                            const SizedBox(height: 20),
-                            TextButton(
-                              onPressed: () => Navigator.of(context).pop(),
-                              style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                              ),
-                              child: Text(
-                                'Not Now',
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.7),
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                            SizedBox(height: MediaQuery.of(context).padding.bottom),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          },
-        );
+    RatingModal.show(
+      context,
+      gameName: _gameDetail!.name,
+      coverUrl: _gameDetail!.coverUrl ?? '',
+      releaseYear: _gameDetail!.releaseFullDate,
+      initialRating: _userRating,
+      onRatingSelected: (rating) {
+        setState(() {
+          _userRating = rating;
+        });
       },
     );
   }

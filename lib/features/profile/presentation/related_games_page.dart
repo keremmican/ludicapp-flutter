@@ -3,6 +3,7 @@ import 'package:ludicapp/features/game/presentation/game_detail_page.dart';
 import 'package:ludicapp/services/repository/game_repository.dart';
 import 'package:ludicapp/services/model/response/game_summary.dart';
 import 'package:ludicapp/services/model/response/top_games_cover.dart';
+import 'package:ludicapp/core/widgets/rating_modal.dart';
 
 enum SortOption {
   topRated,
@@ -22,12 +23,14 @@ class RelatedGamesPage extends StatefulWidget {
 class _RelatedGamesPageState extends State<RelatedGamesPage> {
   final GameRepository _gameRepository = GameRepository();
   List<dynamic> games = [];
+  Set<int> savedGames = {};
   bool _isLoading = false;
   bool _hasMore = true;
   int _currentPage = 0;
   static const int _pageSize = 20;
   final ScrollController _scrollController = ScrollController();
   SortOption _currentSort = SortOption.topRated;
+  int? _userRating;
 
   @override
   void initState() {
@@ -93,6 +96,16 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
       else if (widget.categoryTitle == 'Top Rated') {
         print('Fetching top rated games - Page: $_currentPage');
         final response = await _gameRepository.fetchTopRatedGames(
+          page: _currentPage,
+          size: _pageSize,
+        );
+
+        if (!mounted) return;
+        handleResponse(response);
+      }
+      else if (widget.categoryTitle == 'Coming Soon') {
+        print('Fetching coming soon games - Page: $_currentPage');
+        final response = await _gameRepository.fetchComingSoon(
           page: _currentPage,
           size: _pageSize,
         );
@@ -373,12 +386,12 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
                   backgroundColor: Colors.grey[900],
                   child: GridView.builder(
                     controller: _scrollController,
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
                       crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      childAspectRatio: 0.53,
+                      mainAxisSpacing: 16,
+                      childAspectRatio: 0.51,
                     ),
                     itemCount: games.length + (_hasMore ? 1 : 0),
                     itemBuilder: (context, index) {
@@ -400,13 +413,9 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
     );
   }
 
-  Widget _buildGameCard(dynamic game) {
-    final String imageUrl = game.coverUrl;
-    final String name = game is GameSummary ? game.name : 'Top Rated Game';
-    final String score = game is GameSummary ? (game.releaseYear % 100).toString() : '85';
-    final int scoreNum = int.parse(score);
-    final scoreColor = scoreNum >= 70 ? const Color(0xFF2ECC71) : Colors.grey;
-
+  Widget _buildGameCard(GameSummary game) {
+    final bool isSaved = savedGames.contains(game.id);
+    
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -418,109 +427,119 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
       },
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Game Image
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                color: Colors.grey[900],
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.network(
-                    imageUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        color: Colors.grey[800],
-                        child: const Icon(
-                          Icons.videogame_asset,
-                          color: Colors.white54,
-                          size: 50,
-                        ),
-                      );
-                    },
+          // Game Cover Image with Container
+          Stack(
+            children: [
+              AspectRatio(
+                aspectRatio: 2 / 3,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.grey[900],
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  // Score Badge
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: scoreColor,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        score,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.network(
+                      game.coverUrl ?? '',
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: Colors.grey[800],
+                          child: const Icon(Icons.error, color: Colors.white),
+                        );
+                      },
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
+              if (isSaved)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.favorite,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 8),
-          // Game Title
-          Text(
-            name,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 8),
-          // Action Buttons
+          // Game Title and Rating Row
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _buildActionButton(
-                icon: Icons.visibility_off,
-                onTap: () => _showHideConfirmation(game),
+              Expanded(
+                child: Text(
+                  game.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              _buildActionButton(
-                icon: Icons.check,
-                onTap: () => _showRatingDialog(game),
-              ),
-              _buildActionButton(
-                icon: Icons.favorite_border,
-                onTap: () => _saveGame(game),
+              const SizedBox(width: 8),
+              Text(
+                game.rating?.toStringAsFixed(0) ?? '--',
+                style: TextStyle(
+                  color: Colors.green[400],
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ],
           ),
+          if (!isSaved) ...[
+            const SizedBox(height: 4),
+            // Action Buttons
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  onPressed: () => _showHideConfirmation(game),
+                  icon: const Icon(
+                    Icons.thumb_down_outlined,
+                    color: Colors.white70,
+                    size: 24,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+                IconButton(
+                  onPressed: () => _showRatingDialog(game),
+                  icon: const Icon(
+                    Icons.check_outlined,
+                    color: Colors.white70,
+                    size: 24,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+                IconButton(
+                  onPressed: () => _handleSaveGame(game),
+                  icon: const Icon(
+                    Icons.favorite_border_outlined,
+                    color: Colors.white70,
+                    size: 24,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+          ],
         ],
-      ),
-    );
-  }
-
-  Widget _buildActionButton({
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Colors.grey[900],
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(
-          icon,
-          color: Colors.white,
-          size: 20,
-        ),
       ),
     );
   }
@@ -559,196 +578,62 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
     }
   }
 
-  Future<void> _showRatingDialog(dynamic game) async {
-    await showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height,
-        decoration: const BoxDecoration(
-          color: Color(0xFF1C1C1E),
-        ),
-        child: Stack(
-          children: [
-            // Main Content
-            Column(
-              children: [
-                const SizedBox(height: 60),
-                const Text(
-                  "I've Seen This",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                // Game Cover Image
-                Container(
-                  height: MediaQuery.of(context).size.height * 0.5,
-                  margin: const EdgeInsets.symmetric(horizontal: 20),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    image: DecorationImage(
-                      image: NetworkImage(game.coverUrl),
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                // Game Title
-                Text(
-                  game is GameSummary ? game.name : 'Rate this game',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                // Release Year
-                Text(
-                  "(${game is GameSummary ? game.releaseYear : '2024'})",
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 16,
-                  ),
-                ),
-                const Spacer(),
-                // Rating Options
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildRatingOption('Awful', const Color(0xFF8E8E93), 0.8),
-                      _buildRatingOption('Meh', const Color(0xFFAEA79F), 1.0),
-                      _buildRatingOption('Good', const Color(0xFFFFA500), 1.2),
-                      _buildRatingOption('Amazing', const Color(0xFFFF6B00), 0.8),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 40),
-                // Haven't Seen Button
-                Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  child: TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      backgroundColor: const Color(0xFF2C2C2E),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text(
-                      "Haven't Seen",
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 40),
-              ],
-            ),
-            // Close Button
-            Positioned(
-              top: 20,
-              right: 20,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white, size: 28),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ),
-          ],
-        ),
-      ),
+  void _showRatingDialog(dynamic game) {
+    RatingModal.show(
+      context,
+      gameName: game is GameSummary ? game.name : 'Rate this game',
+      coverUrl: game.coverUrl,
+      releaseYear: game is GameSummary ? game.releaseDate : null,
+      initialRating: _userRating,
+      onRatingSelected: (rating) {
+        setState(() {
+          _userRating = rating;
+        });
+      },
     );
-  }
-
-  Widget _buildRatingOption(String label, Color color, double scale) {
-    final baseSize = 60.0;
-    final size = baseSize * scale;
-    
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: color.withOpacity(0.3),
-                blurRadius: 8,
-                spreadRadius: 2,
-              ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {
-                // TODO: Implement rating functionality
-                Navigator.pop(context);
-              },
-              borderRadius: BorderRadius.circular(size / 2),
-              child: Center(
-                child: Icon(
-                  _getRatingIcon(label),
-                  color: Colors.white,
-                  size: size * 0.5,
-                ),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
-    );
-  }
-
-  IconData _getRatingIcon(String label) {
-    switch (label) {
-      case 'Amazing':
-        return Icons.star_rounded;
-      case 'Good':
-        return Icons.thumb_up_rounded;
-      case 'Meh':
-        return Icons.thumbs_up_down_rounded;
-      case 'Awful':
-        return Icons.thumb_down_rounded;
-      default:
-        return Icons.star_rounded;
-    }
   }
 
   Future<void> _saveGame(dynamic game) async {
     // TODO: Implement save functionality with backend
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Added ${game is GameSummary ? game.name : 'game'} to your saved list',
-          style: const TextStyle(color: Colors.white),
-        ),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 2),
+  }
+
+  void _showSavedNotification() {
+    showDialog(
+      context: context,
+      barrierColor: Colors.transparent,
+      builder: (context) => TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0.0, end: 1.0),
+        duration: const Duration(milliseconds: 300),
+        builder: (context, value, child) {
+          return Opacity(
+            opacity: value,
+            child: Dialog(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              child: Icon(
+                Icons.favorite,
+                color: Colors.red[400],
+                size: 64,
+              ),
+            ),
+          );
+        },
       ),
     );
+
+    // Automatically dismiss after 1 second
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (context.mounted) {
+        Navigator.of(context).pop();
+      }
+    });
+  }
+
+  Future<void> _handleSaveGame(GameSummary game) async {
+    await _saveGame(game);
+    setState(() {
+      savedGames.add(game.id);
+    });
+    _showSavedNotification();
   }
 }

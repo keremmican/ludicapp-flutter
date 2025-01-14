@@ -10,6 +10,9 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   final GameRepository _gameRepository = GameRepository();
+  bool _isLoading = false;
+  ImageProvider? _backgroundImage;
+  ImageProvider? _logoImage;
 
   @override
   void initState() {
@@ -32,13 +35,13 @@ class _SplashScreenState extends State<SplashScreen> {
       final priorityImages = [
         ...newReleasesResponse.content.take(4).map((game) => game.coverUrl),
         ...topRatedResponse.content.take(4).map((game) => game.coverUrl),
-      ];
+      ].where((url) => url != null).cast<String>();
 
       print('Starting to preload ${priorityImages.length} priority images');
 
       // Öncelikli resimleri yükle
       for (final imageUrl in priorityImages) {
-        if (imageUrl.startsWith('http')) {
+        if (imageUrl?.startsWith('http') ?? false) {
           try {
             final imageProvider = NetworkImage(imageUrl);
             await precacheImage(imageProvider, context);
@@ -54,21 +57,16 @@ class _SplashScreenState extends State<SplashScreen> {
       // Kısa bir bekleme ekleyelim ki kullanıcı logo'yu görebilsin
       await Future.delayed(const Duration(seconds: 1));
 
-      // Ana sayfaya git
-      if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/main');
-      }
-
       // Geri kalan resimleri arka planda yükle
       final remainingImages = [
         ...newReleasesResponse.content.skip(4).map((game) => game.coverUrl),
         ...topRatedResponse.content.skip(4).map((game) => game.coverUrl),
-      ];
+      ].where((url) => url != null).cast<String>();
 
       print('Starting to preload ${remainingImages.length} remaining images in background');
 
       for (final imageUrl in remainingImages) {
-        if (imageUrl.startsWith('http')) {
+        if (imageUrl?.startsWith('http') ?? false) {
           try {
             final imageProvider = NetworkImage(imageUrl);
             precacheImage(imageProvider, context); // await kullanmıyoruz
@@ -78,6 +76,11 @@ class _SplashScreenState extends State<SplashScreen> {
           }
         }
       }
+
+      // Ana sayfaya git
+      if (mounted) {
+        Navigator.of(context).pushReplacementNamed('/main');
+      }
     } catch (e) {
       print('Error during data loading: $e');
       // Even if there's an error, continue to main layout after a short delay
@@ -85,6 +88,62 @@ class _SplashScreenState extends State<SplashScreen> {
       if (mounted) {
         Navigator.of(context).pushReplacementNamed('/main');
       }
+    }
+  }
+
+  Future<void> _loadBackgroundImage() async {
+    try {
+      final response = await _gameRepository.fetchNewReleases();
+      if (response.content.isNotEmpty) {
+        final game = response.content.first;
+        final coverUrl = game.coverUrl;
+        
+        if (coverUrl?.startsWith('http') ?? false) {
+          setState(() {
+            _isLoading = true;
+          });
+          
+          final imageProvider = NetworkImage(coverUrl!);
+          await precacheImage(imageProvider, context);
+          
+          if (mounted) {
+            setState(() {
+              _backgroundImage = imageProvider;
+              _isLoading = false;
+            });
+          }
+        }
+      }
+    } catch (error) {
+      print('Error loading background image: $error');
+    }
+  }
+
+  Future<void> _loadLogo() async {
+    try {
+      final response = await _gameRepository.fetchTopRatedGames();
+      if (response.content.isNotEmpty) {
+        final game = response.content.first;
+        final coverUrl = game.coverUrl;
+        
+        if (coverUrl?.startsWith('http') ?? false) {
+          setState(() {
+            _isLoading = true;
+          });
+          
+          final imageProvider = NetworkImage(coverUrl!);
+          await precacheImage(imageProvider, context);
+          
+          if (mounted) {
+            setState(() {
+              _logoImage = imageProvider;
+              _isLoading = false;
+            });
+          }
+        }
+      }
+    } catch (error) {
+      print('Error loading logo image: $error');
     }
   }
 

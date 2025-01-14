@@ -84,7 +84,7 @@ class MainPageGame extends StatelessWidget {
                       ),
                       const SizedBox(height: 5),
                       Text(
-                        '${game['genre']} • ${game['releaseYear']}',
+                        game['releaseYear']!,
                         style: const TextStyle(
                           color: Colors.white70,
                           fontSize: 16,

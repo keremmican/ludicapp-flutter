@@ -1,10 +1,11 @@
 import 'package:dio/dio.dart';
+import 'package:ludicapp/core/config/environment_config.dart';
 
 class ApiService {
   final Dio _dio = Dio(BaseOptions(
-    baseUrl: "http://10.0.2.2:8081/", // Backend'inizin base URL'si
-    connectTimeout: const Duration(seconds: 5), // 5 saniye
-    receiveTimeout: const Duration(seconds: 3), // 3 saniye
+    baseUrl: EnvironmentConfig.baseUrl,
+    connectTimeout: const Duration(seconds: 5),
+    receiveTimeout: const Duration(seconds: 3),
   ));
 
   ApiService() {

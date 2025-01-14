@@ -3,7 +3,6 @@ import 'package:ludicapp/core/widgets/game_section.dart';
 import 'package:ludicapp/features/home/presentation/widgets/main_page_game.dart';
 import 'package:ludicapp/features/game/presentation/game_detail_page.dart';
 import 'package:ludicapp/services/model/response/game_summary.dart';
-import 'package:ludicapp/services/model/response/top_games_cover.dart';
 import 'package:ludicapp/services/repository/game_repository.dart';
 
 class HomePage extends StatefulWidget {
@@ -16,7 +15,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final GameRepository _gameRepository = GameRepository();
   List<GameSummary> _newReleases = [];
-  List<TopRatedGamesCover> _topRatedGames = [];
+  List<GameSummary> _topRatedGames = [];
   GameSummary? _randomGame;
 
   @override
@@ -55,9 +54,9 @@ class _HomePageState extends State<HomePage> {
             GameSection(
               title: 'New Releases',
               games: _newReleases.skip(1).map((game) => {
-                'image': game.coverUrl,
+                'image': game.coverUrl ?? '',
                 'id': game.id.toString(),
-              }).toList(),
+              }).toList().cast<Map<String, String>>(),
               onGameTap: (game) {
                 final selectedGame = _newReleases.firstWhere(
                   (g) => g.coverUrl == game['image'],
@@ -65,8 +64,8 @@ class _HomePageState extends State<HomePage> {
                     id: 0,
                     coverUrl: '',
                     name: 'Unknown',
-                    genre: '',
-                    releaseYear: 0,
+                    rating: 0,
+                    releaseDate: '',
                   ),
                 );
                 if (selectedGame != null) {
@@ -85,13 +84,19 @@ class _HomePageState extends State<HomePage> {
             GameSection(
               title: 'Top Rated',
               games: _topRatedGames.map((game) => {
-                'image': game.coverUrl,
+                'image': game.coverUrl ?? '',
                 'id': game.id.toString(),
-              }).toList(),
+              }).toList().cast<Map<String, String>>(),
               onGameTap: (game) {
                 final selectedGame = _topRatedGames.firstWhere(
                   (g) => g.coverUrl == game['image'],
-                  orElse: () => TopRatedGamesCover(id: 0, coverUrl: ''),
+                  orElse: () => GameSummary(
+                    id: 0,
+                    coverUrl: '',
+                    name: 'Unknown',
+                    rating: 0,
+                    releaseDate: '',
+                  ),
                 );
                 if (selectedGame != null) {
                   Navigator.push(
@@ -113,14 +118,10 @@ class _HomePageState extends State<HomePage> {
       padding: const EdgeInsets.all(15.0),
       child: MainPageGame(
         game: {
-          'image': game.coverUrl,
+          'image': game.coverUrl ?? '',
           'name': game.name,
-          'genre': game.genre,
-          'releaseYear': game.releaseYear.toString(),
-          'developer': 'Unknown',
-          'publisher': 'Unknown',
-          'metacritic': 'N/A',
-          'imdb': 'N/A',
+          'releaseYear': game.releaseDate ?? 'TBA',
+          'rating': game.rating?.toString() ?? 'N/A',
         },
         onTap: () {
           Navigator.push(

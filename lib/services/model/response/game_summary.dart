@@ -1,25 +1,25 @@
 class GameSummary {
   final int id;
-  final String coverUrl;
+  final String? coverUrl;
   final String name;
-  final String genre;
-  final int releaseYear;
+  final double? rating;
+  final String? releaseDate;
 
   GameSummary({
     required this.id,
-    required this.coverUrl,
+    this.coverUrl,
     required this.name,
-    required this.genre,
-    required this.releaseYear,
+    this.rating,
+    this.releaseDate,
   });
 
   factory GameSummary.fromJson(Map<String, dynamic> json) {
     return GameSummary(
       id: json['id'] as int,
-      coverUrl: json['coverUrl'] as String,
+      coverUrl: json['coverUrl'] as String?,
       name: json['name'] as String,
-      genre: json['genre'] as String,
-      releaseYear: json['releaseYear'] as int,
+      rating: json['rating'] != null ? (json['rating'] as num).toDouble() : null,
+      releaseDate: json['releaseDate'] as String?,
     );
   }
 
@@ -28,8 +28,8 @@ class GameSummary {
       'id': id,
       'coverUrl': coverUrl,
       'name': name,
-      'genre': genre,
-      'releaseYear': releaseYear,
+      'rating': rating,
+      'releaseDate': releaseDate,
     };
   }
 }
@@ -59,7 +59,7 @@ class PageableResponse<T> {
     Map<String, dynamic> json,
     T Function(Map<String, dynamic>) fromJsonT,
   ) {
-    final contentList = (json['content'] as List).last as List;
+    final contentList = json['content'] as List;
     
     return PageableResponse(
       content: contentList

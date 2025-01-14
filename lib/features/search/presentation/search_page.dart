@@ -34,11 +34,7 @@ class _SearchPageState extends State<SearchPage> {
     'Most Played',
     'Trending',
     'Coming Soon',
-    'Free to Play',
-    'Special Offers',
-    'Award Winners',
-    'Hidden Gems',
-    'Early Access',
+    'Free to Play'
   ];
 
   static const List<String> genres = [

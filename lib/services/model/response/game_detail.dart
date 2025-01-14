@@ -1,11 +1,11 @@
 class GameDetail {
   final int id;
-  final String coverUrl;
+  final String? coverUrl;
   final String name;
   final String slug;
-  final String genre;
+  final List<String> genres;
   final String releaseFullDate;
-  final String gameVideo;
+  final String? gameVideo;
   final String summary;
   final List<String> screenshots;
   final Map<String, String> websites;
@@ -20,12 +20,12 @@ class GameDetail {
 
   GameDetail({
     required this.id,
-    required this.coverUrl,
+    this.coverUrl,
     required this.name,
     required this.slug,
-    required this.genre,
+    required this.genres,
     required this.releaseFullDate,
-    required this.gameVideo,
+    this.gameVideo,
     required this.summary,
     required this.screenshots,
     required this.websites,
@@ -40,30 +40,24 @@ class GameDetail {
   });
 
   factory GameDetail.fromJson(Map<String, dynamic> json) {
-    // İç içe listeleri parse et
-    final screenshotsList = (json['screenshots'] as List).last as List;
-    final platformsList = (json['platforms'] as List).last as List;
-    final companiesList = (json['companies'] as List).last as List;
-    final themesList = (json['themes'] as List).last as List;
-    
     return GameDetail(
       id: json['id'] as int,
-      coverUrl: json['coverUrl'] as String,
+      coverUrl: json['coverUrl'] as String?,
       name: json['name'] as String,
       slug: json['slug'] as String,
-      genre: json['genre'] as String,
+      genres: List<String>.from(json['genres'] as List),
       releaseFullDate: json['releaseFullDate'] as String,
-      gameVideo: json['gameVideo'] as String,
+      gameVideo: json['gameVideo'] as String?,
       summary: json['summary'] as String,
-      screenshots: List<String>.from(screenshotsList),
-      websites: Map<String, String>.from(json['websites'] as Map)..remove('@class'),
+      screenshots: List<String>.from(json['screenshots'] as List),
+      websites: Map<String, String>.from(json['websites'] as Map),
       hastilyGameTime: json['hastilyGameTime'] as int?,
       normallyGameTime: json['normallyGameTime'] as int?,
       completelyGameTime: json['completelyGameTime'] as int?,
-      platforms: List<String>.from(platformsList),
-      companies: List<String>.from(companiesList),
-      themes: List<String>.from(themesList),
-      totalRatingScore: json['totalRatingScore'] as double?,
+      platforms: List<String>.from(json['platforms'] as List),
+      companies: List<String>.from(json['companies'] as List),
+      themes: List<String>.from(json['themes'] as List),
+      totalRatingScore: json['totalRatingScore'] != null ? (json['totalRatingScore'] as num).toDouble() : null,
       ageRating: json['ageRating'] as String?,
     );
   }
@@ -74,7 +68,7 @@ class GameDetail {
       'coverUrl': coverUrl,
       'name': name,
       'slug': slug,
-      'genre': genre,
+      'genres': genres,
       'releaseFullDate': releaseFullDate,
       'gameVideo': gameVideo,
       'summary': summary,
