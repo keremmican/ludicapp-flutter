@@ -40,8 +40,8 @@ class MyApp extends StatelessWidget {
         future: _checkIfLoggedIn(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Scaffold(
-              backgroundColor: Colors.black,
+            return Scaffold(
+              backgroundColor: AppTheme.primaryDark,
               body: Center(
                 child: CircularProgressIndicator(
                   valueColor: AlwaysStoppedAnimation<Color>(Colors.white),

@@ -4,6 +4,9 @@ import 'package:ludicapp/features/game/presentation/game_detail_page.dart';
 import 'package:ludicapp/features/recommendations/presentation/swipe_card.dart';
 import 'package:scrumlab_flutter_tindercard/scrumlab_flutter_tindercard.dart';
 import 'package:palette_generator/palette_generator.dart';
+import 'package:ludicapp/services/model/response/game_summary.dart';
+import 'package:ludicapp/core/models/game.dart';
+
 
 class RecommendationPage extends StatefulWidget {
   const RecommendationPage({super.key});
@@ -206,7 +209,21 @@ class _RecommendationPageState extends State<RecommendationPage> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => GameDetailPage(id: 0,),
+                        builder: (context) => GameDetailPage(
+                          game: Game.fromGameSummary(GameSummary(
+                            id: 0,
+                            name: 'Unknown',
+                            slug: 'unknown',
+                            coverUrl: '',
+                            totalRating: 0,
+                            releaseDate: '',
+                            genres: [],
+                            themes: [],
+                            platforms: [],
+                            companies: [],
+                            screenshots: [],
+                          )),
+                        ),
                       ),
                     );
                   },

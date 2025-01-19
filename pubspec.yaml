@@ -65,11 +65,11 @@ dev_dependencies:
 flutter_icons:
   android: true
   ios: true
-  image_path: "lib/assets/images/app_logo_2_black.png" # Path to your app logo
+  image_path: "lib/assets/images/app_logo_2.png" # Path to your app logo
 
 flutter_native_splash:
   color: "#000000" # Pure black background
-  image: "lib/assets/images/app_logo_2_black.png" # Path to your app logo
+  image: "lib/assets/images/app_logo_2.png" # Path to your app logo
   android: true
   ios: true
   android_gravity: center

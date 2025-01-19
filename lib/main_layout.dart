@@ -30,7 +30,7 @@ class _MainLayoutState extends State<MainLayout> {
     ];
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: const TopNavBar(),
       body: pages[_currentIndex],
       bottomNavigationBar: BottomNavBar(

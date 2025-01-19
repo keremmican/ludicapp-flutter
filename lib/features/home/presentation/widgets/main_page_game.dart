@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'dart:ui';
 
 class MainPageGame extends StatelessWidget {
   final Map<String, String> game;
@@ -19,7 +21,7 @@ class MainPageGame extends StatelessWidget {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
         ),
-        child: Container(
+        child: SizedBox(
           height: MediaQuery.of(context).size.height * 0.6,
           child: Stack(
             children: [
@@ -29,9 +31,9 @@ class MainPageGame extends StatelessWidget {
                 child: SizedBox(
                   width: double.infinity,
                   height: double.infinity,
-                  child: game['image']!.startsWith('http')
+                  child: (game['image'] ?? '').startsWith('http')
                       ? Image.network(
-                          game['image']!,
+                          game['image'] ?? '',
                           fit: BoxFit.cover,
                           gaplessPlayback: true,
                           errorBuilder: (context, error, stackTrace) {
@@ -42,7 +44,7 @@ class MainPageGame extends StatelessWidget {
                           },
                         )
                       : Image.asset(
-                          game['image']!,
+                          game['image'] ?? '',
                           fit: BoxFit.cover,
                         ),
                 ),
@@ -56,17 +58,38 @@ class MainPageGame extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
                   decoration: BoxDecoration(
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(20),
+                      bottomRight: Radius.circular(20),
+                    ),
                     gradient: LinearGradient(
                       begin: Alignment.bottomCenter,
                       end: Alignment.topCenter,
                       colors: [
+                        Colors.black,
+                        Colors.black,
+                        Colors.black,
+                        Colors.black,
+                        Colors.black,
+                        Colors.black.withOpacity(0.98),
+                        Colors.black.withOpacity(0.95),
+                        Colors.black.withOpacity(0.9),
                         Colors.black.withOpacity(0.85),
+                        Colors.black.withOpacity(0.8),
+                        Colors.black.withOpacity(0.75),
+                        Colors.black.withOpacity(0.7),
+                        Colors.black.withOpacity(0.6),
+                        Colors.black.withOpacity(0.5),
+                        Colors.black.withOpacity(0.4),
+                        Colors.black.withOpacity(0.3),
+                        Colors.black.withOpacity(0.2),
+                        Colors.black.withOpacity(0.1),
+                        Colors.black.withOpacity(0.05),
                         Colors.black.withOpacity(0.0),
                       ],
-                    ),
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(20),
-                      bottomRight: Radius.circular(20),
+                      stops: const [
+                        0.0, 0.1, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 0.97, 1.0
+                      ],
                     ),
                   ),
                   child: Column(
@@ -74,7 +97,7 @@ class MainPageGame extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Text(
-                        game['name']!,
+                        game['name'] ?? 'Unknown',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 20,
@@ -84,7 +107,7 @@ class MainPageGame extends StatelessWidget {
                       ),
                       const SizedBox(height: 5),
                       Text(
-                        game['releaseYear']!,
+                        game['releaseDate'] ?? 'TBA',
                         style: const TextStyle(
                           color: Colors.white70,
                           fontSize: 16,

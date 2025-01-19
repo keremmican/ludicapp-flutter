@@ -8,7 +8,7 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      backgroundColor: Colors.black,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       elevation: 0,
       automaticallyImplyLeading: false,
       title: Row(
@@ -30,9 +30,9 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
 
           // App Logo
           SizedBox(
-            height: 60, // Increased logo size
+            height: 100, // Increased logo size
             child: Image.asset(
-              'lib/assets/images/app_logo_2.png',
+              'lib/assets/images/app_logo.png',
               fit: BoxFit.contain,
             ),
           ),

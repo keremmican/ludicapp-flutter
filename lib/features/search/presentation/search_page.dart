@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:ludicapp/theme/app_theme.dart';
 import 'package:ludicapp/features/game/presentation/game_detail_page.dart';
 import 'package:ludicapp/features/profile/presentation/related_games_page.dart';
+import 'package:ludicapp/core/models/game.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
@@ -324,6 +325,8 @@ class _SearchPageState extends State<SearchPage> {
             fontSize: 16,
             fontWeight: FontWeight.w500,
           ),
+          overflow: TextOverflow.ellipsis,
+          maxLines: 1,
         ),
         trailing: const Icon(
           Icons.arrow_forward_ios,
@@ -335,7 +338,10 @@ class _SearchPageState extends State<SearchPage> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => GameDetailPage(id: game.id!),
+                builder: (context) => GameDetailPage(
+                  game: Game.fromGameSummary(game.toGameSummary()),
+                  fromSearch: true,
+                ),
               ),
             );
           }
@@ -352,36 +358,55 @@ class _SearchPageState extends State<SearchPage> {
         backgroundColor: Colors.black,
         elevation: 0,
         automaticallyImplyLeading: false,
-        title: Container(
-          height: 36,
-          decoration: BoxDecoration(
-            color: const Color(0xFF1C1C1E),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: TextField(
-            controller: _searchController,
-            style: const TextStyle(color: Colors.white, fontSize: 15),
-            decoration: InputDecoration(
-              hintText: 'Search',
-              prefixIcon: Icon(Icons.search, color: Colors.grey[600], size: 20),
-              hintStyle: TextStyle(color: Colors.grey[600], fontSize: 15),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        title: Row(
+          children: [
+            Expanded(
+              child: Container(
+                height: 36,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1C1C1E),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: TextField(
+                  controller: _searchController,
+                  style: const TextStyle(color: Colors.white, fontSize: 15),
+                  decoration: InputDecoration(
+                    hintText: 'Search',
+                    prefixIcon: Icon(Icons.search, color: Colors.grey[600], size: 20),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: Icon(Icons.clear, color: Colors.grey[600], size: 20),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() {
+                                _searchResults = [];
+                                _lastQuery = '';
+                                _currentPage = 0;
+                                _hasMore = true;
+                              });
+                            },
+                          )
+                        : null,
+                    hintStyle: TextStyle(color: Colors.grey[600], fontSize: 15),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  ),
+                ),
+              ),
             ),
-          ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: Colors.grey[400], fontSize: 14),
+              ),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancel',
-              style: TextStyle(color: Colors.grey[400], fontSize: 14),
-            ),
-          ),
-        ],
       ),
       body: _searchResults.isEmpty && _lastQuery.isEmpty
           ? SingleChildScrollView(
+              padding: const EdgeInsets.only(bottom: 32),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

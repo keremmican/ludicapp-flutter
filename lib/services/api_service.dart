@@ -4,8 +4,8 @@ import 'package:ludicapp/core/config/environment_config.dart';
 class ApiService {
   final Dio _dio = Dio(BaseOptions(
     baseUrl: EnvironmentConfig.baseUrl,
-    connectTimeout: const Duration(seconds: 5),
-    receiveTimeout: const Duration(seconds: 3),
+    connectTimeout: const Duration(seconds: 10),
+    receiveTimeout: const Duration(seconds: 10),
   ));
 
   ApiService() {

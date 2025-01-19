@@ -70,9 +70,9 @@ class _RatingModalState extends State<RatingModal> {
               const SizedBox(height: 20),
               // Game Cover Image
               Expanded(
-                flex: 5,
+                flex: 4,
                 child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 20),
+                  margin: const EdgeInsets.symmetric(horizontal: 32),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
                     image: DecorationImage(
@@ -82,17 +82,21 @@ class _RatingModalState extends State<RatingModal> {
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
               // Game Title
-              Text(
-                widget.gameName,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Text(
+                  widget.gameName,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               // Release Year
               if (widget.releaseYear != null)
                 Text(
@@ -102,25 +106,24 @@ class _RatingModalState extends State<RatingModal> {
                     fontSize: 16,
                   ),
                 ),
+              const SizedBox(height: 24),
+              // Rating Options
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildRatingOption('Awful', const Color(0xFF8E8E93), 0.8),
+                    _buildRatingOption('Meh', const Color(0xFFAEA79F), 1.0),
+                    _buildRatingOption('Good', const Color(0xFFFFA500), 1.2),
+                    _buildRatingOption('Amazing', const Color(0xFFFF6B00), 0.8),
+                  ],
+                ),
+              ),
               Expanded(
-                flex: 3,
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    // Rating Options
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _buildRatingOption('Awful', const Color(0xFF8E8E93), 0.8),
-                          _buildRatingOption('Meh', const Color(0xFFAEA79F), 1.0),
-                          _buildRatingOption('Good', const Color(0xFFFFA500), 1.2),
-                          _buildRatingOption('Amazing', const Color(0xFFFF6B00), 0.8),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 40),
                     // Haven't Seen Button
                     Container(
                       width: double.infinity,
@@ -144,7 +147,7 @@ class _RatingModalState extends State<RatingModal> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 48),
                   ],
                 ),
               ),

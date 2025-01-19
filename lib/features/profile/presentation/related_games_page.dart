@@ -4,6 +4,8 @@ import 'package:ludicapp/services/repository/game_repository.dart';
 import 'package:ludicapp/services/model/response/game_summary.dart';
 import 'package:ludicapp/services/model/response/top_games_cover.dart';
 import 'package:ludicapp/core/widgets/rating_modal.dart';
+import 'package:ludicapp/core/models/game.dart';
+import 'package:ludicapp/core/providers/blurred_background_provider.dart';
 
 enum SortOption {
   topRated,
@@ -24,6 +26,7 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
   final GameRepository _gameRepository = GameRepository();
   List<dynamic> games = [];
   Set<int> savedGames = {};
+  Set<int> ratedGames = {};
   bool _isLoading = false;
   bool _hasMore = true;
   int _currentPage = 0;
@@ -415,13 +418,24 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
 
   Widget _buildGameCard(GameSummary game) {
     final bool isSaved = savedGames.contains(game.id);
+    final bool isRated = ratedGames.contains(game.id);
+    final _backgroundProvider = BlurredBackgroundProvider();
+    
+    // Cache the blurred background and preload screenshots
+    _backgroundProvider.cacheBackground(game.id.toString(), game.coverUrl);
+    if (game.screenshots.isNotEmpty) {
+      Game.preloadScreenshots(game.id, game.screenshots);
+      for (final screenshot in game.screenshots) {
+        _backgroundProvider.cacheBackground('${game.id}_${screenshot.hashCode}', screenshot);
+      }
+    }
     
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => GameDetailPage(id: game.id),
+            builder: (context) => GameDetailPage(game: Game.fromGameSummary(game)),
           ),
         );
       },
@@ -491,7 +505,7 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
               ),
               const SizedBox(width: 8),
               Text(
-                game.rating?.toStringAsFixed(0) ?? '--',
+                game.totalRating?.toStringAsFixed(0) ?? '--',
                 style: TextStyle(
                   color: Colors.green[400],
                   fontSize: 16,
@@ -500,7 +514,7 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
               ),
             ],
           ),
-          if (!isSaved) ...[
+          if (!isSaved && !isRated) ...[
             const SizedBox(height: 4),
             // Action Buttons
             Row(
@@ -588,6 +602,7 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
       onRatingSelected: (rating) {
         setState(() {
           _userRating = rating;
+          ratedGames.add(game.id);
         });
       },
     );
@@ -598,34 +613,33 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
   }
 
   void _showSavedNotification() {
-    showDialog(
-      context: context,
-      barrierColor: Colors.transparent,
-      builder: (context) => TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0.0, end: 1.0),
-        duration: const Duration(milliseconds: 300),
-        builder: (context, value, child) {
-          return Opacity(
-            opacity: value,
-            child: Dialog(
-              backgroundColor: Colors.transparent,
-              elevation: 0,
+    final overlayState = Overlay.of(context);
+    final overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).size.height / 2 - 32,
+        left: MediaQuery.of(context).size.width / 2 - 32,
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.0, end: 1.0),
+          duration: const Duration(milliseconds: 300),
+          builder: (context, value, child) {
+            return Opacity(
+              opacity: value,
               child: Icon(
                 Icons.favorite,
                 color: Colors.red[400],
                 size: 64,
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
 
-    // Automatically dismiss after 1 second
+    overlayState.insert(overlayEntry);
+
+    // Automatically remove after 800ms
     Future.delayed(const Duration(milliseconds: 800), () {
-      if (context.mounted) {
-        Navigator.of(context).pop();
-      }
+      overlayEntry.remove();
     });
   }
 

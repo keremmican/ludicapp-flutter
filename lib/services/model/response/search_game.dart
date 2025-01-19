@@ -1,3 +1,5 @@
+import 'package:ludicapp/services/model/response/game_summary.dart';
+
 class SearchGame {
   final int? id;
   final String name;
@@ -48,6 +50,23 @@ class SearchResponse {
       number: json['number'] as int,
       size: json['size'] as int,
       last: json['last'] as bool,
+    );
+  }
+}
+
+extension SearchGameExtension on SearchGame {
+  GameSummary toGameSummary() {
+    return GameSummary(
+      id: id ?? 0,
+      name: name,
+      slug: name.toLowerCase().replaceAll(' ', '-'),
+      coverUrl: imageUrl,
+      genres: [],
+      themes: [],
+      platforms: [],
+      companies: [],
+      screenshots: [],
+      websites: {},
     );
   }
 } 
