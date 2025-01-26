@@ -5,20 +5,22 @@ class GameDetail {
   final String? coverUrl;
   final String name;
   final String slug;
-  final List<String> genres;
+  final List<Map<String, dynamic>> genres;
   final String releaseFullDate;
-  final String? gameVideo;
+  final List<Map<String, String>> gameVideos;
   final String summary;
   final List<String> screenshots;
   final Map<String, String> websites;
-  final int? hastilyGameTime;
-  final int? normallyGameTime;
-  final int? completelyGameTime;
-  final List<String> platforms;
-  final List<String> companies;
-  final List<String> themes;
+  final Map<String, int>? gameTimeToBeats;
+  final List<Map<String, dynamic>> platforms;
+  final List<Map<String, dynamic>> companies;
+  final List<Map<String, dynamic>> themes;
   final double? totalRatingScore;
   final String? ageRating;
+  final List<Map<String, dynamic>> franchises;
+  final List<Map<String, dynamic>> gameModes;
+  final List<Map<String, dynamic>> playerPerspectives;
+  final List<Map<String, String>> languageSupports;
 
   GameDetail({
     required this.id,
@@ -27,18 +29,20 @@ class GameDetail {
     required this.slug,
     required this.genres,
     required this.releaseFullDate,
-    this.gameVideo,
+    required this.gameVideos,
     required this.summary,
     required this.screenshots,
     required this.websites,
-    this.hastilyGameTime,
-    this.normallyGameTime,
-    this.completelyGameTime,
+    this.gameTimeToBeats,
     required this.platforms,
     required this.companies,
     required this.themes,
     this.totalRatingScore,
     this.ageRating,
+    required this.franchises,
+    required this.gameModes,
+    required this.playerPerspectives,
+    required this.languageSupports,
   });
 
   factory GameDetail.fromJson(Map<String, dynamic> json) {
@@ -47,20 +51,29 @@ class GameDetail {
       coverUrl: json['coverUrl'] as String?,
       name: json['name'] as String? ?? '',
       slug: json['slug'] as String? ?? '',
-      genres: List<String>.from(json['genres'] as List? ?? []),
+      genres: (json['genres'] as List?)?.map((e) => e as Map<String, dynamic>).toList() ?? [],
       releaseFullDate: json['releaseFullDate'] as String? ?? '',
-      gameVideo: json['gameVideo'] as String?,
+      gameVideos: (json['gameVideos'] as List?)?.map((e) => Map<String, String>.from(e)).toList() ?? [],
       summary: json['summary'] as String? ?? '',
       screenshots: List<String>.from(json['screenshots'] as List? ?? []),
       websites: Map<String, String>.from(json['websites'] as Map? ?? {}),
-      hastilyGameTime: json['hastilyGameTime'] as int?,
-      normallyGameTime: json['normallyGameTime'] as int?,
-      completelyGameTime: json['completelyGameTime'] as int?,
-      platforms: List<String>.from(json['platforms'] as List? ?? []),
-      companies: List<String>.from(json['companies'] as List? ?? []),
-      themes: List<String>.from(json['themes'] as List? ?? []),
+      gameTimeToBeats: json['gameTimeToBeats'] != null 
+          ? (json['gameTimeToBeats'] as Map?)?.map(
+              (key, value) => MapEntry(
+                key.toString(),
+                value is int ? value : (value as num?)?.toInt() ?? 0
+              ),
+            )
+          : null,
+      platforms: (json['platforms'] as List?)?.map((e) => e as Map<String, dynamic>).toList() ?? [],
+      companies: (json['companies'] as List?)?.map((e) => e as Map<String, dynamic>).toList() ?? [],
+      themes: (json['themes'] as List?)?.map((e) => e as Map<String, dynamic>).toList() ?? [],
       totalRatingScore: json['totalRatingScore'] != null ? (json['totalRatingScore'] as num).toDouble() : null,
       ageRating: json['ageRating'] as String?,
+      franchises: (json['franchises'] as List?)?.map((e) => e as Map<String, dynamic>).toList() ?? [],
+      gameModes: (json['gameModes'] as List?)?.map((e) => e as Map<String, dynamic>).toList() ?? [],
+      playerPerspectives: (json['playerPerspectives'] as List?)?.map((e) => e as Map<String, dynamic>).toList() ?? [],
+      languageSupports: (json['languageSupports'] as List?)?.map((e) => Map<String, String>.from(e)).toList() ?? [],
     );
   }
 
@@ -72,18 +85,20 @@ class GameDetail {
       'slug': slug,
       'genres': genres,
       'releaseFullDate': releaseFullDate,
-      'gameVideo': gameVideo,
+      'gameVideos': gameVideos,
       'summary': summary,
       'screenshots': screenshots,
       'websites': websites,
-      'hastilyGameTime': hastilyGameTime,
-      'normallyGameTime': normallyGameTime,
-      'completelyGameTime': completelyGameTime,
+      'gameTimeToBeats': gameTimeToBeats,
       'platforms': platforms,
       'companies': companies,
       'themes': themes,
       'totalRatingScore': totalRatingScore,
       'ageRating': ageRating,
+      'franchises': franchises,
+      'gameModes': gameModes,
+      'playerPerspectives': playerPerspectives,
+      'languageSupports': languageSupports,
     };
   }
 
@@ -101,13 +116,15 @@ class GameDetail {
       platforms: platforms,
       companies: companies,
       screenshots: screenshots,
-      gameVideo: gameVideo,
+      gameVideos: gameVideos,
       websites: websites,
-      hastilyGameTime: hastilyGameTime,
-      normallyGameTime: normallyGameTime,
-      completelyGameTime: completelyGameTime,
+      gameTimeToBeats: gameTimeToBeats,
       pegiAgeRating: ageRating,
       releaseFullDate: releaseFullDate,
+      franchises: franchises,
+      gameModes: gameModes,
+      playerPerspectives: playerPerspectives,
+      languageSupports: languageSupports,
     );
   }
 }

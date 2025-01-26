@@ -68,7 +68,7 @@ class ProfilePage extends StatelessWidget {
           _buildGameLibrary(context),
 
           // Steam Profile Section
-          _buildSteamProfile(),
+          _buildSteamProfile(context),
         ],
       ),
     );
@@ -132,7 +132,7 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _buildSteamProfile() {
+  Widget _buildSteamProfile(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(20.0),
       child: Column(
@@ -150,7 +150,7 @@ class ProfilePage extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(15.0),
             decoration: BoxDecoration(
-              color: Colors.grey.shade900,
+              color: Theme.of(context).scaffoldBackgroundColor,
               borderRadius: BorderRadius.circular(10.0),
             ),
             child: Column(

@@ -7,18 +7,19 @@ class GameSummary {
   final double? totalRating;
   final int? totalRatingCount;
   final String? summary;
-  final List<String> genres;
-  final List<String> themes;
-  final List<String> platforms;
-  final List<String> companies;
+  final List<Map<String, dynamic>> genres;
+  final List<Map<String, dynamic>> themes;
+  final List<Map<String, dynamic>> platforms;
+  final List<Map<String, dynamic>> companies;
   final List<String> screenshots;
-  final String? gameVideo;
+  final List<Map<String, String>> gameVideos;
   final Map<String, String>? websites;
-  final int? hastilyGameTime;
-  final int? normallyGameTime;
-  final int? completelyGameTime;
+  final Map<String, int>? gameTimeToBeats;
   final String? pegiAgeRating;
-  final String? releaseFullDate;
+  final List<Map<String, dynamic>> franchises;
+  final List<Map<String, dynamic>> gameModes;
+  final List<Map<String, dynamic>> playerPerspectives;
+  final List<Map<String, String>> languageSupports;
 
   GameSummary({
     required this.id,
@@ -34,40 +35,96 @@ class GameSummary {
     required this.platforms,
     required this.companies,
     required this.screenshots,
-    this.gameVideo,
+    required this.gameVideos,
     this.websites,
-    this.hastilyGameTime,
-    this.normallyGameTime,
-    this.completelyGameTime,
+    this.gameTimeToBeats,
     this.pegiAgeRating,
-    this.releaseFullDate,
+    required this.franchises,
+    required this.gameModes,
+    required this.playerPerspectives,
+    required this.languageSupports,
   });
 
   factory GameSummary.fromJson(Map<String, dynamic> json) {
-    return GameSummary(
-      id: json['gameId'] as int,
-      name: json['name'] as String,
-      slug: json['slug'] as String,
-      coverUrl: json['coverUrl'] as String?,
-      releaseDate: json['releaseDate'] as String?,
-      totalRating: json['totalRating'] != null ? (json['totalRating'] as num).toDouble() : null,
-      totalRatingCount: json['totalRatingCount'] as int?,
-      summary: json['summary'] as String?,
-      genres: List<String>.from(json['genres'] ?? []),
-      themes: List<String>.from(json['themes'] ?? []),
-      platforms: List<String>.from(json['platforms'] ?? []),
-      companies: List<String>.from(json['companies'] ?? []),
-      screenshots: List<String>.from(json['screenshots'] ?? []),
-      gameVideo: json['gameVideo'] as String?,
-      websites: json['websites'] != null 
-          ? Map<String, String>.from(json['websites'] as Map)
-          : null,
-      hastilyGameTime: json['hastilyGameTime'] as int?,
-      normallyGameTime: json['normallyGameTime'] as int?,
-      completelyGameTime: json['completelyGameTime'] as int?,
-      pegiAgeRating: json['pegiAgeRating'] as String?,
-      releaseFullDate: json['releaseFullDate'] as String?,
-    );
+    try {
+      // Handle websites conversion
+      Map<String, String>? websitesMap;
+      if (json['websites'] != null) {
+        try {
+          websitesMap = Map<String, String>.from(json['websites'] as Map);
+        } catch (e) {
+          print('Error converting websites: $e');
+          websitesMap = null;
+        }
+      }
+
+      // Handle game time to beats conversion
+      Map<String, int>? gameTimeToBeatsMap;
+      if (json['gameTimeToBeats'] != null) {
+        try {
+          gameTimeToBeatsMap = (json['gameTimeToBeats'] as Map?)?.map(
+            (key, value) => MapEntry(
+              key.toString(),
+              value is int ? value : (value as num?)?.toInt() ?? 0
+            ),
+          );
+        } catch (e) {
+          print('Error converting gameTimeToBeats: $e');
+          gameTimeToBeatsMap = null;
+        }
+      }
+
+      // Convert lists with safe null checks and type casting
+      List<Map<String, dynamic>> convertList(dynamic list) {
+        if (list == null) return [];
+        return (list as List).map((e) => e as Map<String, dynamic>).toList();
+      }
+
+      List<Map<String, String>> convertStringMapList(dynamic list) {
+        if (list == null) return [];
+        return (list as List).map((e) => Map<String, String>.from(e)).toList();
+      }
+
+      return GameSummary(
+        id: json['id'] != null 
+            ? (json['id'] is int 
+                ? json['id'] 
+                : (json['id'] as num).toInt()) 
+            : 0,
+        name: json['name'] as String? ?? 'Unknown Game',
+        slug: json['slug'] as String? ?? 'unknown-game',
+        coverUrl: json['coverUrl'] as String?,
+        releaseDate: json['releaseDate'] as String?,
+        totalRating: json['totalRating'] != null 
+            ? (json['totalRating'] is double 
+                ? json['totalRating'] 
+                : (json['totalRating'] as num).toDouble()) 
+            : null,
+        totalRatingCount: json['totalRatingCount'] != null 
+            ? (json['totalRatingCount'] is int 
+                ? json['totalRatingCount'] 
+                : (json['totalRatingCount'] as num).toInt()) 
+            : null,
+        summary: json['summary'] as String?,
+        genres: convertList(json['genres']),
+        themes: convertList(json['themes']),
+        platforms: convertList(json['platforms']),
+        companies: convertList(json['companies']),
+        screenshots: List<String>.from(json['screenshots'] ?? []),
+        gameVideos: convertStringMapList(json['gameVideos']),
+        websites: websitesMap,
+        gameTimeToBeats: gameTimeToBeatsMap,
+        pegiAgeRating: json['pegiAgeRating'] as String?,
+        franchises: convertList(json['franchises']),
+        gameModes: convertList(json['gameModes']),
+        playerPerspectives: convertList(json['playerPerspectives']),
+        languageSupports: convertStringMapList(json['languageSupports']),
+      );
+    } catch (e, stackTrace) {
+      print('Error in GameSummary.fromJson: $e');
+      print('Stack trace: $stackTrace');
+      rethrow;
+    }
   }
 
   Map<String, dynamic> toJson() {
@@ -85,13 +142,14 @@ class GameSummary {
       'platforms': platforms,
       'companies': companies,
       'screenshots': screenshots,
-      'gameVideo': gameVideo,
+      'gameVideos': gameVideos,
       'websites': websites,
-      'hastilyGameTime': hastilyGameTime,
-      'normallyGameTime': normallyGameTime,
-      'completelyGameTime': completelyGameTime,
+      'gameTimeToBeats': gameTimeToBeats,
       'pegiAgeRating': pegiAgeRating,
-      'releaseFullDate': releaseFullDate,
+      'franchises': franchises,
+      'gameModes': gameModes,
+      'playerPerspectives': playerPerspectives,
+      'languageSupports': languageSupports,
     };
   }
 }
@@ -121,19 +179,17 @@ class PageableResponse<T> {
     Map<String, dynamic> json,
     T Function(Map<String, dynamic>) fromJsonT,
   ) {
-    final contentList = json['content'] as List;
-    
-    return PageableResponse(
-      content: contentList
-          .map((item) => fromJsonT(item as Map<String, dynamic>))
-          .toList(),
-      totalPages: json['totalPages'] as int,
-      totalElements: json['totalElements'] as int,
-      number: json['number'] as int,
-      size: json['size'] as int,
-      first: json['first'] as bool,
-      last: json['last'] as bool,
-      empty: json['empty'] as bool,
+    return PageableResponse<T>(
+      content: (json['content'] as List?)
+          ?.map((e) => fromJsonT(e as Map<String, dynamic>))
+          .toList() ?? [],
+      totalPages: json['totalPages'] != null ? (json['totalPages'] is int ? json['totalPages'] : (json['totalPages'] as num).toInt()) : 0,
+      totalElements: json['totalElements'] != null ? (json['totalElements'] is int ? json['totalElements'] : (json['totalElements'] as num).toInt()) : 0,
+      number: json['number'] != null ? (json['number'] is int ? json['number'] : (json['number'] as num).toInt()) : 0,
+      size: json['size'] != null ? (json['size'] is int ? json['size'] : (json['size'] as num).toInt()) : 0,
+      first: json['first'] as bool? ?? true,
+      last: json['last'] as bool? ?? true,
+      empty: json['empty'] as bool? ?? true,
     );
   }
 }

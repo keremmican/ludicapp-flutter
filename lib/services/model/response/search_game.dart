@@ -66,7 +66,11 @@ extension SearchGameExtension on SearchGame {
       platforms: [],
       companies: [],
       screenshots: [],
-      websites: {},
+      gameVideos: [],
+      franchises: [],
+      gameModes: [],
+      playerPerspectives: [],
+      languageSupports: [],
     );
   }
 } 

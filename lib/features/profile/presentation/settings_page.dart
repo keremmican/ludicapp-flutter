@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:ludicapp/features/authentication/presentation/login_page.dart';
+import 'package:ludicapp/theme/app_theme.dart';
 
 class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: AppTheme.surfaceDark,
         title: const Text('Settings', style: TextStyle(color: Colors.white)),
         iconTheme: const IconThemeData(color: Colors.white),
       ),

@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:ludicapp/services/api_service.dart';
-import 'package:ludicapp/services/model/response/game_detail.dart';
 import 'package:ludicapp/services/model/response/game_summary.dart';
+import 'package:ludicapp/services/model/response/game_category.dart';
 
 class GameRepository {
   final ApiService _apiService = ApiService();
@@ -50,29 +50,31 @@ class GameRepository {
     );
   }
 
-  Future<GameDetail> fetchGameDetails(int gameId) async {
+  Future<GameSummary> fetchGameDetails(int gameId) async {
     final response = await _apiService.get("/games/detail/$gameId");
     
     final Map<String, dynamic> jsonData = response.data is String 
         ? json.decode(response.data as String)
         : response.data as Map<String, dynamic>;
 
-    return GameDetail.fromJson(jsonData);
+    return GameSummary.fromJson(jsonData);
   }
 
   Future<PageableResponse<GameSummary>> fetchGamesByGenre({
-    required String genre,
+    required int genreId,
+    required String sortBy,
+    required String sortDirection,
     int page = 0,
-    int size = 20,
-    bool sortByRating = true,
+    int pageSize = 20,
   }) async {
     final response = await _apiService.get(
       "/games/games-by-genre",
       queryParameters: {
-        'genre': genre,
+        'genreId': genreId.toString(),
+        'sortBy': sortBy,
+        'sortDirection': sortDirection,
         'page': page.toString(),
-        'size': size.toString(),
-        'sortByRating': sortByRating.toString(),
+        'pageSize': pageSize.toString(),
       },
     );
 
@@ -87,18 +89,20 @@ class GameRepository {
   }
 
   Future<PageableResponse<GameSummary>> fetchGamesByTheme({
-    required String theme,
+    required int themeId,
+    required String sortBy,
+    required String sortDirection,
     int page = 0,
-    int size = 20,
-    bool sortByRating = true,
+    int pageSize = 20,
   }) async {
     final response = await _apiService.get(
       "/games/games-by-theme",
       queryParameters: {
-        'theme': theme,
+        'themeId': themeId.toString(),
+        'sortBy': sortBy,
+        'sortDirection': sortDirection,
         'page': page.toString(),
-        'size': size.toString(),
-        'sortByRating': sortByRating.toString(),
+        'pageSize': pageSize.toString(),
       },
     );
 
@@ -132,5 +136,40 @@ class GameRepository {
       jsonData,
       (json) => GameSummary.fromJson(json as Map<String, dynamic>),
     );
+  }
+
+  Future<List<GameCategory>> fetchGenres() async {
+    final response = await _apiService.get("/games/get-genres");
+    
+    final List<dynamic> jsonData = response.data is String 
+        ? json.decode(response.data as String)
+        : response.data as List<dynamic>;
+
+    return jsonData.map((json) => GameCategory.fromJson(json as Map<String, dynamic>)).toList();
+  }
+
+  Future<List<GameCategory>> fetchThemes() async {
+    final response = await _apiService.get("/games/get-themes");
+    
+    final List<dynamic> jsonData = response.data is String 
+        ? json.decode(response.data as String)
+        : response.data as List<dynamic>;
+
+    return jsonData.map((json) => GameCategory.fromJson(json as Map<String, dynamic>)).toList();
+  }
+
+  Future<List<GameSummary>> fetchRandomGames({int count = 10}) async {
+    final response = await _apiService.get(
+      "/games/random",
+      queryParameters: {
+        'count': count.toString(),
+      },
+    );
+
+    final List<dynamic> jsonData = response.data is String 
+        ? json.decode(response.data as String)
+        : response.data as List<dynamic>;
+
+    return jsonData.map((json) => GameSummary.fromJson(json as Map<String, dynamic>)).toList();
   }
 }

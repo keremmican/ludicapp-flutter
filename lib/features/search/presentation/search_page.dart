@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:ludicapp/services/model/response/search_game.dart';
 import 'package:ludicapp/services/repository/search_repository.dart';
+import 'package:ludicapp/services/repository/game_repository.dart';
+import 'package:ludicapp/services/model/response/game_category.dart';
+import 'package:ludicapp/services/category_service.dart';
 import 'dart:async';
 import 'package:ludicapp/theme/app_theme.dart';
 import 'package:ludicapp/features/game/presentation/game_detail_page.dart';
@@ -19,6 +22,7 @@ class _SearchPageState extends State<SearchPage> {
 
   late final TextEditingController _searchController;
   late final SearchRepository _searchRepository;
+  late final CategoryService _categoryService;
   late final ScrollController _scrollController;
   
   List<SearchGame> _searchResults = [];
@@ -38,79 +42,18 @@ class _SearchPageState extends State<SearchPage> {
     'Free to Play'
   ];
 
-  static const List<String> genres = [
-    'Point-and-click',
-    'Fighting',
-    'Shooter',
-    'Music',
-    'Platform',
-    'Puzzle',
-    'Racing',
-    'Real Time Strategy (RTS)',
-    'Role-playing (RPG)',
-    'Simulator',
-    'Sport',
-    'Strategy',
-    'Turn-based strategy (TBS)',
-    'Tactical',
-    'Hack and slash/Beat \'em up',
-    'Quiz/Trivia',
-    'Pinball',
-    'Adventure',
-    'Indie',
-    'Arcade',
-    'Visual Novel',
-    'Card & Board Game',
-    'MOBA',
-  ];
-
-  static const List<String> specialInterests = [
-    'Anime',
-    'Asian Dramas',
-    'Blockbuster Movies',
-    'Bollywood Movies',
-    'Documentaries',
-    'Foreign',
-    'Horror',
-    'Reality TV',
-    'Stand-Up Comedy',
-    'Superhero',
-  ];
-
-  static const List<String> themes = [
-    'Drama',
-    'Non-fiction',
-    'Sandbox',
-    'Educational',
-    'Kids',
-    'Open world',
-    'Warfare',
-    'Party',
-    '4X (explore, expand, exploit, and exterminate)',
-    'Erotic',
-    'Mystery',
-    'Action',
-    'Fantasy',
-    'Science fiction',
-    'Horror',
-    'Thriller',
-    'Survival',
-    'Historical',
-    'Stealth',
-    'Comedy',
-    'Business',
-    'Romance',
-  ];
-
   @override
   void initState() {
     super.initState();
     _searchController = TextEditingController();
     _searchRepository = SearchRepository();
+    _categoryService = CategoryService();
     _scrollController = ScrollController();
     
     _scrollController.addListener(_onScroll);
     _searchController.addListener(_onSearchChanged);
+    
+    _ensureCategoriesLoaded();
   }
 
   @override
@@ -193,7 +136,18 @@ class _SearchPageState extends State<SearchPage> {
     }
   }
 
-  Widget _buildSection(String title, List<String> items) {
+  Future<void> _ensureCategoriesLoaded() async {
+    if (!_categoryService.isInitialized) {
+      try {
+        await _categoryService.initialize();
+        if (mounted) setState(() {});
+      } catch (e) {
+        print('Error loading categories: $e');
+      }
+    }
+  }
+
+  Widget _buildSection(String title, List<dynamic> items) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -213,7 +167,9 @@ class _SearchPageState extends State<SearchPage> {
           child: Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: items.map((item) => _buildChip(item)).toList(),
+            children: items.map((item) => _buildChip(
+              item is GameCategory ? item.name : item as String
+            )).toList(),
           ),
         ),
       ],
@@ -233,7 +189,7 @@ class _SearchPageState extends State<SearchPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFF1C1C1E),
+          color: AppTheme.surfaceDark,
           borderRadius: BorderRadius.circular(6),
         ),
         child: Text(
@@ -353,9 +309,9 @@ class _SearchPageState extends State<SearchPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: AppTheme.primaryDark,
         elevation: 0,
         automaticallyImplyLeading: false,
         title: Row(
@@ -412,9 +368,9 @@ class _SearchPageState extends State<SearchPage> {
                 children: [
                   _buildSection('Popular', popularCategories),
                   const SizedBox(height: 16),
-                  _buildSection('Genre', genres),
+                  _buildSection('Genre', _categoryService.genres),
                   const SizedBox(height: 16),
-                  _buildSection('Themes', themes),
+                  _buildSection('Themes', _categoryService.themes),
                 ],
               ),
             )

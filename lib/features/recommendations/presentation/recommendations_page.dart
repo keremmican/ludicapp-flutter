@@ -2,10 +2,12 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:ludicapp/features/game/presentation/game_detail_page.dart';
 import 'package:ludicapp/features/recommendations/presentation/swipe_card.dart';
-import 'package:scrumlab_flutter_tindercard/scrumlab_flutter_tindercard.dart';
+import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:palette_generator/palette_generator.dart';
 import 'package:ludicapp/services/model/response/game_summary.dart';
 import 'package:ludicapp/core/models/game.dart';
+import 'package:ludicapp/services/repository/game_repository.dart';
+import 'package:ludicapp/theme/app_theme.dart';
 
 
 class RecommendationPage extends StatefulWidget {
@@ -16,71 +18,8 @@ class RecommendationPage extends StatefulWidget {
 }
 
 class _RecommendationPageState extends State<RecommendationPage> {
-  // Enhanced mock data to include genre, release year, developer, publisher, metacritic, imdb
-  static const List<Map<String, String>> mockGames = [
-    {
-      'image': 'lib/assets/images/mock_games/game1.jpg',
-      'name': 'Grand Theft Auto VI',
-      'genre': 'Action-Adventure',
-      'releaseYear': '2024',
-      'developer': 'Rockstar Games',
-      'publisher': 'Rockstar Games',
-      'metacritic': '97',
-      'imdb': '9.0',
-    },
-    {
-      'image': 'lib/assets/images/mock_games/game2.jpg',
-      'name': 'Cyberpunk 2077: Phantom Liberty',
-      'genre': 'RPG',
-      'releaseYear': '2023',
-      'developer': 'CD Projekt Red',
-      'publisher': 'CD Projekt',
-      'metacritic': '86',
-      'imdb': '8.5',
-    },
-    {
-      'image': 'lib/assets/images/mock_games/game3.jpg',
-      'name': 'The Witcher 4',
-      'genre': 'RPG',
-      'releaseYear': '2025',
-      'developer': 'CD Projekt Red',
-      'publisher': 'CD Projekt',
-      'metacritic': '90',
-      'imdb': '8.8',
-    },
-    {
-      'image': 'lib/assets/images/mock_games/game4.jpg',
-      'name': 'Halo Infinite',
-      'genre': 'First-Person Shooter',
-      'releaseYear': '2021',
-      'developer': '343 Industries',
-      'publisher': 'Microsoft Studios',
-      'metacritic': '91',
-      'imdb': '8.7',
-    },
-    {
-      'image': 'lib/assets/images/mock_games/game5.jpg',
-      'name': 'Minecraft Legends',
-      'genre': 'Sandbox',
-      'releaseYear': '2022',
-      'developer': 'Mojang Studios',
-      'publisher': 'Xbox Game Studios',
-      'metacritic': '84',
-      'imdb': '8.3',
-    },
-    {
-      'image': 'lib/assets/images/mock_games/game6.jpg',
-      'name': 'FIFA 24',
-      'genre': 'Sports',
-      'releaseYear': '2023',
-      'developer': 'EA Sports',
-      'publisher': 'Electronic Arts',
-      'metacritic': '80',
-      'imdb': '7.8',
-    },
-  ];
-
-  final CardController _cardController = CardController(); // Controller for the swipe cards
+  final CardSwiperController _swiperController = CardSwiperController();
+  final GameRepository _gameRepository = GameRepository();
 
   // Variable to track swipe direction for background color effect
   double _swipeDirection = 0.0; // Negative for left, positive for right
@@ -88,96 +27,118 @@ class _RecommendationPageState extends State<RecommendationPage> {
   // Variable to track the current card index
   int _currentCardIndex = 0;
 
-  // List of mock user reviews
-  static const List<String> _mockReviews = [
-    "Absolutely loved the gameplay mechanics!",
-    "A bit too long but worth every minute.",
-    "Graphics are stunning, but the story lacks depth.",
-    "Highly recommended for action game enthusiasts.",
-    "Could use more diverse missions.",
-    "An excellent addition to the series!",
-  ];
-
-  final Random _random = Random(); // Random generator for selecting reviews
-
-  // Precomputed game data with reviews and match points
-  late final List<Map<String, String>> _gamesWithDetails;
-
-  List<Color?> _dominantColors = []; // List to store dominant colors, nullable
+  // List to store random games
+  List<GameSummary> _randomGames = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _gamesWithDetails = mockGames.map((game) {
-      return {
-        ...game,
-        'userReview': _mockReviews[_random.nextInt(_mockReviews.length)],
-        'matchPoint': _random.nextInt(101).toString(), // 0 to 100 as String
-      };
-    }).toList();
-
-    // Initialize the dominantColors list with nulls
-    _dominantColors = List<Color?>.filled(_gamesWithDetails.length, null);
-
-    // Extract the dominant color for the first two cards immediately
-    _extractDominantColor(_currentCardIndex);
-    if (_gamesWithDetails.length > 1) {
-      _extractDominantColor(_currentCardIndex + 1);
-    }
+    _loadRandomGames();
   }
 
-  /// Extracts the dominant color for a specific card index
-  Future<void> _extractDominantColor(int index) async {
+  Future<void> _loadRandomGames() async {
     try {
-      final paletteGenerator = await PaletteGenerator.fromImageProvider(
-        AssetImage(_gamesWithDetails[index]['image']!),
-        size: Size(200, 100), // Optional: Specify size to speed up
-        maximumColorCount: 20, // Reduce the number of colors to analyze
+      final games = await _gameRepository.fetchRandomGames(count: 10);
+      
+      // Tüm resimleri önceden yükle
+      await Future.wait(
+        games.map((game) => precacheImage(
+          NetworkImage(game.coverUrl ?? ''),
+          context,
+        )).toList(),
       );
-      final color = paletteGenerator.dominantColor?.color ?? Colors.grey.withOpacity(0.5);
 
-      setState(() {
-        _dominantColors[index] = color;
-      });
+      if (mounted) {
+        setState(() {
+          _randomGames = games;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      // Handle any errors during color extraction
-      print('Error extracting color for card $index: $e');
-      setState(() {
-        _dominantColors[index] = Colors.grey.withOpacity(0.5);
-      });
-    }
-  }
-
-  /// Preloads dominant colors for the next [preloadCount] cards
-  void _preloadNextColors(int currentIndex, {int preloadCount = 2}) {
-    for (int i = 1; i <= preloadCount; i++) {
-      int nextIndex = currentIndex + i;
-      if (nextIndex < _gamesWithDetails.length && _dominantColors[nextIndex] == null) {
-        _extractDominantColor(nextIndex);
+      print('Error loading random games: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }
 
   @override
+  void dispose() {
+    _swiperController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (_dominantColors[0] == null || 
-        (_gamesWithDetails.length > 1 && _dominantColors[1] == null)) {
-      return _buildLoadingScreen();
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: AppTheme.primaryDark,
+        body: Center(
+          child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Theme.of(context).primaryColor.withOpacity(0.8),
+                      ),
+                    ),
+                  ),
+        ),
+      );
+    }
+
+    if (_randomGames.isEmpty) {
+      return Scaffold(
+        backgroundColor: AppTheme.primaryDark,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 64,
+                color: Colors.white.withOpacity(0.5),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No games available',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.8),
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: _loadRandomGames,
+                child: const Text(
+                  'Try Again',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppTheme.primaryDark,
       body: SafeArea(
         child: Stack(
           children: [
             // Base Background
             Positioned.fill(
-              child: Container(color: Colors.black),
+              child: Container(color: AppTheme.primaryDark),
             ),
-            // Swipe Overlays
-            _buildSwipeOverlays(),
             // Swipeable Cards
             _buildCardStack(),
+            // Swipe Overlays
+            _buildSwipeOverlays(),
           ],
         ),
       ),
@@ -186,86 +147,136 @@ class _RecommendationPageState extends State<RecommendationPage> {
 
   Widget _buildCardStack() {
     return Center(
-      child: _currentCardIndex < _gamesWithDetails.length
-          ? TinderSwapCard(
-              orientation: AmassOrientation.bottom,
-              totalNum: _gamesWithDetails.length - _currentCardIndex,
-              stackNum: 3,
-              swipeEdge: 4.0,
-              maxWidth: MediaQuery.of(context).size.width * 0.92,
-              maxHeight: MediaQuery.of(context).size.height * 0.85,
-              minWidth: MediaQuery.of(context).size.width * 0.88,
-              minHeight: MediaQuery.of(context).size.height * 0.8,
-              cardBuilder: (context, index) {
-                final gameDetails = _gamesWithDetails[_currentCardIndex + index];
-                final color = _dominantColors[_currentCardIndex + index] ?? Colors.grey.withOpacity(0.5);
+      child: _currentCardIndex < _randomGames.length
+          ? CardSwiper(
+              controller: _swiperController,
+              cardsCount: _randomGames.length,
+              onSwipe: _onSwipe,
+              numberOfCardsDisplayed: 2,
+              backCardOffset: const Offset(0, -10),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+              isDisabled: false,
+              isLoop: false,
+              maxAngle: 30,
+              threshold: 50,
+              scale: 0.9,
+              duration: const Duration(milliseconds: 350),
+              allowedSwipeDirection: AllowedSwipeDirection.only(left: true, right: true),
+              cardBuilder: (context, index, horizontalThresholdPercentage, verticalThresholdPercentage) {
+                if (index >= _randomGames.length) return const SizedBox.shrink();
+                
+                final game = _randomGames[index];
+                final gameDetails = <String, String>{
+                  'image': game.coverUrl ?? '',
+                  'name': game.name,
+                  'genre': game.genres.isNotEmpty ? game.genres.first['name'] as String : 'Unknown',
+                  'releaseYear': game.releaseDate?.substring(0, 4) ?? 'TBA',
+                  'developer': game.companies.isNotEmpty ? game.companies.first['name'] as String : 'Unknown',
+                  'publisher': game.companies.length > 1 ? game.companies[1]['name'] as String : (game.companies.isNotEmpty ? game.companies.first['name'] as String : 'Unknown'),
+                  'metacritic': '${(game.totalRating ?? 0).toStringAsFixed(0)}',
+                  'matchPoint': '${(game.totalRating ?? 0).toStringAsFixed(0)}',
+                  'userReview': game.summary ?? 'No review available.',
+                };
+
                 return SwipeCard(
                   game: gameDetails,
-                  dominantColor: color,
+                  dominantColor: Colors.black.withOpacity(0.8),
                   onTick: () {
-                    _cardController.triggerRight();
+                    _swiperController.swipe(CardSwiperDirection.right);
                   },
                   onTap: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => GameDetailPage(
-                          game: Game.fromGameSummary(GameSummary(
-                            id: 0,
-                            name: 'Unknown',
-                            slug: 'unknown',
-                            coverUrl: '',
-                            totalRating: 0,
-                            releaseDate: '',
-                            genres: [],
-                            themes: [],
-                            platforms: [],
-                            companies: [],
-                            screenshots: [],
-                          )),
+                          game: Game.fromGameSummary(game),
                         ),
                       ),
                     );
                   },
                 );
               },
-              cardController: _cardController,
-              swipeUpdateCallback: (DragUpdateDetails details, Alignment align) {
-                setState(() {
-                  _swipeDirection = align.x;
-                });
-              },
-              swipeCompleteCallback: (CardSwipeOrientation orientation, int index) {
-                setState(() {
-                  _swipeDirection = 0.0;
-                  _currentCardIndex++;
-                });
-                _preloadNextColors(_currentCardIndex - 1);
-              },
             )
           : _buildNoMoreCards(),
     );
   }
 
+  bool _onSwipe(int previousIndex, int? currentIndex, CardSwiperDirection direction) {
+    if (currentIndex == null) return false;
+    
+    setState(() {
+      _swipeDirection = direction == CardSwiperDirection.left ? -1.0 : 1.0;
+      _currentCardIndex = currentIndex;
+
+      // If we're running low on cards, load more
+      if (_currentCardIndex >= _randomGames.length - 3) {
+        _loadMoreGames();
+      }
+    });
+
+    // Reset swipe direction after animation
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (mounted) {
+        setState(() {
+          _swipeDirection = 0.0;
+        });
+      }
+    });
+
+    return true;
+  }
+
+  Future<void> _loadMoreGames() async {
+    try {
+      final newGames = await _gameRepository.fetchRandomGames(count: 5);
+      
+      // Yeni kartların resimlerini önceden yükle
+      await Future.wait(
+        newGames.map((game) => precacheImage(
+          NetworkImage(game.coverUrl ?? ''),
+          context,
+        )).toList(),
+      );
+
+      if (mounted) {
+        setState(() {
+          _randomGames.addAll(newGames);
+        });
+      }
+    } catch (e) {
+      print('Error loading more games: $e');
+    }
+  }
+
   /// Builds the UI when no more cards are left.
   Widget _buildNoMoreCards() {
     return Center(
-      child: Text(
-        'No more games to display!',
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 24,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLoadingScreen() {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Center(
-        child: CircularProgressIndicator(),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.videogame_asset_outlined,
+            size: 64,
+            color: Colors.white.withOpacity(0.5),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No more games to display!',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.8),
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Check back later for more recommendations',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.5),
+              fontSize: 16,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -278,46 +289,72 @@ class _RecommendationPageState extends State<RecommendationPage> {
       children: [
         if (_swipeDirection < -swipeThreshold)
           Positioned.fill(
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Container(
-                width: MediaQuery.of(context).size.width / 2,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    colors: [
-                      Colors.red.withOpacity(
-                        ((_swipeDirection.abs() - swipeThreshold) / (1.0 - swipeThreshold))
-                            .clamp(0.0, 1.0) *
-                            maxOverlayOpacity),
-                      Colors.transparent,
-                    ],
+            child: TweenAnimationBuilder<double>(
+              tween: Tween<double>(begin: 0.0, end: 1.0),
+              duration: const Duration(milliseconds: 150),
+              builder: (context, value, child) {
+                return Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [
+                        Colors.red.withOpacity(
+                          ((_swipeDirection.abs() - swipeThreshold) / (1.0 - swipeThreshold))
+                              .clamp(0.0, 1.0) *
+                              maxOverlayOpacity * value),
+                        Colors.transparent,
+                      ],
+                    ),
                   ),
-                ),
-              ),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 40),
+                      child: Icon(
+                        Icons.close,
+                        color: Colors.red.withOpacity(0.8 * value),
+                        size: 48,
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         if (_swipeDirection > swipeThreshold)
           Positioned.fill(
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: Container(
-                width: MediaQuery.of(context).size.width / 2,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.centerRight,
-                    end: Alignment.centerLeft,
-                    colors: [
-                      Colors.green.withOpacity(
-                        ((_swipeDirection - swipeThreshold) / (1.0 - swipeThreshold))
-                            .clamp(0.0, 1.0) *
-                            maxOverlayOpacity),
-                      Colors.transparent,
-                    ],
+            child: TweenAnimationBuilder<double>(
+              tween: Tween<double>(begin: 0.0, end: 1.0),
+              duration: const Duration(milliseconds: 150),
+              builder: (context, value, child) {
+                return Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.centerRight,
+                      end: Alignment.centerLeft,
+                      colors: [
+                        Colors.greenAccent.withOpacity(
+                          ((_swipeDirection - swipeThreshold) / (1.0 - swipeThreshold))
+                              .clamp(0.0, 1.0) *
+                              maxOverlayOpacity * value),
+                        Colors.transparent,
+                      ],
+                    ),
                   ),
-                ),
-              ),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 40),
+                      child: Icon(
+                        Icons.favorite,
+                        color: Colors.greenAccent.withOpacity(0.8 * value),
+                        size: 48,
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
       ],

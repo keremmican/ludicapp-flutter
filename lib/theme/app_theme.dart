@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 class AppTheme {
   // Ana renkler
-  static const Color primaryDark = Color(0xFF181818);    // Daha da koyu gri arka plan
+  static const Color primaryDark = Color(0xFF121212);    // Taste app benzeri koyu arka plan
   static const Color surfaceDark = Color(0xFF1C1C1C);    // Biraz daha açık siyah
   static const Color accentColor = Color(0xFFBFE429);    // Lime yeşili accent
   

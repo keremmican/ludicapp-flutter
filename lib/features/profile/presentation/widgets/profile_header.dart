@@ -82,7 +82,7 @@ class ProfileHeader extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 2), // Azaltıldı: 8'den 4'e
           margin: const EdgeInsets.symmetric(horizontal: 20),
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.8),
+            color: Theme.of(context).scaffoldBackgroundColor,
             borderRadius: BorderRadius.circular(10.0),
           ),
           child: Row(

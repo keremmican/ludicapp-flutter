@@ -6,10 +6,14 @@ import 'package:ludicapp/services/model/response/top_games_cover.dart';
 import 'package:ludicapp/core/widgets/rating_modal.dart';
 import 'package:ludicapp/core/models/game.dart';
 import 'package:ludicapp/core/providers/blurred_background_provider.dart';
+import 'package:ludicapp/theme/app_theme.dart';
+import 'package:ludicapp/services/category_service.dart';
 
 enum SortOption {
-  topRated,
-  recentlyAdded,
+  topRatedDesc,
+  topRatedAsc,
+  recentlyAddedAsc,
+  oldOnesDesc,
 }
 
 class RelatedGamesPage extends StatefulWidget {
@@ -24,22 +28,24 @@ class RelatedGamesPage extends StatefulWidget {
 
 class _RelatedGamesPageState extends State<RelatedGamesPage> {
   final GameRepository _gameRepository = GameRepository();
-  List<dynamic> games = [];
-  Set<int> savedGames = {};
-  Set<int> ratedGames = {};
+  final CategoryService _categoryService = CategoryService();
+  List<GameSummary> games = [];
+  Map<int, bool> savedGames = {};  // gameId -> isSaved
+  Map<int, bool> ratedGames = {};  // gameId -> isRated
+  Map<int, int> userRatings = {};  // gameId -> rating
   bool _isLoading = false;
+  bool _isInitialLoading = false;
   bool _hasMore = true;
   int _currentPage = 0;
   static const int _pageSize = 20;
   final ScrollController _scrollController = ScrollController();
-  SortOption _currentSort = SortOption.topRated;
-  int? _userRating;
+  SortOption _currentSort = SortOption.topRatedDesc;
 
   @override
   void initState() {
     super.initState();
     print('Initializing RelatedGamesPage for: ${widget.categoryTitle}');
-    _loadGames();
+    _ensureCategoriesLoaded();
     _scrollController.addListener(_onScroll);
   }
 
@@ -47,6 +53,21 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _ensureCategoriesLoaded() async {
+    setState(() {
+      _isInitialLoading = true;
+    });
+    if (!_categoryService.isInitialized) {
+      await _categoryService.initialize();
+    }
+    await _loadGames();
+    if (mounted) {
+      setState(() {
+        _isInitialLoading = false;
+      });
+    }
   }
 
   Future<void> _initialLoad() async {
@@ -118,11 +139,13 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
       }
       else if (genres.contains(widget.categoryTitle)) {
         print('Fetching games for genre: ${widget.categoryTitle} - Page: $_currentPage');
+        final (sortBy, sortDirection) = _getSortParams(_currentSort);
         final response = await _gameRepository.fetchGamesByGenre(
-          genre: widget.categoryTitle,
+          genreId: _getGenreId(widget.categoryTitle),
+          sortBy: sortBy,
+          sortDirection: sortDirection,
           page: _currentPage,
-          size: _pageSize,
-          sortByRating: _currentSort == SortOption.topRated,
+          pageSize: _pageSize,
         );
 
         if (!mounted) return;
@@ -130,11 +153,13 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
       }
       else if (themes.contains(widget.categoryTitle)) {
         print('Fetching games for theme: ${widget.categoryTitle} - Page: $_currentPage');
+        final (sortBy, sortDirection) = _getSortParams(_currentSort);
         final response = await _gameRepository.fetchGamesByTheme(
-          theme: widget.categoryTitle,
+          themeId: _getThemeId(widget.categoryTitle),
+          sortBy: sortBy,
+          sortDirection: sortDirection,
           page: _currentPage,
-          size: _pageSize,
-          sortByRating: _currentSort == SortOption.topRated,
+          pageSize: _pageSize,
         );
 
         if (!mounted) return;
@@ -158,7 +183,20 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
     }
   }
 
-  void handleResponse(PageableResponse response) {
+  (String, String) _getSortParams(SortOption sortOption) {
+    switch (sortOption) {
+      case SortOption.topRatedDesc:
+        return ('rating', 'DESC');
+      case SortOption.topRatedAsc:
+        return ('rating', 'ASC');
+      case SortOption.recentlyAddedAsc:
+        return ('releaseDate', 'ASC');
+      case SortOption.oldOnesDesc:
+        return ('releaseDate', 'DESC');
+    }
+  }
+
+  void handleResponse(PageableResponse<GameSummary> response) {
     setState(() {
       games.addAll(response.content);
       _hasMore = !response.last;
@@ -167,6 +205,22 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
     
     print('Response received: ${response.content.length} items');
     print('Updated state - Total games: ${games.length}, hasMore: $_hasMore');
+  }
+
+  int _getGenreId(String genreName) {
+    final genre = _categoryService.genres.firstWhere(
+      (g) => g.name == genreName,
+      orElse: () => throw Exception('Genre not found: $genreName'),
+    );
+    return genre.id;
+  }
+
+  int _getThemeId(String themeName) {
+    final theme = _categoryService.themes.firstWhere(
+      (t) => t.name == themeName,
+      orElse: () => throw Exception('Theme not found: $themeName'),
+    );
+    return theme.id;
   }
 
   static const List<String> genres = [
@@ -221,28 +275,23 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
   ];
 
   Widget _buildFilterRow() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Padding(
+    return Container(
+      height: 48,
+      margin: const EdgeInsets.only(top: 8),
+      child: ListView(
+        scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: Row(
-          children: [
-            // Sıralama Butonu
+        children: [
+          // Sorting Button - Only show for genres and themes
+          if (genres.contains(widget.categoryTitle) || themes.contains(widget.categoryTitle))
             Container(
-              margin: const EdgeInsets.only(right: 12),
-              decoration: BoxDecoration(
-                color: Colors.grey[850],
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: Colors.grey[800]!,
-                  width: 1,
-                ),
-              ),
+              margin: const EdgeInsets.only(right: 8),
               child: PopupMenuButton<SortOption>(
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                color: Colors.grey[900],
+                color: AppTheme.surfaceDark,
+                elevation: 8,
                 offset: const Offset(0, 40),
                 onSelected: (SortOption result) {
                   setState(() {
@@ -254,55 +303,86 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
                   });
                 },
                 itemBuilder: (BuildContext context) => <PopupMenuEntry<SortOption>>[
-                  const PopupMenuItem<SortOption>(
-                    value: SortOption.topRated,
-                    child: Row(
-                      children: [
-                        Icon(Icons.star, color: Colors.amber, size: 20),
-                        SizedBox(width: 8),
-                        Text(
-                          'Top Rated',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      ],
+                  if (_currentSort != SortOption.topRatedDesc)
+                    const PopupMenuItem<SortOption>(
+                      value: SortOption.topRatedDesc,
+                      child: Row(
+                        children: [
+                          Icon(Icons.star, color: Colors.amber, size: 20),
+                          SizedBox(width: 8),
+                          Text(
+                            'Top Rated (High to Low)',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  PopupMenuItem<SortOption>(
-                    value: SortOption.recentlyAdded,
-                    child: Row(
-                      children: [
-                        Icon(Icons.access_time, 
-                          color: Colors.blue[300], 
-                          size: 20
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Recently Added',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      ],
+                  if (_currentSort != SortOption.topRatedAsc)
+                    const PopupMenuItem<SortOption>(
+                      value: SortOption.topRatedAsc,
+                      child: Row(
+                        children: [
+                          Icon(Icons.star_half, color: Colors.amber, size: 20),
+                          SizedBox(width: 8),
+                          Text(
+                            'Top Rated (Low to High)',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
+                  if (_currentSort != SortOption.recentlyAddedAsc)
+                    PopupMenuItem<SortOption>(
+                      value: SortOption.recentlyAddedAsc,
+                      child: Row(
+                        children: [
+                          Icon(Icons.access_time, 
+                            color: Colors.blue[300], 
+                            size: 20
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Recently Added',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (_currentSort != SortOption.oldOnesDesc)
+                    PopupMenuItem<SortOption>(
+                      value: SortOption.oldOnesDesc,
+                      child: Row(
+                        children: [
+                          Icon(Icons.history, 
+                            color: Colors.grey[400], 
+                            size: 20
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Old Ones',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
-                child: Padding(
+                child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceDark,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        _currentSort == SortOption.topRated 
-                          ? Icons.star 
-                          : Icons.access_time,
-                        color: _currentSort == SortOption.topRated 
-                          ? Colors.amber 
-                          : Colors.blue[300],
+                        _getSortIcon(_currentSort),
+                        color: _getSortIconColor(_currentSort),
                         size: 20,
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        _currentSort == SortOption.topRated 
-                          ? 'Top Rated' 
-                          : 'Recently Added',
+                        _getSortText(_currentSort),
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 14,
@@ -311,7 +391,7 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
                       const SizedBox(width: 4),
                       const Icon(
                         Icons.arrow_drop_down,
-                        color: Colors.white54,
+                        color: Colors.white70,
                         size: 20,
                       ),
                     ],
@@ -319,39 +399,73 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
                 ),
               ),
             ),
-            // Diğer Filtre Butonları
-            _buildFilterButton('Available to Play'),
-            _buildFilterButton('Hide Rated'),
-          ],
-        ),
+          // Other Filter Buttons - Show for all categories
+          _buildFilterButton('Available to Play'),
+          _buildFilterButton('Hide Rated'),
+        ],
       ),
     );
+  }
+
+  IconData _getSortIcon(SortOption sortOption) {
+    switch (sortOption) {
+      case SortOption.topRatedDesc:
+      case SortOption.topRatedAsc:
+        return sortOption == SortOption.topRatedDesc ? Icons.star : Icons.star_half;
+      case SortOption.recentlyAddedAsc:
+        return Icons.access_time;
+      case SortOption.oldOnesDesc:
+        return Icons.history;
+    }
+  }
+
+  Color _getSortIconColor(SortOption sortOption) {
+    switch (sortOption) {
+      case SortOption.topRatedDesc:
+      case SortOption.topRatedAsc:
+        return Colors.amber;
+      case SortOption.recentlyAddedAsc:
+        return Colors.blue[300]!;
+      case SortOption.oldOnesDesc:
+        return Colors.grey[400]!;
+    }
+  }
+
+  String _getSortText(SortOption sortOption) {
+    switch (sortOption) {
+      case SortOption.topRatedDesc:
+        return 'Top Rated (High to Low)';
+      case SortOption.topRatedAsc:
+        return 'Top Rated (Low to High)';
+      case SortOption.recentlyAddedAsc:
+        return 'Recently Added';
+      case SortOption.oldOnesDesc:
+        return 'Old Ones';
+    }
   }
 
   Widget _buildFilterButton(String title, {bool isSelected = false}) {
     return Container(
       margin: const EdgeInsets.only(right: 8),
-      child: ElevatedButton(
-        onPressed: () {
+      child: InkWell(
+        onTap: () {
           print('$title filter selected');
         },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: isSelected ? Colors.grey[700] : Colors.grey[850],
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-            side: BorderSide(
-              color: Colors.grey[800]!,
-              width: 1,
-            ),
+        child: Container(
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: AppTheme.surfaceDark,
+            borderRadius: BorderRadius.circular(6),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        ),
-        child: Text(
-          title,
-          style: TextStyle(
-            color: isSelected ? Colors.white : Colors.white70,
-            fontSize: 14,
+          child: Center(
+            child: Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+              ),
+            ),
           ),
         ),
       ),
@@ -361,54 +475,92 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
           widget.categoryTitle,
           style: const TextStyle(color: Colors.white),
         ),
-        backgroundColor: Colors.black,
+        backgroundColor: AppTheme.primaryDark,
         iconTheme: const IconThemeData(color: Colors.white),
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildFilterRow(), // Yeni filtre satırı
+          _buildFilterRow(),
           const SizedBox(height: 16),
           Expanded(
-            child: games.isEmpty && !_isLoading
-              ? const Center(
-                  child: Text(
-                    'No games available in this category.',
-                    style: TextStyle(color: Colors.white, fontSize: 16),
+            child: _isInitialLoading
+              ? Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Theme.of(context).primaryColor.withOpacity(0.8),
+                      ),
+                    ),
                   ),
                 )
-              : RefreshIndicator(
-                  onRefresh: _initialLoad,
-                  color: Colors.white,
-                  backgroundColor: Colors.grey[900],
-                  child: GridView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 16,
-                      childAspectRatio: 0.51,
-                    ),
-                    itemCount: games.length + (_hasMore ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (index >= games.length) {
-                        return const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(16.0),
-                            child: CircularProgressIndicator(color: Colors.white),
+              : Stack(
+                  children: [
+                    games.isEmpty && !_isLoading
+                      ? const Center(
+                          child: Text(
+                            'No games available in this category.',
+                            style: TextStyle(color: Colors.white, fontSize: 16),
                           ),
-                        );
-                      }
-                      return _buildGameCard(games[index]);
-                    },
-                  ),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: _initialLoad,
+                          color: Colors.white,
+                          backgroundColor: Colors.grey[900],
+                          child: GridView.builder(
+                            controller: _scrollController,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              crossAxisSpacing: 12,
+                              mainAxisSpacing: 16,
+                              childAspectRatio: 0.51,
+                            ),
+                            itemCount: games.length + (_hasMore && _isLoading ? 1 : 0),
+                            itemBuilder: (context, index) {
+                              if (index >= games.length) {
+                                return const Padding(
+                                  padding: EdgeInsets.all(16.0),
+                                  child: Center(
+                                    child: SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }
+                              return GameCard(
+                                game: games[index],
+                                onSave: _handleSaveGame,
+                                onRate: _showRatingDialog,
+                                onHide: (game) {
+                                  setState(() {
+                                    final index = games.indexWhere((g) => g.id == game.id);
+                                    if (index != -1) {
+                                      games.removeAt(index);
+                                    }
+                                  });
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                  ],
                 ),
           ),
         ],
@@ -417,8 +569,8 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
   }
 
   Widget _buildGameCard(GameSummary game) {
-    final bool isSaved = savedGames.contains(game.id);
-    final bool isRated = ratedGames.contains(game.id);
+    final bool isSaved = savedGames[game.id] ?? false;
+    final bool isRated = ratedGames[game.id] ?? false;
     final _backgroundProvider = BlurredBackgroundProvider();
     
     // Cache the blurred background and preload screenshots
@@ -521,7 +673,9 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 IconButton(
-                  onPressed: () => _showHideConfirmation(game),
+                  onPressed: () {
+                    _showHideConfirmation(game);
+                  },
                   icon: const Icon(
                     Icons.thumb_down_outlined,
                     color: Colors.white70,
@@ -531,7 +685,9 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
                   constraints: const BoxConstraints(),
                 ),
                 IconButton(
-                  onPressed: () => _showRatingDialog(game),
+                  onPressed: () {
+                    _showRatingDialog(game);
+                  },
                   icon: const Icon(
                     Icons.check_outlined,
                     color: Colors.white70,
@@ -541,7 +697,9 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
                   constraints: const BoxConstraints(),
                 ),
                 IconButton(
-                  onPressed: () => _handleSaveGame(game),
+                  onPressed: () {
+                    _handleSaveGame(game);
+                  },
                   icon: const Icon(
                     Icons.favorite_border_outlined,
                     color: Colors.white70,
@@ -558,7 +716,33 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
     );
   }
 
-  Future<void> _showHideConfirmation(dynamic game) async {
+  void _showRatingDialog(GameSummary game) {
+    RatingModal.show(
+      context,
+      gameName: game.name,
+      coverUrl: game.coverUrl ?? '',
+      releaseYear: game.releaseDate,
+      initialRating: userRatings[game.id],
+      onRatingSelected: (rating) {
+        setState(() {
+          userRatings[game.id] = rating;
+          ratedGames[game.id] = true;
+        });
+      },
+    );
+  }
+
+  Future<void> _handleSaveGame(GameSummary game) async {
+    await _saveGame(game);
+    if (mounted) {
+      setState(() {
+        savedGames[game.id] = true;
+      });
+      _showSavedNotification();
+    }
+  }
+
+  Future<void> _showHideConfirmation(GameSummary game) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -568,7 +752,7 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
           style: TextStyle(color: Colors.white),
         ),
         content: Text(
-          'Are you sure you want to hide "${game is GameSummary ? game.name : 'this game'}"? You won\'t see it again in your recommendations.',
+          'Are you sure you want to hide "${game.name}"? You won\'t see it again in your recommendations.',
           style: const TextStyle(color: Colors.white70),
         ),
         actions: [
@@ -584,32 +768,15 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
       ),
     );
 
-    if (confirmed == true) {
+    if (confirmed == true && mounted) {
       // TODO: Implement hide functionality with backend
       setState(() {
-        games.remove(game);
+        final index = games.indexWhere((g) => g.id == game.id);
+        if (index != -1) {
+          games.removeAt(index);
+        }
       });
     }
-  }
-
-  void _showRatingDialog(dynamic game) {
-    RatingModal.show(
-      context,
-      gameName: game is GameSummary ? game.name : 'Rate this game',
-      coverUrl: game.coverUrl,
-      releaseYear: game is GameSummary ? game.releaseDate : null,
-      initialRating: _userRating,
-      onRatingSelected: (rating) {
-        setState(() {
-          _userRating = rating;
-          ratedGames.add(game.id);
-        });
-      },
-    );
-  }
-
-  Future<void> _saveGame(dynamic game) async {
-    // TODO: Implement save functionality with backend
   }
 
   void _showSavedNotification() {
@@ -643,11 +810,218 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
     });
   }
 
-  Future<void> _handleSaveGame(GameSummary game) async {
-    await _saveGame(game);
-    setState(() {
-      savedGames.add(game.id);
-    });
-    _showSavedNotification();
+  Future<void> _saveGame(GameSummary game) async {
+    // TODO: Implement save functionality with backend
+  }
+}
+
+class GameCard extends StatefulWidget {
+  final GameSummary game;
+  final Function(GameSummary) onSave;
+  final Function(GameSummary) onRate;
+  final Function(GameSummary) onHide;
+
+  const GameCard({
+    Key? key,
+    required this.game,
+    required this.onSave,
+    required this.onRate,
+    required this.onHide,
+  }) : super(key: key);
+
+  @override
+  State<GameCard> createState() => _GameCardState();
+}
+
+class _GameCardState extends State<GameCard> {
+  bool isSaved = false;
+  bool isRated = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final _backgroundProvider = BlurredBackgroundProvider();
+    
+    // Cache the blurred background and preload screenshots
+    _backgroundProvider.cacheBackground(widget.game.id.toString(), widget.game.coverUrl);
+    if (widget.game.screenshots.isNotEmpty) {
+      Game.preloadScreenshots(widget.game.id, widget.game.screenshots);
+      for (final screenshot in widget.game.screenshots) {
+        _backgroundProvider.cacheBackground('${widget.game.id}_${screenshot.hashCode}', screenshot);
+      }
+    }
+    
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => GameDetailPage(game: Game.fromGameSummary(widget.game)),
+          ),
+        );
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Game Cover Image with Container
+          Stack(
+            children: [
+              AspectRatio(
+                aspectRatio: 2 / 3,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.grey[900],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.network(
+                      widget.game.coverUrl ?? '',
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: Colors.grey[800],
+                          child: const Icon(Icons.error, color: Colors.white),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+              if (isSaved)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.favorite,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Game Title and Rating Row
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  widget.game.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                widget.game.totalRating?.toStringAsFixed(0) ?? '--',
+                style: TextStyle(
+                  color: Colors.green[400],
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          if (!isSaved && !isRated) ...[
+            const SizedBox(height: 4),
+            // Action Buttons
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  onPressed: () {
+                    _showHideConfirmation(context);
+                  },
+                  icon: const Icon(
+                    Icons.thumb_down_outlined,
+                    color: Colors.white70,
+                    size: 24,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+                IconButton(
+                  onPressed: () {
+                    widget.onRate(widget.game);
+                    setState(() {
+                      isRated = true;
+                    });
+                  },
+                  icon: const Icon(
+                    Icons.check_outlined,
+                    color: Colors.white70,
+                    size: 24,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+                IconButton(
+                  onPressed: () {
+                    widget.onSave(widget.game);
+                    setState(() {
+                      isSaved = true;
+                    });
+                  },
+                  icon: const Icon(
+                    Icons.favorite_border_outlined,
+                    color: Colors.white70,
+                    size: 24,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showHideConfirmation(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title: const Text(
+          'Hide Game',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: Text(
+          'Are you sure you want to hide "${widget.game.name}"? You won\'t see it again in your recommendations.',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Hide'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      // TODO: Implement hide functionality with backend
+      widget.onHide(widget.game);  // Ana widget'a bildir
+      setState(() {
+        isSaved = false;
+      });
+    }
   }
 }

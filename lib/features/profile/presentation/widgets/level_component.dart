@@ -19,11 +19,11 @@ class LevelComponent extends StatelessWidget {
           children: [
             // Progress Circle
             SizedBox(
-              width: 50, // Küçültülmüş boyut
-              height: 50, // Küçültülmüş boyut
+              width: 20, // Daha da küçültülmüş boyut
+              height: 20, // Daha da küçültülmüş boyut
               child: CircularProgressIndicator(
                 value: progress,
-                strokeWidth: 3, // Daha ince stroke
+                strokeWidth: 2.5, // Daha ince stroke
                 backgroundColor: Colors.grey.shade700,
                 valueColor: AlwaysStoppedAnimation<Color>(const Color(0xFFBFE429)), // Yeşil renk
               ),
@@ -32,7 +32,7 @@ class LevelComponent extends StatelessWidget {
             Icon(
               Icons.star, // İkon
               color: Colors.yellowAccent,
-              size: 20, // Küçültülmüş ikon boyutu
+              size: 16, // Daha da küçültülmüş ikon boyutu
             ),
           ],
         ),
