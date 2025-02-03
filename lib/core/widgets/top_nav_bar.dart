@@ -32,7 +32,7 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
 
           // App Logo
           SizedBox(
-            height: 100, // Increased logo size
+            height: 40, // Increased logo size
             child: Image.asset(
               'lib/assets/images/app_logo.png',
               fit: BoxFit.contain,

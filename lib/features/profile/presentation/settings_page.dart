@@ -1,8 +1,55 @@
 import 'package:flutter/material.dart';
 import 'package:ludicapp/features/authentication/presentation/login_page.dart';
 import 'package:ludicapp/theme/app_theme.dart';
+import 'package:ludicapp/services/api_service.dart';
+import 'package:ludicapp/services/token_service.dart';
+import 'package:ludicapp/services/repository/auth_repository.dart';
 
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends StatefulWidget {
+  const SettingsPage({Key? key}) : super(key: key);
+
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  final _apiService = ApiService();
+  final _tokenService = TokenService();
+  final _authRepository = AuthRepository();
+
+  Future<void> _handleLogout(BuildContext context) async {
+    try {
+      final success = await _authRepository.signOut();
+      
+      if (!mounted) return;
+
+      if (success) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/landing',
+          (route) => false,
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Çıkış yapılırken bir hata oluştu. Lütfen tekrar deneyin.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Logout Error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Çıkış yapılırken bir hata oluştu. Lütfen tekrar deneyin.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -11,6 +58,8 @@ class SettingsPage extends StatelessWidget {
         backgroundColor: AppTheme.surfaceDark,
         title: const Text('Settings', style: TextStyle(color: Colors.white)),
         iconTheme: const IconThemeData(color: Colors.white),
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
       ),
       body: ListView(
         padding: const EdgeInsets.all(10.0),
@@ -58,7 +107,7 @@ class SettingsPage extends StatelessWidget {
             onTap: () {
               print('Delete Account clicked');
             },
-            textColor: Colors.red, // Set red color for "Delete Account"
+            textColor: Colors.red,
           ),
 
           const SizedBox(height: 20),
@@ -70,7 +119,6 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
-  // Section Header
   Widget _buildSectionHeader(String title) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 15.0),
@@ -85,7 +133,6 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
-  // List Tile
   Widget _buildListTile(String title, IconData icon,
       {required VoidCallback onTap, Color textColor = Colors.white}) {
     return ListTile(
@@ -100,17 +147,9 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
-  // Sign Out Button
   Widget _buildSignOutButton(BuildContext context) {
     return ListTile(
-      onTap: () {
-        // Clear navigation stack and redirect to login page
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => LoginPage()),
-          (route) => false,
-        );
-      },
+      onTap: () => _handleLogout(context),
       title: const Text(
         'Sign Out',
         style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16),

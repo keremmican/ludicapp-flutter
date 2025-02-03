@@ -2,9 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:ludicapp/services/repository/game_repository.dart';
 import 'package:ludicapp/services/category_service.dart';
 import 'package:ludicapp/features/home/presentation/controller/home_controller.dart';
+import 'package:ludicapp/services/repository/auth_repository.dart';
+import 'package:ludicapp/services/repository/user_repository.dart';
+import 'package:ludicapp/models/profile_response.dart';
+import 'package:ludicapp/models/user_light_response.dart';
+import 'package:dio/dio.dart';
+import 'package:ludicapp/models/user_status.dart';
+import 'package:ludicapp/services/api_service.dart';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'dart:developer' as developer;
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
+
+  static ProfileResponse? get profileData => _SplashScreenState._profileData;
 
   @override
   _SplashScreenState createState() => _SplashScreenState();
@@ -14,9 +26,14 @@ class _SplashScreenState extends State<SplashScreen> {
   final GameRepository _gameRepository = GameRepository();
   final CategoryService _categoryService = CategoryService();
   final HomeController _homeController = HomeController();
+  final AuthRepository _authRepository = AuthRepository();
+  final UserRepository _userRepository = UserRepository();
+  final ApiService _apiService = ApiService();
   bool _isLoading = false;
+  bool _hasError = false;
   ImageProvider? _backgroundImage;
   ImageProvider? _logoImage;
+  static ProfileResponse? _profileData;
 
   @override
   void initState() {
@@ -24,36 +41,13 @@ class _SplashScreenState extends State<SplashScreen> {
     _loadData();
   }
 
-  Future<void> _loadData() async {
+  Future<void> _initializeCategories() async {
     try {
-      // Başlatma işlemlerini ve veri çekme işlemlerini paralel yap
-      await Future.wait([
-        _initializeCategories(), // Kategorileri yükle
-        _loadInitialData(), // Ana sayfa verilerini yükle
-      ]);
-
-      // Ana sayfaya git
-      if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/main');
+      if (!_categoryService.isInitialized) {
+        await _categoryService.initialize();
       }
     } catch (e) {
-      print('Error during data loading: $e');
-      // Even if there's an error, continue to main layout after a short delay
-      await Future.delayed(const Duration(seconds: 2));
-      if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/main');
-      }
-    }
-  }
-
-  Future<void> _initializeCategories() async {
-    if (!_categoryService.isInitialized) {
-      try {
-        await _categoryService.initialize();
-      } catch (e) {
-        print('Error loading categories: $e');
-        // Hata olsa bile devam et, kritik değil
-      }
+      // Continue even if there's an error, not critical
     }
   }
 
@@ -75,8 +69,6 @@ class _SplashScreenState extends State<SplashScreen> {
       comingSoonGames: comingSoonResponse.content,
     );
 
-    print('Data fetched successfully');
-
     // Her listeden ilk 4 resmi al
     final priorityImages = [
       ...newReleasesResponse.content.take(4).map((game) => game.coverUrl),
@@ -84,22 +76,17 @@ class _SplashScreenState extends State<SplashScreen> {
       ...comingSoonResponse.content.take(4).map((game) => game.coverUrl),
     ].where((url) => url != null).cast<String>();
 
-    print('Starting to preload ${priorityImages.length} priority images');
-
     // Öncelikli resimleri yükle
     for (final imageUrl in priorityImages) {
       if (imageUrl?.startsWith('http') ?? false) {
         try {
           final imageProvider = NetworkImage(imageUrl);
           await precacheImage(imageProvider, context);
-          print('Preloaded priority image: $imageUrl');
         } catch (e) {
-          print('Failed to preload priority image: $imageUrl');
+          // Ignore image loading errors
         }
       }
     }
-
-    print('Priority images preloaded');
 
     // Kısa bir bekleme ekleyelim ki kullanıcı logo'yu görebilsin
     await Future.delayed(const Duration(seconds: 1));
@@ -111,74 +98,73 @@ class _SplashScreenState extends State<SplashScreen> {
       ...comingSoonResponse.content.skip(4).map((game) => game.coverUrl),
     ].where((url) => url != null).cast<String>();
 
-    print('Starting to preload ${remainingImages.length} remaining images in background');
-
     for (final imageUrl in remainingImages) {
       if (imageUrl?.startsWith('http') ?? false) {
         try {
           final imageProvider = NetworkImage(imageUrl);
-          precacheImage(imageProvider, context); // await kullanmıyoruz
-          print('Started preloading background image: $imageUrl');
+          precacheImage(imageProvider, context);
         } catch (e) {
-          print('Failed to preload background image: $imageUrl');
+          // Ignore image loading errors
         }
       }
     }
   }
 
-  Future<void> _loadBackgroundImage() async {
-    try {
-      final response = await _gameRepository.fetchNewReleases();
-      if (response.content.isNotEmpty) {
-        final game = response.content.first;
-        final coverUrl = game.coverUrl;
-        
-        if (coverUrl?.startsWith('http') ?? false) {
-          setState(() {
-            _isLoading = true;
-          });
-          
-          final imageProvider = NetworkImage(coverUrl!);
-          await precacheImage(imageProvider, context);
-          
-          if (mounted) {
-            setState(() {
-              _backgroundImage = imageProvider;
-              _isLoading = false;
-            });
-          }
-        }
-      }
-    } catch (error) {
-      print('Error loading background image: $error');
-    }
+  Future<void> _loadUserProfile() async {
+    _profileData = await _userRepository.fetchUserProfile();
   }
 
-  Future<void> _loadLogo() async {
+  Future<void> _loadData() async {
     try {
-      final response = await _gameRepository.fetchTopRatedGames();
-      if (response.content.isNotEmpty) {
-        final game = response.content.first;
-        final coverUrl = game.coverUrl;
-        
-        if (coverUrl?.startsWith('http') ?? false) {
+      // Tüm veri yükleme işlemlerini paralel yap
+      await Future.wait([
+        _initializeCategories(),
+        _loadInitialData(),
+        _loadUserProfile(),
+      ]);
+
+      if (!mounted) return;
+
+      if (_profileData != null) {
+        switch (_profileData!.userStatus) {
+          case UserStatus.ACTIVE:
+            Navigator.of(context).pushReplacementNamed('/main');
+            break;
+          case UserStatus.ONBOARDING:
+            try {
+              await _apiService.get('/games/get-platforms');
+              Navigator.of(context).pushReplacementNamed('/onboarding');
+            } catch (e) {
+              setState(() {
+                _hasError = true;
+              });
+            }
+            break;
+          case UserStatus.BANNED:
+            Navigator.of(context).pushReplacementNamed('/banned');
+            break;
+          case UserStatus.DELETED:
+            try {
+              await _apiService.post('/api/auth/reactivate-account', {});
+              Navigator.of(context).pushReplacementNamed('/main');
+            } catch (e) {
+              Navigator.of(context).pushReplacementNamed('/landing');
+            }
+            break;
+        }
+      } else if (mounted) {
+        Navigator.of(context).pushReplacementNamed('/landing');
+      }
+    } catch (e) {
+      if (mounted) {
+        if (e is DioException && e.response?.statusCode == 401) {
+          Navigator.of(context).pushReplacementNamed('/landing');
+        } else {
           setState(() {
-            _isLoading = true;
+            _hasError = true;
           });
-          
-          final imageProvider = NetworkImage(coverUrl!);
-          await precacheImage(imageProvider, context);
-          
-          if (mounted) {
-            setState(() {
-              _logoImage = imageProvider;
-              _isLoading = false;
-            });
-          }
         }
       }
-    } catch (error) {
-      print('Error loading logo image: $error');
     }
   }
 
@@ -196,16 +182,31 @@ class _SplashScreenState extends State<SplashScreen> {
               height: 100,
             ),
             const SizedBox(height: 20),
-            SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  Theme.of(context).primaryColor.withOpacity(0.8),
+            if (_hasError) ...[
+              const Text(
+                'Connection error',
+                style: TextStyle(color: Colors.red),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _loadData,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).primaryColor,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Retry'),
+              ),
+            ] else
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    Theme.of(context).primaryColor.withOpacity(0.8),
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),

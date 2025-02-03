@@ -1,27 +1,31 @@
 class GameCategory {
   final int id;
   final String name;
-  final String? slug;
-  final String? url;
+  final String? description;
+  final String? imageUrl;
 
-  const GameCategory({
+  GameCategory({
     required this.id,
     required this.name,
-    this.slug,
-    this.url,
+    this.description,
+    this.imageUrl,
   });
 
-  factory GameCategory.fromJson(Map<String, dynamic> json) => GameCategory(
-    id: json['id'] as int,
-    name: json['name'] as String,
-    slug: json['slug'] as String?,
-    url: json['url'] as String?,
-  );
+  factory GameCategory.fromJson(Map<String, dynamic> json) {
+    return GameCategory(
+      id: json['id'] as int,
+      name: json['name'] as String,
+      description: json['description'] as String?,
+      imageUrl: json['imageUrl'] as String?,
+    );
+  }
 
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'slug': slug,
-    'url': url,
-  };
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'description': description,
+      'imageUrl': imageUrl,
+    };
+  }
 } 

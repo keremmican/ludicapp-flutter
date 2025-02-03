@@ -157,10 +157,10 @@ class _RecommendationPageState extends State<RecommendationPage> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
               isDisabled: false,
               isLoop: false,
-              maxAngle: 30,
-              threshold: 50,
+              maxAngle: 25,
+              threshold: 100,
               scale: 0.9,
-              duration: const Duration(milliseconds: 350),
+              duration: const Duration(milliseconds: 200),
               allowedSwipeDirection: AllowedSwipeDirection.only(left: true, right: true),
               cardBuilder: (context, index, horizontalThresholdPercentage, verticalThresholdPercentage) {
                 if (index >= _randomGames.length) return const SizedBox.shrink();
@@ -181,6 +181,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
                 return SwipeCard(
                   game: gameDetails,
                   dominantColor: Colors.black.withOpacity(0.8),
+                  horizontalThresholdPercentage: horizontalThresholdPercentage.toDouble(),
                   onTick: () {
                     _swiperController.swipe(CardSwiperDirection.right);
                   },

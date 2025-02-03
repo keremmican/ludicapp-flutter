@@ -30,8 +30,8 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
   final GameRepository _gameRepository = GameRepository();
   final CategoryService _categoryService = CategoryService();
   List<GameSummary> games = [];
-  Map<int, bool> savedGames = {};  // gameId -> isSaved
-  Map<int, bool> ratedGames = {};  // gameId -> isRated
+  Set<int> savedGames = {};  // Changed from Map to Set
+  Set<int> ratedGames = {};  // Changed from Map to Set
   Map<int, int> userRatings = {};  // gameId -> rating
   bool _isLoading = false;
   bool _isInitialLoading = false;
@@ -525,7 +525,7 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
                               crossAxisCount: 2,
                               crossAxisSpacing: 12,
                               mainAxisSpacing: 16,
-                              childAspectRatio: 0.51,
+                              childAspectRatio: 0.54,
                             ),
                             itemCount: games.length + (_hasMore && _isLoading ? 1 : 0),
                             itemBuilder: (context, index) {
@@ -548,14 +548,7 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
                                 game: games[index],
                                 onSave: _handleSaveGame,
                                 onRate: _showRatingDialog,
-                                onHide: (game) {
-                                  setState(() {
-                                    final index = games.indexWhere((g) => g.id == game.id);
-                                    if (index != -1) {
-                                      games.removeAt(index);
-                                    }
-                                  });
-                                },
+                                onHide: _handleHideGame,
                               );
                             },
                           ),
@@ -569,8 +562,8 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
   }
 
   Widget _buildGameCard(GameSummary game) {
-    final bool isSaved = savedGames[game.id] ?? false;
-    final bool isRated = ratedGames[game.id] ?? false;
+    final bool isSaved = savedGames.contains(game.id);
+    final bool isRated = ratedGames.contains(game.id);
     final _backgroundProvider = BlurredBackgroundProvider();
     
     // Cache the blurred background and preload screenshots
@@ -591,127 +584,148 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
           ),
         );
       },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Game Cover Image with Container
-          Stack(
-            children: [
-              AspectRatio(
-                aspectRatio: 2 / 3,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey[900],
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      game.coverUrl ?? '',
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: Colors.grey[800],
-                          child: const Icon(Icons.error, color: Colors.white),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ),
-              if (isSaved)
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.grey[900]?.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Game Cover Image with Container
+            Expanded(
+              child: Stack(
+                children: [
+                  Container(
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.5),
-                      shape: BoxShape.circle,
+                      color: Colors.grey[900],
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(
-                      Icons.favorite,
-                      color: Colors.white,
-                      size: 20,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.network(
+                        game.coverUrl ?? '',
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: Colors.grey[800],
+                            child: const Icon(Icons.error, color: Colors.white),
+                          );
+                        },
+                      ),
                     ),
                   ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          // Game Title and Rating Row
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  game.name,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                  if (isSaved)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.5),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.favorite,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                ],
               ),
-              const SizedBox(width: 8),
-              Text(
-                game.totalRating?.toStringAsFixed(0) ?? '--',
-                style: TextStyle(
-                  color: Colors.green[400],
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+            ),
+            // Game Title and Rating Row
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          game.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        game.totalRating?.toStringAsFixed(0) ?? '--',
+                        style: TextStyle(
+                          color: Colors.green[400],
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  // Action Buttons - Always show but with opacity
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Opacity(
+                        opacity: (!isSaved && !isRated) ? 1.0 : 0.0,
+                        child: IconButton(
+                          onPressed: (!isSaved && !isRated) ? () {
+                            _showHideConfirmation(context, game);
+                          } : null,
+                          icon: const Icon(
+                            Icons.thumb_down_outlined,
+                            color: Colors.white70,
+                            size: 20,
+                          ),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ),
+                      Opacity(
+                        opacity: (!isSaved && !isRated) ? 1.0 : 0.0,
+                        child: IconButton(
+                          onPressed: (!isSaved && !isRated) ? () {
+                            _showRatingDialog(game);
+                          } : null,
+                          icon: const Icon(
+                            Icons.check_outlined,
+                            color: Colors.white70,
+                            size: 20,
+                          ),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ),
+                      Opacity(
+                        opacity: (!isSaved && !isRated) ? 1.0 : 0.0,
+                        child: IconButton(
+                          onPressed: (!isSaved && !isRated) ? () {
+                            _handleSaveGame(game);
+                          } : null,
+                          icon: const Icon(
+                            Icons.favorite_border_outlined,
+                            color: Colors.white70,
+                            size: 20,
+                          ),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
-          if (!isSaved && !isRated) ...[
-            const SizedBox(height: 4),
-            // Action Buttons
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                IconButton(
-                  onPressed: () {
-                    _showHideConfirmation(game);
-                  },
-                  icon: const Icon(
-                    Icons.thumb_down_outlined,
-                    color: Colors.white70,
-                    size: 24,
-                  ),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-                IconButton(
-                  onPressed: () {
-                    _showRatingDialog(game);
-                  },
-                  icon: const Icon(
-                    Icons.check_outlined,
-                    color: Colors.white70,
-                    size: 24,
-                  ),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-                IconButton(
-                  onPressed: () {
-                    _handleSaveGame(game);
-                  },
-                  icon: const Icon(
-                    Icons.favorite_border_outlined,
-                    color: Colors.white70,
-                    size: 24,
-                  ),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-              ],
             ),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -726,7 +740,7 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
       onRatingSelected: (rating) {
         setState(() {
           userRatings[game.id] = rating;
-          ratedGames[game.id] = true;
+          ratedGames.add(game.id);  // Changed from Map to Set usage
         });
       },
     );
@@ -736,13 +750,17 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
     await _saveGame(game);
     if (mounted) {
       setState(() {
-        savedGames[game.id] = true;
+        savedGames.add(game.id);  // Changed from Map to Set usage
       });
       _showSavedNotification();
     }
   }
 
-  Future<void> _showHideConfirmation(GameSummary game) async {
+  Future<void> _handleHideGame(GameSummary gameToHide) async {
+    await _showHideConfirmation(context, gameToHide);
+  }
+
+  Future<void> _showHideConfirmation(BuildContext context, GameSummary gameToHide) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -752,7 +770,7 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
           style: TextStyle(color: Colors.white),
         ),
         content: Text(
-          'Are you sure you want to hide "${game.name}"? You won\'t see it again in your recommendations.',
+          'Are you sure you want to hide "${gameToHide.name}"? You won\'t see it again in your recommendations.',
           style: const TextStyle(color: Colors.white70),
         ),
         actions: [
@@ -771,10 +789,7 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
     if (confirmed == true && mounted) {
       // TODO: Implement hide functionality with backend
       setState(() {
-        final index = games.indexWhere((g) => g.id == game.id);
-        if (index != -1) {
-          games.removeAt(index);
-        }
+        games.remove(gameToHide);  // Changed from indexWhere/removeAt to direct remove
       });
     }
   }
@@ -859,169 +874,158 @@ class _GameCardState extends State<GameCard> {
           ),
         );
       },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Game Cover Image with Container
-          Stack(
-            children: [
-              AspectRatio(
-                aspectRatio: 2 / 3,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey[900],
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      widget.game.coverUrl ?? '',
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: Colors.grey[800],
-                          child: const Icon(Icons.error, color: Colors.white),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ),
-              if (isSaved)
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.grey[900]?.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Game Cover Image with Container
+            Expanded(
+              child: Stack(
+                children: [
+                  Container(
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.5),
-                      shape: BoxShape.circle,
+                      color: Colors.grey[900],
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(
-                      Icons.favorite,
-                      color: Colors.white,
-                      size: 20,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.network(
+                        widget.game.coverUrl ?? '',
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: Colors.grey[800],
+                            child: const Icon(Icons.error, color: Colors.white),
+                          );
+                        },
+                      ),
                     ),
                   ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          // Game Title and Rating Row
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  widget.game.name,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                  if (isSaved)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.5),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.favorite,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                ],
               ),
-              const SizedBox(width: 8),
-              Text(
-                widget.game.totalRating?.toStringAsFixed(0) ?? '--',
-                style: TextStyle(
-                  color: Colors.green[400],
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+            ),
+            // Game Title and Rating Row
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.game.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        widget.game.totalRating?.toStringAsFixed(0) ?? '--',
+                        style: TextStyle(
+                          color: Colors.green[400],
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  // Action Buttons - Always show but with opacity
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Opacity(
+                        opacity: (!isSaved && !isRated) ? 1.0 : 0.0,
+                        child: IconButton(
+                          onPressed: (!isSaved && !isRated) ? () {
+                            widget.onHide(widget.game);
+                            setState(() {
+                              isSaved = false;
+                            });
+                          } : null,
+                          icon: const Icon(
+                            Icons.thumb_down_outlined,
+                            color: Colors.white70,
+                            size: 20,
+                          ),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ),
+                      Opacity(
+                        opacity: (!isSaved && !isRated) ? 1.0 : 0.0,
+                        child: IconButton(
+                          onPressed: (!isSaved && !isRated) ? () {
+                            widget.onRate(widget.game);
+                            setState(() {
+                              isRated = true;
+                            });
+                          } : null,
+                          icon: const Icon(
+                            Icons.check_outlined,
+                            color: Colors.white70,
+                            size: 20,
+                          ),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ),
+                      Opacity(
+                        opacity: (!isSaved && !isRated) ? 1.0 : 0.0,
+                        child: IconButton(
+                          onPressed: (!isSaved && !isRated) ? () {
+                            widget.onSave(widget.game);
+                            setState(() {
+                              isSaved = true;
+                            });
+                          } : null,
+                          icon: const Icon(
+                            Icons.favorite_border_outlined,
+                            color: Colors.white70,
+                            size: 20,
+                          ),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
-          if (!isSaved && !isRated) ...[
-            const SizedBox(height: 4),
-            // Action Buttons
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                IconButton(
-                  onPressed: () {
-                    _showHideConfirmation(context);
-                  },
-                  icon: const Icon(
-                    Icons.thumb_down_outlined,
-                    color: Colors.white70,
-                    size: 24,
-                  ),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-                IconButton(
-                  onPressed: () {
-                    widget.onRate(widget.game);
-                    setState(() {
-                      isRated = true;
-                    });
-                  },
-                  icon: const Icon(
-                    Icons.check_outlined,
-                    color: Colors.white70,
-                    size: 24,
-                  ),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-                IconButton(
-                  onPressed: () {
-                    widget.onSave(widget.game);
-                    setState(() {
-                      isSaved = true;
-                    });
-                  },
-                  icon: const Icon(
-                    Icons.favorite_border_outlined,
-                    color: Colors.white70,
-                    size: 24,
-                  ),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-              ],
             ),
           ],
-        ],
+        ),
       ),
     );
-  }
-
-  Future<void> _showHideConfirmation(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.grey[900],
-        title: const Text(
-          'Hide Game',
-          style: TextStyle(color: Colors.white),
-        ),
-        content: Text(
-          'Are you sure you want to hide "${widget.game.name}"? You won\'t see it again in your recommendations.',
-          style: const TextStyle(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Hide'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true && mounted) {
-      // TODO: Implement hide functionality with backend
-      widget.onHide(widget.game);  // Ana widget'a bildir
-      setState(() {
-        isSaved = false;
-      });
-    }
   }
 }

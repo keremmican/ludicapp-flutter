@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ludicapp/core/utils/date_formatter.dart';
 
 class MainPageGame extends StatelessWidget {
   final Map<String, String> game;
@@ -17,9 +18,11 @@ class MainPageGame extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          height: MediaQuery.of(context).size.height * 0.5,
+          width: MediaQuery.of(context).size.width - 32,
+          height: (MediaQuery.of(context).size.width - 32) * (1942 / 1559),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
+            color: Colors.grey[900],
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.2),
@@ -36,7 +39,11 @@ class MainPageGame extends StatelessWidget {
                 tag: 'game-${game['id']}',
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(24),
-                  child: _buildGameImage(),
+                  child: Container(
+                    width: double.infinity,
+                    height: double.infinity,
+                    child: _buildGameImage(),
+                  ),
                 ),
               ),
 
@@ -108,7 +115,7 @@ class MainPageGame extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            game['releaseDate'] ?? 'TBA',
+                            DateFormatter.formatDate(game['releaseDate']),
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.w600,
@@ -139,6 +146,7 @@ class MainPageGame extends StatelessWidget {
       return Image.network(
         game['image'] ?? '',
         fit: BoxFit.cover,
+        alignment: Alignment.center,
         errorBuilder: (context, error, stackTrace) => _buildErrorWidget(),
         loadingBuilder: (context, child, loadingProgress) {
           if (loadingProgress == null) return child;
@@ -149,6 +157,7 @@ class MainPageGame extends StatelessWidget {
     return Image.asset(
       game['image'] ?? '',
       fit: BoxFit.cover,
+      alignment: Alignment.center,
     );
   }
 

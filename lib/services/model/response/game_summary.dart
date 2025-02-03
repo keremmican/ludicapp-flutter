@@ -82,7 +82,13 @@ class GameSummary {
 
       List<Map<String, String>> convertStringMapList(dynamic list) {
         if (list == null) return [];
-        return (list as List).map((e) => Map<String, String>.from(e)).toList();
+        return (list as List).map((e) {
+          Map<String, dynamic> map = e as Map<String, dynamic>;
+          return map.map((key, value) => MapEntry(
+            key,
+            value?.toString() ?? ''
+          ));
+        }).toList();
       }
 
       return GameSummary(

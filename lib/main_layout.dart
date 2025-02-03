@@ -4,6 +4,7 @@ import 'features/recommendations/presentation/recommendations_page.dart';
 import 'features/profile/presentation/profile_page.dart';
 import 'core/widgets/top_nav_bar.dart';
 import 'core/widgets/bottom_nav_bar.dart';
+import 'package:ludicapp/services/token_service.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -14,11 +15,23 @@ class MainLayout extends StatefulWidget {
 
 class _MainLayoutState extends State<MainLayout> {
   int _currentIndex = 0;
+  final _tokenService = TokenService();
 
   void _onTabTapped(int index) {
     setState(() {
       _currentIndex = index;
     });
+  }
+
+  Future<void> signOut() async {
+    await _tokenService.clearAuthData();
+    if (mounted) {
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        '/landing',
+        (route) => false,
+      );
+    }
   }
 
   @override

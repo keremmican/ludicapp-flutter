@@ -13,6 +13,7 @@ import 'package:ludicapp/core/widgets/rating_modal.dart';
 import 'package:ludicapp/features/profile/presentation/related_games_page.dart';
 import 'package:ludicapp/core/widgets/review_modal.dart';
 import 'package:ludicapp/core/providers/blurred_background_provider.dart';
+import 'package:ludicapp/core/utils/date_formatter.dart';
 
 class GameDetailPage extends StatefulWidget {
   final Game game;
@@ -500,6 +501,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
                       children: [
                         Text(
                           _game.name,
+                          textAlign: TextAlign.center,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 24,
@@ -815,7 +817,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
                           const SizedBox(height: 16),
                         ],
                         if (_game.releaseDate != null) ...[
-                          _buildDetailRow('Release Date', _game.releaseDate!),
+                          _buildDetailRow('Release Date', DateFormatter.formatDate(_game.releaseDate!)),
                           const SizedBox(height: 16),
                         ],
                         if (_game.companies?.isNotEmpty ?? false) ...[

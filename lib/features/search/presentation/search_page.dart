@@ -9,6 +9,8 @@ import 'package:ludicapp/theme/app_theme.dart';
 import 'package:ludicapp/features/game/presentation/game_detail_page.dart';
 import 'package:ludicapp/features/profile/presentation/related_games_page.dart';
 import 'package:ludicapp/core/models/game.dart';
+import 'dart:convert';
+import 'package:ludicapp/services/api_service.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
@@ -24,6 +26,7 @@ class _SearchPageState extends State<SearchPage> {
   late final SearchRepository _searchRepository;
   late final CategoryService _categoryService;
   late final ScrollController _scrollController;
+  late final ApiService _apiService;
   
   List<SearchGame> _searchResults = [];
   bool _isLoading = false;
@@ -49,6 +52,7 @@ class _SearchPageState extends State<SearchPage> {
     _searchRepository = SearchRepository();
     _categoryService = CategoryService();
     _scrollController = ScrollController();
+    _apiService = ApiService();
     
     _scrollController.addListener(_onScroll);
     _searchController.addListener(_onSearchChanged);
@@ -314,6 +318,8 @@ class _SearchPageState extends State<SearchPage> {
         backgroundColor: AppTheme.primaryDark,
         elevation: 0,
         automaticallyImplyLeading: false,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
         title: Row(
           children: [
             Expanded(
@@ -371,6 +377,8 @@ class _SearchPageState extends State<SearchPage> {
                   _buildSection('Genre', _categoryService.genres),
                   const SizedBox(height: 16),
                   _buildSection('Themes', _categoryService.themes),
+                  const SizedBox(height: 16),
+                  _buildSection('Platforms', _categoryService.platforms.map((p) => p['name'] as String).toList()),
                 ],
               ),
             )

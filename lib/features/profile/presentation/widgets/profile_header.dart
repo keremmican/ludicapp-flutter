@@ -3,9 +3,10 @@ import 'level_component.dart';
 
 class ProfileHeader extends StatelessWidget {
   final int level;
-  final double progress; // Value between 0.0 and 1.0
+  final double progress;
   final int followingCount;
   final int followersCount;
+  final String username;
   final VoidCallback onSettingsPressed;
   final VoidCallback onFollowingPressed;
   final VoidCallback onFollowersPressed;
@@ -16,6 +17,7 @@ class ProfileHeader extends StatelessWidget {
     required this.progress,
     required this.followingCount,
     required this.followersCount,
+    required this.username,
     required this.onSettingsPressed,
     required this.onFollowingPressed,
     required this.onFollowersPressed,
@@ -23,42 +25,58 @@ class ProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Stack(
+      clipBehavior: Clip.none,
       children: [
-        // Background and Profile Photo with Settings Icon
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            // Background Photo
-            Container(
-              height: 160,
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                image: DecorationImage(
-                  image: AssetImage('lib/assets/images/background_profile.jpg'),
-                  fit: BoxFit.cover,
-                ),
-              ),
-              child: Container(
-                color: Colors.black.withOpacity(0.5),
+        // Background Image with Gradient Overlay
+        Container(
+          height: 200,
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage('lib/assets/images/background_profile.jpg'),
+              fit: BoxFit.cover,
+            ),
+          ),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withOpacity(0.3),
+                  Colors.black.withOpacity(0.7),
+                ],
               ),
             ),
+          ),
+        ),
 
-            // Settings Icon Positioned at Top Right
-            Positioned(
-              top: 16,
-              right: 16,
-              child: IconButton(
-                onPressed: onSettingsPressed,
-                icon: const Icon(Icons.settings, color: Color(0xFFBFE429)),
-              ),
+        // Settings Button
+        Positioned(
+          top: 16,
+          right: 16,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.black26,
+              borderRadius: BorderRadius.circular(8),
             ),
+            child: IconButton(
+              onPressed: onSettingsPressed,
+              icon: const Icon(Icons.settings, color: Color(0xFFBFE429)),
+            ),
+          ),
+        ),
 
-            // Profile Photo
-            Positioned(
-              top: 100,
-              left: MediaQuery.of(context).size.width / 2 - 50,
-              child: Container(
+        // Profile Info Container
+        Positioned(
+          bottom: -60,
+          left: 0,
+          right: 0,
+          child: Column(
+            children: [
+              // Profile Photo
+              Container(
                 width: 100,
                 height: 100,
                 decoration: BoxDecoration(
@@ -67,76 +85,63 @@ class ProfileHeader extends StatelessWidget {
                     image: AssetImage('lib/assets/images/profile_photo.jpg'),
                     fit: BoxFit.cover,
                   ),
-                  borderRadius: BorderRadius.circular(10.0),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: const Color(0xFFBFE429),
+                    width: 2,
+                  ),
                 ),
               ),
-            ),
-          ],
-        ),
-
-        // Space between Profile Photo and Stats
-        const SizedBox(height: 50), // Azaltıldı: 60'dan 50'ye
-
-        // Stats Container
-        Container(
-          padding: const EdgeInsets.symmetric(vertical: 2), // Azaltıldı: 8'den 4'e
-          margin: const EdgeInsets.symmetric(horizontal: 20),
-          decoration: BoxDecoration(
-            color: Theme.of(context).scaffoldBackgroundColor,
-            borderRadius: BorderRadius.circular(10.0),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              // Level Component
-              LevelComponent(
-                level: level,
-                progress: progress,
-              ),
-
-              // Followers Stat (Clickable)
-              GestureDetector(
-                onTap: onFollowersPressed,
-                child: Column(
-                  children: [
-                    Text(
-                      '$followersCount',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Text(
-                      'Followers',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
+              
+              // Username
+              const SizedBox(height: 8),
+              Text(
+                username,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
 
-              // Following Stat (Clickable)
-              GestureDetector(
-                onTap: onFollowingPressed,
-                child: Column(
+              // Stats Container
+              const SizedBox(height: 16),
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.grey.withOpacity(0.2),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    Text(
-                      '$followingCount',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    // Level Component
+                    LevelComponent(
+                      level: level,
+                      progress: progress,
                     ),
-                    const Text(
-                      'Following',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                      ),
+
+                    _buildDivider(),
+
+                    // Followers
+                    _buildStat(
+                      label: 'Followers',
+                      value: followersCount.toString(),
+                      onTap: onFollowersPressed,
+                    ),
+
+                    _buildDivider(),
+
+                    // Following
+                    _buildStat(
+                      label: 'Following',
+                      value: followingCount.toString(),
+                      onTap: onFollowingPressed,
                     ),
                   ],
                 ),
@@ -144,11 +149,46 @@ class ProfileHeader extends StatelessWidget {
             ],
           ),
         ),
-
-        const SizedBox(height: 10), // Ayarlanabilir boşluk
-
-        // Diğer öğeler veya boşluklar eklenebilir
       ],
+    );
+  }
+
+  Widget _buildDivider() {
+    return Container(
+      height: 24,
+      width: 1,
+      color: Colors.grey.withOpacity(0.2),
+    );
+  }
+
+  Widget _buildStat({
+    required String label,
+    required String value,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.grey[400],
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
