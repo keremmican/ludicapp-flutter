@@ -9,17 +9,40 @@ import 'package:ludicapp/models/user_light_response.dart';
 import 'package:dio/dio.dart';
 import 'package:ludicapp/models/user_status.dart';
 import 'package:ludicapp/services/api_service.dart';
+import 'package:ludicapp/services/model/response/name_id_response.dart';
+import 'package:ludicapp/services/model/response/game_summary.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'dart:developer' as developer;
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({Key? key}) : super(key: key);
+  static ProfileResponse? _profileData;
+  static List<NameIdResponse>? _popularityTypes;
+  static int? _visitsPopularityTypeId;
 
-  static ProfileResponse? get profileData => _SplashScreenState._profileData;
+  static ProfileResponse? get profileData => _profileData;
+  static List<NameIdResponse>? get popularityTypes => _popularityTypes;
+  static int? get visitsPopularityTypeId => _visitsPopularityTypeId;
+  
+  static set profileData(ProfileResponse? value) {
+    _profileData = value;
+  }
+
+  static set popularityTypes(List<NameIdResponse>? value) {
+    _popularityTypes = value;
+    if (value != null) {
+      final visitsType = value.firstWhere(
+        (type) => type.name == "Visits",
+        orElse: () => value.first,
+      );
+      _visitsPopularityTypeId = visitsType.id;
+    }
+  }
+
+  const SplashScreen({super.key});
 
   @override
-  _SplashScreenState createState() => _SplashScreenState();
+  State<SplashScreen> createState() => _SplashScreenState();
 }
 
 class _SplashScreenState extends State<SplashScreen> {
@@ -29,11 +52,10 @@ class _SplashScreenState extends State<SplashScreen> {
   final AuthRepository _authRepository = AuthRepository();
   final UserRepository _userRepository = UserRepository();
   final ApiService _apiService = ApiService();
-  bool _isLoading = false;
-  bool _hasError = false;
+  bool _isLoading = true;
+  String? _errorMessage;
   ImageProvider? _backgroundImage;
   ImageProvider? _logoImage;
-  static ProfileResponse? _profileData;
 
   @override
   void initState() {
@@ -52,6 +74,12 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _loadInitialData() async {
+    // Fetch popularity types first
+    final popularityTypesResponse = await _gameRepository.getPopularityTypes()
+        .timeout(const Duration(seconds: 5));
+    
+    SplashScreen.popularityTypes = popularityTypesResponse;
+
     // Fetch data with timeout
     final newReleasesResponse = await _gameRepository.fetchNewReleases()
         .timeout(const Duration(seconds: 5));
@@ -62,83 +90,108 @@ class _SplashScreenState extends State<SplashScreen> {
     final comingSoonResponse = await _gameRepository.fetchComingSoon()
         .timeout(const Duration(seconds: 5));
 
+    // Fetch game by visits popularity type if available
+    GameSummary? popularGameByVisits;
+    if (SplashScreen.visitsPopularityTypeId != null) {
+      popularGameByVisits = await _gameRepository.getSingleGameByPopularityType(
+        SplashScreen.visitsPopularityTypeId!
+      ).timeout(const Duration(seconds: 5));
+
+      // Immediately preload the main game cover image if available
+      if (popularGameByVisits?.coverUrl != null && popularGameByVisits!.coverUrl!.startsWith('http')) {
+        try {
+          final mainGameImageProvider = NetworkImage(popularGameByVisits.coverUrl!);
+          await precacheImage(mainGameImageProvider, context);
+        } catch (e) {
+          developer.log('Failed to preload main game cover: ${e.toString()}');
+        }
+      }
+    }
+
     // Initialize HomeController with fetched data
     _homeController.setInitialData(
       newReleases: newReleasesResponse.content,
       topRatedGames: topRatedResponse.content,
       comingSoonGames: comingSoonResponse.content,
+      popularGameByVisits: popularGameByVisits,
     );
 
-    // Her listeden ilk 4 resmi al
+    // Get priority images excluding the main game which is already loaded
     final priorityImages = [
       ...newReleasesResponse.content.take(4).map((game) => game.coverUrl),
       ...topRatedResponse.content.take(4).map((game) => game.coverUrl),
       ...comingSoonResponse.content.take(4).map((game) => game.coverUrl),
-    ].where((url) => url != null).cast<String>();
+    ]
+    .where((url) => url != null && url != popularGameByVisits?.coverUrl)
+    .cast<String>();
 
-    // Öncelikli resimleri yükle
+    // Load priority images
     for (final imageUrl in priorityImages) {
-      if (imageUrl?.startsWith('http') ?? false) {
+      if (imageUrl.startsWith('http')) {
         try {
           final imageProvider = NetworkImage(imageUrl);
           await precacheImage(imageProvider, context);
         } catch (e) {
-          // Ignore image loading errors
+          developer.log('Failed to preload priority image: ${e.toString()}');
         }
       }
     }
 
-    // Kısa bir bekleme ekleyelim ki kullanıcı logo'yu görebilsin
+    // Short delay for logo visibility
     await Future.delayed(const Duration(seconds: 1));
 
-    // Geri kalan resimleri arka planda yükle
+    // Load remaining images in background
     final remainingImages = [
       ...newReleasesResponse.content.skip(4).map((game) => game.coverUrl),
       ...topRatedResponse.content.skip(4).map((game) => game.coverUrl),
       ...comingSoonResponse.content.skip(4).map((game) => game.coverUrl),
-    ].where((url) => url != null).cast<String>();
+    ]
+    .where((url) => url != null && url != popularGameByVisits?.coverUrl)
+    .cast<String>();
 
     for (final imageUrl in remainingImages) {
-      if (imageUrl?.startsWith('http') ?? false) {
+      if (imageUrl.startsWith('http')) {
         try {
           final imageProvider = NetworkImage(imageUrl);
           precacheImage(imageProvider, context);
         } catch (e) {
-          // Ignore image loading errors
+          developer.log('Failed to preload remaining image: ${e.toString()}');
         }
       }
     }
   }
 
   Future<void> _loadUserProfile() async {
-    _profileData = await _userRepository.fetchUserProfile();
+    SplashScreen.profileData = await _userRepository.fetchUserProfile();
   }
 
   Future<void> _loadData() async {
+    if (!mounted) return;
+    
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
     try {
-      // Tüm veri yükleme işlemlerini paralel yap
+      // Initialize categories first since it's critical
+      await _initializeCategories();
+
+      // Then load user profile and initial data in parallel
       await Future.wait([
-        _initializeCategories(),
         _loadInitialData(),
         _loadUserProfile(),
       ]);
 
       if (!mounted) return;
 
-      if (_profileData != null) {
-        switch (_profileData!.userStatus) {
+      if (SplashScreen.profileData != null) {
+        switch (SplashScreen.profileData!.userStatus) {
           case UserStatus.ACTIVE:
             Navigator.of(context).pushReplacementNamed('/main');
             break;
           case UserStatus.ONBOARDING:
-            try {
-              await _apiService.get('/games/get-platforms');
-              Navigator.of(context).pushReplacementNamed('/onboarding');
-            } catch (e) {
-              setState(() {
-                _hasError = true;
-              });
-            }
+            Navigator.of(context).pushReplacementNamed('/onboarding');
             break;
           case UserStatus.BANNED:
             Navigator.of(context).pushReplacementNamed('/banned');
@@ -146,8 +199,10 @@ class _SplashScreenState extends State<SplashScreen> {
           case UserStatus.DELETED:
             try {
               await _apiService.post('/api/auth/reactivate-account', {});
+              if (!mounted) return;
               Navigator.of(context).pushReplacementNamed('/main');
             } catch (e) {
+              if (!mounted) return;
               Navigator.of(context).pushReplacementNamed('/landing');
             }
             break;
@@ -156,16 +211,43 @@ class _SplashScreenState extends State<SplashScreen> {
         Navigator.of(context).pushReplacementNamed('/landing');
       }
     } catch (e) {
-      if (mounted) {
-        if (e is DioException && e.response?.statusCode == 401) {
-          Navigator.of(context).pushReplacementNamed('/landing');
-        } else {
-          setState(() {
-            _hasError = true;
-          });
-        }
-      }
+      _handleError(e);
     }
+  }
+
+  void _handleError(dynamic error) {
+    if (!mounted) return;
+    
+    setState(() {
+      _isLoading = false;
+      if (error is DioException) {
+        switch (error.type) {
+          case DioExceptionType.connectionTimeout:
+          case DioExceptionType.sendTimeout:
+          case DioExceptionType.receiveTimeout:
+            _errorMessage = 'Connection timeout';
+            break;
+          case DioExceptionType.connectionError:
+            _errorMessage = 'No internet connection';
+            break;
+          case DioExceptionType.badResponse:
+            if (error.response?.statusCode == 401) {
+              Navigator.of(context).pushReplacementNamed('/landing');
+              return;
+            } else if (error.response?.statusCode == 500) {
+              _errorMessage = 'Server error';
+            } else {
+              _errorMessage = 'Connection error';
+            }
+            break;
+          default:
+            _errorMessage = 'Connection error';
+            break;
+        }
+      } else {
+        _errorMessage = 'An unexpected error occurred';
+      }
+    });
   }
 
   @override
@@ -182,10 +264,10 @@ class _SplashScreenState extends State<SplashScreen> {
               height: 100,
             ),
             const SizedBox(height: 20),
-            if (_hasError) ...[
-              const Text(
-                'Connection error',
-                style: TextStyle(color: Colors.red),
+            if (_errorMessage != null) ...[
+              Text(
+                _errorMessage!,
+                style: const TextStyle(color: Colors.red),
               ),
               const SizedBox(height: 16),
               ElevatedButton(
@@ -196,7 +278,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 ),
                 child: const Text('Retry'),
               ),
-            ] else
+            ] else if (_isLoading)
               SizedBox(
                 width: 20,
                 height: 20,

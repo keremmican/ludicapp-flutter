@@ -33,11 +33,16 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   // Static platforms for onboarding
   final List<Map<String, dynamic>> _staticPlatforms = [
-    {'id': 1, 'name': 'PC (Microsoft Windows)'},
-    {'id': 2, 'name': 'PlayStation'},
-    {'id': 3, 'name': 'Xbox'},
-    {'id': 4, 'name': 'Nintendo'},
-    {'id': 5, 'name': 'Mobile'},
+    {'id': 14, 'name': 'Mac'},
+    {'id': 167, 'name': 'PlayStation 5'},
+    {'id': 56, 'name': 'PC (Microsoft Windows)'},
+    {'id': 130, 'name': 'Nintendo Switch'},
+    {'id': 169, 'name': 'Xbox Series X|S'},
+    {'id': 34, 'name': 'Android'},
+    {'id': 48, 'name': 'PlayStation 4'},
+    {'id': 49, 'name': 'Xbox One'},
+    {'id': 39, 'name': 'iOS'},
+    {'id': 3, 'name': 'Linux'},
   ];
 
   bool get _canProceedFromPlatforms => _selectedPlatformIds.length >= 1;
@@ -57,21 +62,11 @@ class _OnboardingPageState extends State<OnboardingPage> {
         await _categoryService.initialize();
       }
 
-      // Still load platforms in background for search page
-      final platformsResponse = await _apiService.get('/games/get-platforms');
-      final List<dynamic> platformsData = platformsResponse.data is String 
-          ? json.decode(platformsResponse.data as String)
-          : platformsResponse.data as List<dynamic>;
-      
-      _platforms = platformsData.map((p) => {
-        'id': p['id'] as int,
-        'name': p['name'] as String,
-      }).toList();
-
       if (mounted) {
         setState(() {
           _genres = _categoryService.genres;
           _themes = _categoryService.themes;
+          _platforms = _staticPlatforms;
         });
       }
     } catch (e) {
@@ -266,7 +261,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: _staticPlatforms.map((platform) => _buildChip(
+            children: _platforms.map((platform) => _buildChip(
               platform['name'] as String,
               _selectedPlatformIds.contains(platform['id']),
               () {

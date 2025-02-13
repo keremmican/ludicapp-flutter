@@ -29,30 +29,29 @@ class CategoryService {
           ? json.decode(genresResponse.data as String)
           : genresResponse.data as List<dynamic>;
       
+      _genres = genresData.map((g) => GameCategory.fromJson(g as Map<String, dynamic>)).toList();
+
       // Fetch themes
       final themesResponse = await apiService.get('/games/get-themes');
       final List<dynamic> themesData = themesResponse.data is String 
           ? json.decode(themesResponse.data as String)
           : themesResponse.data as List<dynamic>;
+      
+      _themes = themesData.map((t) => GameCategory.fromJson(t as Map<String, dynamic>)).toList();
 
-      // Fetch platforms
-      final platformsResponse = await apiService.get('/games/get-platforms');
-      final List<dynamic> platformsData = platformsResponse.data is String 
-          ? json.decode(platformsResponse.data as String)
-          : platformsResponse.data as List<dynamic>;
-
-      _genres = genresData
-          .map((genre) => GameCategory.fromJson(genre as Map<String, dynamic>))
-          .toList();
-
-      _themes = themesData
-          .map((theme) => GameCategory.fromJson(theme as Map<String, dynamic>))
-          .toList();
-
-      _platforms = platformsData.map((p) => {
-        'id': p['id'] as int,
-        'name': p['name'] as String,
-      }).toList();
+      // Use static platforms instead of fetching from API
+      _platforms = [
+        {'id': 14, 'name': 'Mac'},
+        {'id': 167, 'name': 'PlayStation 5'},
+        {'id': 56, 'name': 'PC (Microsoft Windows)'},
+        {'id': 130, 'name': 'Nintendo Switch'},
+        {'id': 169, 'name': 'Xbox Series X|S'},
+        {'id': 34, 'name': 'Android'},
+        {'id': 48, 'name': 'PlayStation 4'},
+        {'id': 49, 'name': 'Xbox One'},
+        {'id': 39, 'name': 'iOS'},
+        {'id': 3, 'name': 'Linux'},
+      ];
 
       isInitialized = true;
     } catch (e) {

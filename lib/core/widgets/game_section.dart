@@ -39,7 +39,7 @@ class GameSection extends StatelessWidget {
 
           // Horizontally Scrolling Game Cards
           SizedBox(
-            height: MediaQuery.of(context).size.width * 0.30 * (1942/1559),
+            height: MediaQuery.of(context).size.width * 0.33 * (1942/1559),
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16.0),

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:ludicapp/core/utils/date_formatter.dart';
+import 'package:ludicapp/services/model/response/game_summary.dart';
 
 class MainPageGame extends StatelessWidget {
-  final Map<String, String> game;
+  final GameSummary game;
   final VoidCallback onTap;
 
   const MainPageGame({
@@ -36,7 +37,7 @@ class MainPageGame extends StatelessWidget {
             children: [
               // Game Image with Hero animation
               Hero(
-                tag: 'game-${game['id']}',
+                tag: 'game-${game.id}',
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(24),
                   child: Container(
@@ -77,7 +78,7 @@ class MainPageGame extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        game['name'] ?? 'Unknown',
+                        game.name,
                         style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.w800,
@@ -115,7 +116,7 @@ class MainPageGame extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            DateFormatter.formatDate(game['releaseDate']),
+                            DateFormatter.formatDate(game.releaseDate),
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.w600,
@@ -142,9 +143,9 @@ class MainPageGame extends StatelessWidget {
   }
 
   Widget _buildGameImage() {
-    if ((game['image'] ?? '').startsWith('http')) {
+    if (game.coverUrl?.startsWith('http') ?? false) {
       return Image.network(
-        game['image'] ?? '',
+        game.coverUrl!,
         fit: BoxFit.cover,
         alignment: Alignment.center,
         errorBuilder: (context, error, stackTrace) => _buildErrorWidget(),
@@ -154,11 +155,7 @@ class MainPageGame extends StatelessWidget {
         },
       );
     }
-    return Image.asset(
-      game['image'] ?? '',
-      fit: BoxFit.cover,
-      alignment: Alignment.center,
-    );
+    return _buildErrorWidget();
   }
 
   Widget _buildErrorWidget() {

@@ -5,11 +5,35 @@ import 'package:ludicapp/features/profile/presentation/widgets/following_page.da
 import 'package:ludicapp/features/profile/presentation/widgets/profile_header.dart';
 import 'package:ludicapp/theme/app_theme.dart';
 import 'package:ludicapp/features/splash/presentation/splash_screen.dart';
+import 'package:ludicapp/services/repository/user_repository.dart';
+import 'package:ludicapp/services/token_service.dart';
+import 'package:ludicapp/models/profile_response.dart';
 import 'dart:math';
 import 'settings_page.dart';
 import 'related_games_page.dart';
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
+  final String? userId;
+  final bool fromSearch;
+
+  const ProfilePage({
+    Key? key, 
+    this.userId,
+    this.fromSearch = false,
+  }) : super(key: key);
+
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  final UserRepository _userRepository = UserRepository();
+  final TokenService _tokenService = TokenService();
+  ProfileResponse? _profileData;
+  bool _isCurrentUser = false;
+  bool _isLoading = true;
+  bool _isFollowing = false;
+
   static const List<String> mockImages = [
     'lib/assets/images/mock_games/game1.jpg',
     'lib/assets/images/mock_games/game2.jpg',
@@ -19,60 +43,265 @@ class ProfilePage extends StatelessWidget {
     'lib/assets/images/mock_games/game6.jpg',
   ];
 
-  const ProfilePage({Key? key}) : super(key: key);
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      setState(() => _isLoading = true);
+      
+      final currentUserId = await _tokenService.getUserId();
+      _isCurrentUser = widget.userId == null || widget.userId == currentUserId.toString();
+
+      if (_isCurrentUser) {
+        // If it's the current user's profile, use the cached data from splash screen
+        setState(() {
+          _profileData = SplashScreen.profileData;
+          _isLoading = false;
+        });
+      } else {
+        // If it's another user's profile, fetch from API
+        final response = await _userRepository.fetchUserProfile(userId: widget.userId);
+        setState(() {
+          _profileData = response;
+          _isLoading = false;
+          _isFollowing = response.isFollowing ?? false;
+        });
+      }
+    } catch (e) {
+      print('Error loading profile: $e');
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _showMoreOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceDark,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.report, color: Colors.red),
+              title: const Text('Report User', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                // TODO: Implement report functionality
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.block, color: Colors.red),
+              title: const Text('Block User', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                // TODO: Implement block functionality
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _toggleFollow() async {
+    try {
+      setState(() => _isFollowing = !_isFollowing);
+      // TODO: Implement follow/unfollow API call
+      await _userRepository.refreshCurrentUserProfile(); // Refresh current user's following count
+    } catch (e) {
+      setState(() => _isFollowing = !_isFollowing); // Revert on error
+      print('Error toggling follow: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final profileData = SplashScreen.profileData;
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    if (_profileData == null) {
+      return const Scaffold(
+        body: Center(child: Text('Error loading profile')),
+      );
+    }
+
+    return Scaffold(
+      body: Column(
         children: [
-          // Upper Part: Profile Header
-          ProfileHeader(
-            username: profileData?.username ?? 'Guest User',
-            level: profileData?.level.toInt() ?? 0,
-            progress: (profileData?.level ?? 0) % 1,
-            followingCount: profileData?.followingCount ?? 0,
-            followersCount: profileData?.followerCount ?? 0,
-            onSettingsPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SettingsPage()),
-              );
-            },
-            onFollowingPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const FollowingPage()),
-              );
-            },
-            onFollowersPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const FollowersPage()),
-              );
-            },
+          if (widget.fromSearch) ...[
+            // Custom Navigation Bar
+            Container(
+              padding: EdgeInsets.only(
+                top: MediaQuery.of(context).padding.top + 8,
+                bottom: 8,
+                left: 16,
+                right: 16,
+              ),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryDark,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+                border: Border(
+                  bottom: BorderSide(
+                    color: Colors.grey[900]!,
+                    width: 1,
+                  ),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  Text(
+                    _profileData?.username ?? '',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (!_isCurrentUser)
+                    IconButton(
+                      icon: const Icon(Icons.more_vert, color: Colors.white),
+                      onPressed: _showMoreOptions,
+                    )
+                  else
+                    const SizedBox(width: 40), // For alignment
+                ],
+              ),
+            ),
+          ],
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      ProfileHeader(
+                        username: _profileData?.username ?? 'Guest User',
+                        level: _profileData?.level.toInt() ?? 0,
+                        progress: (_profileData?.level ?? 0) % 1,
+                        followingCount: _profileData?.followingCount ?? 0,
+                        followersCount: _profileData?.followerCount ?? 0,
+                        onSettingsPressed: null,
+                        onFollowingPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const FollowingPage()),
+                          );
+                        },
+                        onFollowersPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const FollowersPage()),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 80),
+                  if (_isCurrentUser) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: ElevatedButton.icon(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const SettingsPage()),
+                        ),
+                        icon: const Icon(
+                          Icons.settings,
+                          color: Colors.black,
+                          size: 20,
+                        ),
+                        label: const Text(
+                          'Settings',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.accentColor,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          elevation: 2,
+                          shadowColor: Colors.black.withOpacity(0.3),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ] else if (widget.fromSearch) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: ElevatedButton.icon(
+                        onPressed: _toggleFollow,
+                        icon: Icon(
+                          _isFollowing ? Icons.check : Icons.add,
+                          color: _isFollowing ? Colors.grey[400] : Colors.black,
+                          size: 20,
+                        ),
+                        label: Text(
+                          _isFollowing ? 'Following' : 'Follow',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: _isFollowing ? Colors.grey[400] : Colors.black,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _isFollowing ? Colors.grey[800] : AppTheme.accentColor,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          elevation: 2,
+                          shadowColor: Colors.black.withOpacity(0.3),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+                  _buildSectionHeader(
+                    context,
+                    'My Library',
+                    onSeeAll: () {
+                      print('See all library items');
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  _buildGameLibrary(context),
+                  const SizedBox(height: 24),
+                  _buildSteamProfile(context),
+                ],
+              ),
+            ),
           ),
-
-          const SizedBox(height: 80),
-
-          // My Library Section
-          _buildSectionHeader(
-            context,
-            'My Library',
-            onSeeAll: () {
-              print('See all library items');
-            },
-          ),
-          const SizedBox(height: 16),
-          _buildGameLibrary(context),
-
-          const SizedBox(height: 24),
-
-          // Steam Profile Section
-          _buildSteamProfile(context),
         ],
       ),
     );

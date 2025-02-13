@@ -18,9 +18,15 @@ enum SortOption {
 
 class RelatedGamesPage extends StatefulWidget {
   final String categoryTitle;
+  final int? popularityTypeId;
+  final int? platformId;
 
-  const RelatedGamesPage({Key? key, required this.categoryTitle})
-      : super(key: key);
+  const RelatedGamesPage({
+    Key? key, 
+    required this.categoryTitle,
+    this.popularityTypeId,
+    this.platformId,
+  }) : super(key: key);
 
   @override
   State<RelatedGamesPage> createState() => _RelatedGamesPageState();
@@ -107,7 +113,35 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
     });
 
     try {
-      if (widget.categoryTitle == 'New Releases') {
+      if (widget.platformId != null) {
+        print('Fetching games for platform: ${widget.platformId} - Page: $_currentPage');
+        final (sortBy, sortDirection) = _getSortParams(_currentSort);
+        final response = await _gameRepository.fetchGamesByPlatform(
+          platformId: widget.platformId!,
+          sortBy: sortBy,
+          sortDirection: sortDirection,
+          page: _currentPage,
+          pageSize: _pageSize,
+        );
+
+        if (!mounted) return;
+        handleResponse(response);
+      }
+      else if (widget.popularityTypeId != null) {
+        print('Fetching games for popularity type: ${widget.popularityTypeId} - Page: $_currentPage');
+        final (sortBy, sortDirection) = _getSortParams(_currentSort);
+        final response = await _gameRepository.fetchGamesByPopularityType(
+          popularityType: widget.popularityTypeId!,
+          sortBy: sortBy,
+          sortDirection: sortDirection,
+          page: _currentPage,
+          pageSize: _pageSize,
+        );
+
+        if (!mounted) return;
+        handleResponse(response);
+      }
+      else if (widget.categoryTitle == 'New Releases') {
         print('Fetching new releases - Page: $_currentPage');
         final response = await _gameRepository.fetchNewReleases(
           page: _currentPage,

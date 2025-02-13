@@ -2,23 +2,23 @@ import 'package:flutter/material.dart';
 import 'level_component.dart';
 
 class ProfileHeader extends StatelessWidget {
+  final String username;
   final int level;
   final double progress;
   final int followingCount;
   final int followersCount;
-  final String username;
-  final VoidCallback onSettingsPressed;
+  final VoidCallback? onSettingsPressed;
   final VoidCallback onFollowingPressed;
   final VoidCallback onFollowersPressed;
 
   const ProfileHeader({
     Key? key,
+    required this.username,
     required this.level,
     required this.progress,
     required this.followingCount,
     required this.followersCount,
-    required this.username,
-    required this.onSettingsPressed,
+    this.onSettingsPressed,
     required this.onFollowingPressed,
     required this.onFollowersPressed,
   }) : super(key: key);
@@ -53,7 +53,7 @@ class ProfileHeader extends StatelessWidget {
         ),
 
         // Settings Button
-        Positioned(
+        if (onSettingsPressed != null) Positioned(
           top: 16,
           right: 16,
           child: Container(

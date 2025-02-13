@@ -6,6 +6,7 @@ class ProfileResponse {
   final int followerCount;
   final int followingCount;
   final UserStatus userStatus;
+  final bool? isFollowing;
 
   ProfileResponse({
     required this.username,
@@ -13,6 +14,7 @@ class ProfileResponse {
     required this.followerCount,
     required this.followingCount,
     required this.userStatus,
+    this.isFollowing,
   });
 
   factory ProfileResponse.fromJson(Map<String, dynamic> json) {
@@ -25,6 +27,7 @@ class ProfileResponse {
         (e) => e.toString().split('.').last == (json['status'] as String),
         orElse: () => UserStatus.ACTIVE,
       ),
+      isFollowing: json['isFollowing'] as bool?,
     );
   }
 
@@ -35,6 +38,7 @@ class ProfileResponse {
       'followerCount': followerCount,
       'followingCount': followingCount,
       'userStatus': userStatus.toString().split('.').last,
+      'isFollowing': isFollowing,
     };
   }
 } 
