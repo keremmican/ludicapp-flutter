@@ -3,18 +3,78 @@ import 'package:ludicapp/core/models/game.dart';
 import 'package:ludicapp/core/providers/blurred_background_provider.dart';
 import 'package:ludicapp/features/game/presentation/game_detail_page.dart';
 
-class GameSection extends StatelessWidget {
+class GameSection extends StatefulWidget {
   final String title;
   final List<Game> games;
   final Function(Game) onGameTap;
-  final _backgroundProvider = BlurredBackgroundProvider();
+  final ScrollController? scrollController;
 
-  GameSection({
+  const GameSection({
     Key? key,
     required this.title,
     required this.games,
     required this.onGameTap,
+    this.scrollController,
   }) : super(key: key);
+
+  @override
+  State<GameSection> createState() => _GameSectionState();
+}
+
+class _GameSectionState extends State<GameSection> {
+  final _backgroundProvider = BlurredBackgroundProvider();
+  late ScrollController _scrollController;
+  bool _isInternalController = false;
+
+  @override
+  void initState() {
+    super.initState();
+    
+    // Dışarıdan controller verilmişse onu kullan, yoksa yeni oluştur
+    if (widget.scrollController != null) {
+      _scrollController = widget.scrollController!;
+    } else {
+      _scrollController = ScrollController(initialScrollOffset: 0);
+      _isInternalController = true;
+    }
+    
+    // ScrollController'ı sıfırla
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(0);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    // Sadece içeride oluşturduğumuz controller'ı dispose et
+    if (_isInternalController) {
+      _scrollController.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(GameSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    
+    // Widget güncellendiğinde controller değişmişse güncelle
+    if (widget.scrollController != null && widget.scrollController != _scrollController) {
+      if (_isInternalController) {
+        _scrollController.dispose();
+      }
+      _scrollController = widget.scrollController!;
+      _isInternalController = false;
+      
+      // ScrollController'ı sıfırla
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.jumpTo(0);
+        }
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +87,7 @@ class GameSection extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Text(
-              title,
+              widget.title,
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 16,
@@ -41,11 +101,12 @@ class GameSection extends StatelessWidget {
           SizedBox(
             height: MediaQuery.of(context).size.width * 0.33 * (1942/1559),
             child: ListView.builder(
+              controller: _scrollController,
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              itemCount: games.length,
+              itemCount: widget.games.length,
               itemBuilder: (context, index) {
-                final game = games[index];
+                final game = widget.games[index];
                 // Cache the blurred background
                 _backgroundProvider.cacheBackground(game.gameId.toString(), game.coverUrl);
                 if (game.screenshots != null) {
@@ -55,10 +116,10 @@ class GameSection extends StatelessWidget {
                 }
                 
                 return GestureDetector(
-                  onTap: () => onGameTap(game),
+                  onTap: () => widget.onGameTap(game),
                   child: Container(
                     margin: EdgeInsets.only(
-                      right: index != games.length - 1 ? 12.0 : 0,
+                      right: index != widget.games.length - 1 ? 12.0 : 0,
                     ),
                     width: MediaQuery.of(context).size.width * 0.30,
                     decoration: BoxDecoration(

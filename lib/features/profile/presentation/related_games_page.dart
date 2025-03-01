@@ -20,12 +20,16 @@ class RelatedGamesPage extends StatefulWidget {
   final String categoryTitle;
   final int? popularityTypeId;
   final int? platformId;
+  final int? genreId;
+  final int? themeId;
 
   const RelatedGamesPage({
     Key? key, 
     required this.categoryTitle,
     this.popularityTypeId,
     this.platformId,
+    this.genreId,
+    this.themeId,
   }) : super(key: key);
 
   @override
@@ -118,6 +122,34 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
         final (sortBy, sortDirection) = _getSortParams(_currentSort);
         final response = await _gameRepository.fetchGamesByPlatform(
           platformId: widget.platformId!,
+          sortBy: sortBy,
+          sortDirection: sortDirection,
+          page: _currentPage,
+          pageSize: _pageSize,
+        );
+
+        if (!mounted) return;
+        handleResponse(response);
+      }
+      else if (widget.genreId != null) {
+        print('Fetching games for genre ID: ${widget.genreId} - Page: $_currentPage');
+        final (sortBy, sortDirection) = _getSortParams(_currentSort);
+        final response = await _gameRepository.fetchGamesByGenre(
+          genreId: widget.genreId!,
+          sortBy: sortBy,
+          sortDirection: sortDirection,
+          page: _currentPage,
+          pageSize: _pageSize,
+        );
+
+        if (!mounted) return;
+        handleResponse(response);
+      }
+      else if (widget.themeId != null) {
+        print('Fetching games for theme ID: ${widget.themeId} - Page: $_currentPage');
+        final (sortBy, sortDirection) = _getSortParams(_currentSort);
+        final response = await _gameRepository.fetchGamesByTheme(
+          themeId: widget.themeId!,
           sortBy: sortBy,
           sortDirection: sortDirection,
           page: _currentPage,

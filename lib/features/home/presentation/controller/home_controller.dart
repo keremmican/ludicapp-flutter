@@ -1,4 +1,5 @@
 import 'package:ludicapp/services/model/response/game_summary.dart';
+import 'package:ludicapp/services/model/response/name_id_response.dart';
 import 'package:ludicapp/services/repository/game_repository.dart';
 import 'package:ludicapp/features/splash/presentation/splash_screen.dart';
 
@@ -14,7 +15,7 @@ class HomeController {
   List<GameSummary> comingSoonGames = [];
   GameSummary? randomGame;
   GameSummary? popularGameByVisits;
-  Map<int, List<GameSummary>> popularityTypeGames = {};
+  Map<GameSummary, List<GameSummary>> popularityTypeGames = {};
   bool isLoadingMoreSections = false;
   String? error;
 
@@ -23,8 +24,15 @@ class HomeController {
 
   // Tüm popularity type ID'leri (1 hariç çünkü o showcase için kullanılıyor)
   static const List<List<int>> _popularityTypeBatches = [
-    [1, 4, 3, 10],    // İlk batch: Want to Play, Played, Playing, Total Reviews
-    [5, 6, 2, 9],
+    [1],
+    [4],    // İlk batch: Most Played (büyük kart)
+    [3],    // İkinci batch: Most Played (now) (küçük kart)
+    [10],   // Üçüncü batch: Most Wishlisted (büyük kart)
+    [5],    // Dördüncü batch: 24hr Peak Players (küçük kart)
+    [6],    // Beşinci batch: Most Positive Reviews (büyük kart)
+    [8],
+    [2],    // Altıncı batch: Most Wanted (küçük kart)
+    [9],    // Yedinci batch: Global Top Sellers (büyük kart)
   ];
 
   static const Map<int, String> popularityTypeTitles = {
@@ -38,6 +46,69 @@ class HomeController {
     9: 'Global Top Sellers',
     10: 'Most Wishlisted',
   };
+
+  // Popularity type'ları döndüren getter
+  List<NameIdResponse> get popularityTypes => 
+      SplashScreen.popularityTypes?.where((type) => type.id != SplashScreen.visitsPopularityTypeId).toList() ?? [];
+
+  // Belirli bir popülerlik tipi için oyunları döndüren metot
+  List<GameSummary> getGamesForPopularityType(int popularityTypeId) {
+    final typeObj = popularityTypes.firstWhere(
+      (type) => type.id == popularityTypeId,
+      orElse: () => NameIdResponse(id: popularityTypeId, name: getPopularityTypeTitle(popularityTypeId)),
+    );
+    
+    return popularityTypeGames.entries
+      .where((entry) => entry.key.id == typeObj.id)
+      .map((entry) => entry.value)
+      .firstOrNull ?? [];
+  }
+
+  // Belirli bir bölüm için veri yükleyen metot
+  Future<void> loadSpecificSection(List<int> popularityTypeIds) async {
+    try {
+      isLoadingMoreSections = true;
+      
+      // Belirtilen popülerlik tipleri için oyunları yükle
+      for (final popularityType in popularityTypeIds) {
+        if (!popularityTypeGames.values.any((games) => games.isNotEmpty && games.first.id == popularityType)) {
+          final response = await _gameRepository.fetchGamesByPopularityType(
+            popularityType: popularityType,
+          );
+          
+          // Popularity type'ı bul
+          final typeObj = popularityTypes.firstWhere(
+            (type) => type.id == popularityType,
+            orElse: () => NameIdResponse(id: popularityType, name: getPopularityTypeTitle(popularityType)),
+          );
+          
+          // NameIdResponse'u GameSummary'ye dönüştür
+          final gameSummary = GameSummary(
+            id: typeObj.id,
+            name: typeObj.name,
+            slug: typeObj.name.toLowerCase().replaceAll(' ', '-'),
+            genres: [],
+            themes: [],
+            platforms: [],
+            companies: [],
+            screenshots: [],
+            gameVideos: [],
+            franchises: [],
+            gameModes: [],
+            playerPerspectives: [],
+            languageSupports: [],
+          );
+          
+          popularityTypeGames[gameSummary] = response.content;
+        }
+      }
+    } catch (e) {
+      error = e.toString();
+      throw e; // Hatayı yukarı ilet
+    } finally {
+      isLoadingMoreSections = false;
+    }
+  }
 
   void setInitialData({
     required List<GameSummary> newReleases,
@@ -53,20 +124,31 @@ class HomeController {
     _isInitialized = true;
   }
 
-  Future<void> initializeData() async {
+  Future<void> loadData() async {
     if (_isInitialized) return;
 
     try {
-      final newReleasesResponse = await _gameRepository.fetchNewReleases();
-      final topRatedResponse = await _gameRepository.fetchTopRatedGames();
-      final comingSoonResponse = await _gameRepository.fetchComingSoon();
+      // Splash screen'de yüklenen verileri kullan
+      if (newReleases.isEmpty) {
+        final newReleasesResponse = await _gameRepository.fetchNewReleases();
+        newReleases = newReleasesResponse.content;
+      }
+      
+      if (topRatedGames.isEmpty) {
+        final topRatedResponse = await _gameRepository.fetchTopRatedGames();
+        topRatedGames = topRatedResponse.content;
+      }
+      
+      if (comingSoonGames.isEmpty) {
+        final comingSoonResponse = await _gameRepository.fetchComingSoon();
+        comingSoonGames = comingSoonResponse.content;
+      }
+      
+      if (randomGame == null && newReleases.isNotEmpty) {
+        randomGame = newReleases.first;
+      }
 
-      newReleases = newReleasesResponse.content;
-      topRatedGames = topRatedResponse.content;
-      comingSoonGames = comingSoonResponse.content;
-      randomGame = newReleasesResponse.content.isNotEmpty ? newReleasesResponse.content.first : null;
-
-      if (SplashScreen.visitsPopularityTypeId != null) {
+      if (popularGameByVisits == null && SplashScreen.visitsPopularityTypeId != null) {
         popularGameByVisits = await _gameRepository.getSingleGameByPopularityType(
           SplashScreen.visitsPopularityTypeId!
         );
@@ -75,7 +157,12 @@ class HomeController {
       _isInitialized = true;
     } catch (e) {
       error = e.toString();
+      throw e; // Hatayı yukarı ilet
     }
+  }
+
+  Future<void> initializeData() async {
+    return loadData();
   }
 
   Future<void> loadMoreSections() async {
@@ -89,11 +176,35 @@ class HomeController {
       
       // Load games for each popularity type in this batch
       for (final popularityType in currentBatch) {
-        if (!popularityTypeGames.containsKey(popularityType)) {
+        if (!popularityTypeGames.values.any((games) => games.isNotEmpty && games.first.id == popularityType)) {
           final response = await _gameRepository.fetchGamesByPopularityType(
             popularityType: popularityType,
           );
-          popularityTypeGames[popularityType] = response.content;
+          
+          // Popularity type'ı bul
+          final typeObj = popularityTypes.firstWhere(
+            (type) => type.id == popularityType,
+            orElse: () => NameIdResponse(id: popularityType, name: getPopularityTypeTitle(popularityType)),
+          );
+          
+          // NameIdResponse'u GameSummary'ye dönüştür
+          final gameSummary = GameSummary(
+            id: typeObj.id,
+            name: typeObj.name,
+            slug: typeObj.name.toLowerCase().replaceAll(' ', '-'),
+            genres: [],
+            themes: [],
+            platforms: [],
+            companies: [],
+            screenshots: [],
+            gameVideos: [],
+            franchises: [],
+            gameModes: [],
+            playerPerspectives: [],
+            languageSupports: [],
+          );
+          
+          popularityTypeGames[gameSummary] = response.content;
         }
       }
 
@@ -101,6 +212,7 @@ class HomeController {
       _currentBatchIndex++;
     } catch (e) {
       error = e.toString();
+      throw e; // Hatayı yukarı ilet
     } finally {
       isLoadingMoreSections = false;
     }

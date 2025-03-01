@@ -52,7 +52,7 @@ class _SearchPageState extends State<SearchPage> with SingleTickerProviderStateM
   static const List<Map<String, dynamic>> staticPlatforms = [
     {'id': 14, 'name': 'Mac'},
     {'id': 167, 'name': 'PlayStation 5'},
-    {'id': 56, 'name': 'PC (Microsoft Windows)'},
+    {'id': 6, 'name': 'PC (Microsoft Windows)'},
     {'id': 130, 'name': 'Nintendo Switch'},
     {'id': 169, 'name': 'Xbox Series X|S'},
     {'id': 34, 'name': 'Android'},
@@ -249,27 +249,49 @@ class _SearchPageState extends State<SearchPage> with SingleTickerProviderStateM
               : items.map((item) => _buildChip(
                   item is GameCategory ? item.name : item as String,
                   () {
-                    final popularityTypeEntry = HomeController.popularityTypeTitles.entries
-                        .firstWhere((entry) => entry.value == (item is GameCategory ? item.name : item as String), 
-                        orElse: () => const MapEntry(-1, ''));
-                        
-                    if (popularityTypeEntry.key != -1) {
+                    if (title == 'Genre' && item is GameCategory) {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (context) => RelatedGamesPage(
-                            categoryTitle: item is GameCategory ? item.name : item as String,
-                            popularityTypeId: popularityTypeEntry.key,
+                            categoryTitle: item.name,
+                            genreId: item.id,
                           ),
                         ),
                       );
-                    } else if (item is! GameCategory) {
+                    } else if (title == 'Themes' && item is GameCategory) {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => RelatedGamesPage(categoryTitle: item as String),
+                          builder: (context) => RelatedGamesPage(
+                            categoryTitle: item.name,
+                            themeId: item.id,
+                          ),
                         ),
                       );
+                    } else {
+                      final popularityTypeEntry = HomeController.popularityTypeTitles.entries
+                          .firstWhere((entry) => entry.value == (item is GameCategory ? item.name : item as String), 
+                          orElse: () => const MapEntry(-1, ''));
+                          
+                      if (popularityTypeEntry.key != -1) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => RelatedGamesPage(
+                              categoryTitle: item is GameCategory ? item.name : item as String,
+                              popularityTypeId: popularityTypeEntry.key,
+                            ),
+                          ),
+                        );
+                      } else if (item is! GameCategory) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => RelatedGamesPage(categoryTitle: item as String),
+                          ),
+                        );
+                      }
                     }
                   },
                 )).toList(),
@@ -323,8 +345,15 @@ class _SearchPageState extends State<SearchPage> with SingleTickerProviderStateM
           );
         }
       }
-      return ListView.builder(
+      return GridView.builder(
         controller: _scrollController,
+        padding: const EdgeInsets.all(16.0),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          childAspectRatio: 0.7,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+        ),
         itemCount: _searchGamesResults.length + (_hasMore ? 1 : 0),
         itemBuilder: (context, index) {
           if (index >= _searchGamesResults.length) {
@@ -399,68 +428,140 @@ class _SearchPageState extends State<SearchPage> with SingleTickerProviderStateM
   }
 
   Widget _buildGameItem(SearchGame game) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceDark,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(8),
-        leading: Container(
-          width: 60,
-          height: 80,
-          decoration: BoxDecoration(
-            color: AppTheme.primaryDark,
-            borderRadius: BorderRadius.circular(8.0),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(8.0),
-            child: game.imageUrl != null && game.imageUrl!.isNotEmpty
-                ? Image.network(
-                    game.imageUrl!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const Icon(
-                      Icons.videogame_asset_rounded,
-                      color: AppTheme.textSecondary,
-                      size: 30,
-                    ),
-                  )
-                : const Icon(
-                    Icons.videogame_asset_rounded,
-                    color: AppTheme.textSecondary,
-                    size: 30,
-                  ),
-          ),
-        ),
-        title: Text(
-          game.name,
-          style: const TextStyle(
-            color: AppTheme.textPrimary,
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-          ),
-          overflow: TextOverflow.ellipsis,
-          maxLines: 1,
-        ),
-        trailing: const Icon(
-          Icons.arrow_forward_ios,
-          color: AppTheme.accentColor,
-          size: 18,
-        ),
-        onTap: () {
-          if (game.id != null) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => GameDetailPage(
-                  game: Game.fromGameSummary(game.toGameSummary()),
-                  fromSearch: true,
-                ),
+    return GestureDetector(
+      onTap: () {
+        if (game.id != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => GameDetailPage(
+                game: Game.fromGameSummary(game.toGameSummary()),
+                fromSearch: true,
               ),
-            );
-          }
-        },
+            ),
+          );
+        }
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.grey[900]?.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 5,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Game Cover Image
+            Expanded(
+              child: Stack(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey[850],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: game.imageUrl != null && game.imageUrl!.isNotEmpty
+                          ? Image.network(
+                              game.imageUrl!,
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              height: double.infinity,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: Colors.grey[850],
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.videogame_asset_rounded,
+                                      color: Colors.white70,
+                                      size: 40,
+                                    ),
+                                  ),
+                                );
+                              },
+                            )
+                          : Container(
+                              color: Colors.grey[850],
+                              child: const Center(
+                                child: Icon(
+                                  Icons.videogame_asset_rounded,
+                                  color: Colors.white70,
+                                  size: 40,
+                                ),
+                              ),
+                            ),
+                    ),
+                  ),
+                  // Gradient overlay for better text visibility
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      height: 60,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withOpacity(0.8),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Game name overlay at bottom of image with darker background
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(10.0),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withOpacity(0.8),
+                          ],
+                        ),
+                        borderRadius: const BorderRadius.vertical(
+                          bottom: Radius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        game.name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          shadows: [
+                            Shadow(
+                              blurRadius: 3.0,
+                              color: Colors.black,
+                              offset: Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

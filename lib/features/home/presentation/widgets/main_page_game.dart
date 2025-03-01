@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:ludicapp/core/utils/date_formatter.dart';
 import 'package:ludicapp/services/model/response/game_summary.dart';
 
-class MainPageGame extends StatelessWidget {
+class MainPageGame extends StatefulWidget {
   final GameSummary game;
   final VoidCallback onTap;
 
@@ -13,11 +13,59 @@ class MainPageGame extends StatelessWidget {
   });
 
   @override
+  State<MainPageGame> createState() => _MainPageGameState();
+}
+
+class _MainPageGameState extends State<MainPageGame> with AutomaticKeepAliveClientMixin {
+  bool _isImageLoaded = false;
+  late final NetworkImage _imageProvider;
+  bool _hasError = false;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.game.coverUrl?.isNotEmpty ?? false) {
+      _imageProvider = NetworkImage(widget.game.coverUrl!);
+      _loadImage();
+    }
+  }
+
+  void _loadImage() {
+    if (widget.game.coverUrl?.isEmpty ?? true) return;
+    
+    // Doğrudan ImageProvider'ı kullanarak resmi yükle
+    final image = _imageProvider.resolve(const ImageConfiguration());
+    
+    final listener = ImageStreamListener(
+      (ImageInfo info, bool synchronousCall) {
+        if (mounted && !_isImageLoaded) {
+          setState(() {
+            _isImageLoaded = true;
+          });
+        }
+      },
+      onError: (exception, stackTrace) {
+        if (mounted && !_hasError) {
+          setState(() {
+            _hasError = true;
+          });
+        }
+      },
+    );
+    
+    image.addListener(listener);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: GestureDetector(
-        onTap: onTap,
+        onTap: widget.onTap,
         child: Container(
           width: MediaQuery.of(context).size.width - 32,
           height: (MediaQuery.of(context).size.width - 32) * (1942 / 1559),
@@ -37,7 +85,7 @@ class MainPageGame extends StatelessWidget {
             children: [
               // Game Image with Hero animation
               Hero(
-                tag: 'game-${game.id}',
+                tag: 'game-${widget.game.id}',
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(24),
                   child: Container(
@@ -78,7 +126,7 @@ class MainPageGame extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        game.name,
+                        widget.game.name,
                         style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.w800,
@@ -116,7 +164,7 @@ class MainPageGame extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            DateFormatter.formatDate(game.releaseDate),
+                            DateFormatter.formatDate(widget.game.releaseDate),
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.w600,
@@ -143,19 +191,24 @@ class MainPageGame extends StatelessWidget {
   }
 
   Widget _buildGameImage() {
-    if (game.coverUrl?.startsWith('http') ?? false) {
-      return Image.network(
-        game.coverUrl!,
+    if (widget.game.coverUrl?.isEmpty ?? true) {
+      return _buildErrorWidget();
+    }
+    
+    if (_hasError) {
+      return _buildErrorWidget();
+    }
+    
+    if (_isImageLoaded) {
+      return Image(
+        image: _imageProvider,
         fit: BoxFit.cover,
         alignment: Alignment.center,
         errorBuilder: (context, error, stackTrace) => _buildErrorWidget(),
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          return _buildLoadingWidget();
-        },
       );
     }
-    return _buildErrorWidget();
+    
+    return _buildLoadingWidget();
   }
 
   Widget _buildErrorWidget() {

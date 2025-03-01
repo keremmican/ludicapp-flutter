@@ -14,6 +14,8 @@ import 'package:ludicapp/services/model/response/game_summary.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'dart:developer' as developer;
+import 'dart:async';
+import 'dart:math';
 
 class SplashScreen extends StatefulWidget {
   static ProfileResponse? _profileData;
@@ -116,49 +118,56 @@ class _SplashScreenState extends State<SplashScreen> {
       popularGameByVisits: popularGameByVisits,
     );
 
-    // Get priority images excluding the main game which is already loaded
-    final priorityImages = [
-      ...newReleasesResponse.content.take(4).map((game) => game.coverUrl),
-      ...topRatedResponse.content.take(4).map((game) => game.coverUrl),
-      ...comingSoonResponse.content.take(4).map((game) => game.coverUrl),
-    ]
-    .where((url) => url != null && url != popularGameByVisits?.coverUrl)
-    .cast<String>();
-
-    // Load priority images
-    for (final imageUrl in priorityImages) {
-      if (imageUrl.startsWith('http')) {
-        try {
-          final imageProvider = NetworkImage(imageUrl);
-          await precacheImage(imageProvider, context);
-        } catch (e) {
-          developer.log('Failed to preload priority image: ${e.toString()}');
-        }
+    // Preload only essential images for initial view
+    // Preload showcase game and first few games from each initial section
+    final imagesToPreload = <String>[];
+    
+    // Add showcase game image
+    if (popularGameByVisits?.coverUrl != null && popularGameByVisits!.coverUrl!.startsWith('http')) {
+      imagesToPreload.add(popularGameByVisits!.coverUrl!);
+    }
+    
+    // Add first 3 images from new releases
+    for (int i = 0; i < min(3, newReleasesResponse.content.length); i++) {
+      final game = newReleasesResponse.content[i];
+      if (game.coverUrl != null && game.coverUrl!.startsWith('http')) {
+        imagesToPreload.add(game.coverUrl!);
       }
     }
-
-    // Short delay for logo visibility
-    await Future.delayed(const Duration(seconds: 1));
-
-    // Load remaining images in background
-    final remainingImages = [
-      ...newReleasesResponse.content.skip(4).map((game) => game.coverUrl),
-      ...topRatedResponse.content.skip(4).map((game) => game.coverUrl),
-      ...comingSoonResponse.content.skip(4).map((game) => game.coverUrl),
-    ]
-    .where((url) => url != null && url != popularGameByVisits?.coverUrl)
-    .cast<String>();
-
-    for (final imageUrl in remainingImages) {
-      if (imageUrl.startsWith('http')) {
-        try {
-          final imageProvider = NetworkImage(imageUrl);
-          precacheImage(imageProvider, context);
-        } catch (e) {
-          developer.log('Failed to preload remaining image: ${e.toString()}');
-        }
+    
+    // Add first 3 images from top rated
+    for (int i = 0; i < min(3, topRatedResponse.content.length); i++) {
+      final game = topRatedResponse.content[i];
+      if (game.coverUrl != null && game.coverUrl!.startsWith('http')) {
+        imagesToPreload.add(game.coverUrl!);
       }
     }
+    
+    // Add first 3 images from coming soon
+    for (int i = 0; i < min(3, comingSoonResponse.content.length); i++) {
+      final game = comingSoonResponse.content[i];
+      if (game.coverUrl != null && game.coverUrl!.startsWith('http')) {
+        imagesToPreload.add(game.coverUrl!);
+      }
+    }
+    
+    // Preload images in parallel
+    final preloadFutures = <Future>[];
+    for (final imageUrl in imagesToPreload) {
+      try {
+        final imageProvider = NetworkImage(imageUrl);
+        preloadFutures.add(precacheImage(imageProvider, context));
+      } catch (e) {
+        developer.log('Failed to preload image: ${e.toString()}');
+      }
+    }
+    
+    // Wait for all preloads to complete or timeout after 3 seconds
+    await Future.wait(preloadFutures)
+        .timeout(const Duration(seconds: 3), onTimeout: () {
+      developer.log('Image preloading timed out, continuing with available images');
+      return [];
+    });
   }
 
   Future<void> _loadUserProfile() async {

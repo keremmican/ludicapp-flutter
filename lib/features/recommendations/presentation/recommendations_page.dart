@@ -17,13 +17,10 @@ class RecommendationPage extends StatefulWidget {
   State<RecommendationPage> createState() => _RecommendationPageState();
 }
 
-class _RecommendationPageState extends State<RecommendationPage> {
+class _RecommendationPageState extends State<RecommendationPage> with SingleTickerProviderStateMixin {
   final CardSwiperController _swiperController = CardSwiperController();
   final GameRepository _gameRepository = GameRepository();
-
-  // Variable to track swipe direction for background color effect
-  double _swipeDirection = 0.0; // Negative for left, positive for right
-
+  
   // Variable to track the current card index
   int _currentCardIndex = 0;
 
@@ -77,16 +74,29 @@ class _RecommendationPageState extends State<RecommendationPage> {
       return Scaffold(
         backgroundColor: AppTheme.primaryDark,
         body: Center(
-          child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        Theme.of(context).primaryColor.withOpacity(0.8),
-                      ),
-                    ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 40,
+                height: 40,
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    Theme.of(context).primaryColor.withOpacity(0.8),
                   ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Loading recommendations...',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.8),
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -137,8 +147,6 @@ class _RecommendationPageState extends State<RecommendationPage> {
             ),
             // Swipeable Cards
             _buildCardStack(),
-            // Swipe Overlays
-            _buildSwipeOverlays(),
           ],
         ),
       ),
@@ -152,15 +160,15 @@ class _RecommendationPageState extends State<RecommendationPage> {
               controller: _swiperController,
               cardsCount: _randomGames.length,
               onSwipe: _onSwipe,
-              numberOfCardsDisplayed: 2,
-              backCardOffset: const Offset(0, -10),
+              numberOfCardsDisplayed: 3,
+              backCardOffset: const Offset(0, -15),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
               isDisabled: false,
               isLoop: false,
-              maxAngle: 25,
-              threshold: 100,
-              scale: 0.9,
-              duration: const Duration(milliseconds: 200),
+              maxAngle: 30,
+              threshold: 50,
+              scale: 0.95,
+              duration: const Duration(milliseconds: 400),
               allowedSwipeDirection: AllowedSwipeDirection.only(left: true, right: true),
               cardBuilder: (context, index, horizontalThresholdPercentage, verticalThresholdPercentage) {
                 if (index >= _randomGames.length) return const SizedBox.shrink();
@@ -186,14 +194,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
                     _swiperController.swipe(CardSwiperDirection.right);
                   },
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => GameDetailPage(
-                          game: Game.fromGameSummary(game),
-                        ),
-                      ),
-                    );
+                    _navigateToGameDetails(game);
                   },
                 );
               },
@@ -202,25 +203,26 @@ class _RecommendationPageState extends State<RecommendationPage> {
     );
   }
 
+  void _navigateToGameDetails(GameSummary game) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => GameDetailPage(
+          game: Game.fromGameSummary(game),
+        ),
+      ),
+    );
+  }
+
   bool _onSwipe(int previousIndex, int? currentIndex, CardSwiperDirection direction) {
     if (currentIndex == null) return false;
     
     setState(() {
-      _swipeDirection = direction == CardSwiperDirection.left ? -1.0 : 1.0;
       _currentCardIndex = currentIndex;
 
       // If we're running low on cards, load more
       if (_currentCardIndex >= _randomGames.length - 3) {
         _loadMoreGames();
-      }
-    });
-
-    // Reset swipe direction after animation
-    Future.delayed(const Duration(milliseconds: 200), () {
-      if (mounted) {
-        setState(() {
-          _swipeDirection = 0.0;
-        });
       }
     });
 
@@ -277,88 +279,33 @@ class _RecommendationPageState extends State<RecommendationPage> {
               fontSize: 16,
             ),
           ),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                _isLoading = true;
+                _currentCardIndex = 0;
+              });
+              _loadRandomGames();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: AppTheme.primaryDark,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: const Text(
+              'Refresh Games',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ),
         ],
       ),
-    );
-  }
-
-  Widget _buildSwipeOverlays() {
-    const double maxOverlayOpacity = 0.15;
-    const double swipeThreshold = 0.1;
-
-    return Stack(
-      children: [
-        if (_swipeDirection < -swipeThreshold)
-          Positioned.fill(
-            child: TweenAnimationBuilder<double>(
-              tween: Tween<double>(begin: 0.0, end: 1.0),
-              duration: const Duration(milliseconds: 150),
-              builder: (context, value, child) {
-                return Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                      colors: [
-                        Colors.red.withOpacity(
-                          ((_swipeDirection.abs() - swipeThreshold) / (1.0 - swipeThreshold))
-                              .clamp(0.0, 1.0) *
-                              maxOverlayOpacity * value),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 40),
-                      child: Icon(
-                        Icons.close,
-                        color: Colors.red.withOpacity(0.8 * value),
-                        size: 48,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        if (_swipeDirection > swipeThreshold)
-          Positioned.fill(
-            child: TweenAnimationBuilder<double>(
-              tween: Tween<double>(begin: 0.0, end: 1.0),
-              duration: const Duration(milliseconds: 150),
-              builder: (context, value, child) {
-                return Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.centerRight,
-                      end: Alignment.centerLeft,
-                      colors: [
-                        Colors.greenAccent.withOpacity(
-                          ((_swipeDirection - swipeThreshold) / (1.0 - swipeThreshold))
-                              .clamp(0.0, 1.0) *
-                              maxOverlayOpacity * value),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 40),
-                      child: Icon(
-                        Icons.favorite,
-                        color: Colors.greenAccent.withOpacity(0.8 * value),
-                        size: 48,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-      ],
     );
   }
 }
