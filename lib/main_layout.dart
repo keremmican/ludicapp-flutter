@@ -39,7 +39,7 @@ class _MainLayoutState extends State<MainLayout> {
     final pages = [
       const HomePage(),
       const RecommendationPage(),
-      const ProfilePage(),
+      const ProfilePage(isBottomNavigation: true),
     ];
 
     return Scaffold(

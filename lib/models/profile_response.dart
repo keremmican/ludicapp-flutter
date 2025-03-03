@@ -1,4 +1,5 @@
 import 'user_status.dart';
+import 'package:ludicapp/services/model/response/library_summary_response.dart';
 
 class ProfileResponse {
   final String username;
@@ -7,6 +8,7 @@ class ProfileResponse {
   final int followingCount;
   final UserStatus userStatus;
   final bool? isFollowing;
+  List<LibrarySummaryResponse> librarySummaries;
 
   ProfileResponse({
     required this.username,
@@ -15,6 +17,7 @@ class ProfileResponse {
     required this.followingCount,
     required this.userStatus,
     this.isFollowing,
+    this.librarySummaries = const [],
   });
 
   factory ProfileResponse.fromJson(Map<String, dynamic> json) {
@@ -28,6 +31,9 @@ class ProfileResponse {
         orElse: () => UserStatus.ACTIVE,
       ),
       isFollowing: json['isFollowing'] as bool?,
+      librarySummaries: (json['librarySummaries'] as List<dynamic>?)
+          ?.map((e) => LibrarySummaryResponse.fromJson(e as Map<String, dynamic>))
+          .toList() ?? [],
     );
   }
 
@@ -39,6 +45,7 @@ class ProfileResponse {
       'followingCount': followingCount,
       'userStatus': userStatus.toString().split('.').last,
       'isFollowing': isFollowing,
+      'librarySummaries': librarySummaries.map((e) => e.toJson()).toList(),
     };
   }
 } 

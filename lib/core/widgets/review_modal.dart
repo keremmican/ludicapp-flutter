@@ -3,14 +3,12 @@ import 'package:flutter/material.dart';
 class ReviewModal extends StatefulWidget {
   final String gameName;
   final String coverUrl;
-  final String? releaseYear;
   final Function(String) onReviewSubmitted;
 
   const ReviewModal({
     Key? key,
     required this.gameName,
     required this.coverUrl,
-    this.releaseYear,
     required this.onReviewSubmitted,
   }) : super(key: key);
 
@@ -18,19 +16,19 @@ class ReviewModal extends StatefulWidget {
     BuildContext context, {
     required String gameName,
     required String coverUrl,
-    String? releaseYear,
     required Function(String) onReviewSubmitted,
   }) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (BuildContext context) => Container(
-        height: MediaQuery.of(context).size.height,
+      builder: (BuildContext context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
         child: ReviewModal(
           gameName: gameName,
           coverUrl: coverUrl,
-          releaseYear: releaseYear,
           onReviewSubmitted: onReviewSubmitted,
         ),
       ),
@@ -46,17 +44,40 @@ class _ReviewModalState extends State<ReviewModal> {
   final int maxCharacters = 140;
 
   @override
+  void initState() {
+    super.initState();
+    _reviewController.addListener(() {
+      setState(() {
+        // Update character counter
+      });
+    });
+  }
+
+  @override
   void dispose() {
+    _reviewController.removeListener(() {});
     _reviewController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    
     return Container(
-      color: const Color(0xFF1C1C1E),
+      constraints: BoxConstraints(
+        maxHeight: screenHeight * 0.7,
+      ),
+      decoration: const BoxDecoration(
+        color: Color(0xFF1C1C1E),
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(16),
+          topRight: Radius.circular(16),
+        ),
+      ),
       child: SafeArea(
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header with close and post buttons
@@ -89,12 +110,10 @@ class _ReviewModalState extends State<ReviewModal> {
               ),
             ),
 
-            // Game info section
             Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  // Game cover
                   Container(
                     width: 60,
                     height: 80,
@@ -107,35 +126,22 @@ class _ReviewModalState extends State<ReviewModal> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  // Game title and year
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.gameName,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        if (widget.releaseYear != null)
-                          Text(
-                            "(${widget.releaseYear})",
-                            style: const TextStyle(
-                              color: Colors.grey,
-                              fontSize: 14,
-                            ),
-                          ),
-                      ],
+                    child: Text(
+                      widget.gameName,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
               ),
             ),
 
-            // Review input
             Expanded(
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16),

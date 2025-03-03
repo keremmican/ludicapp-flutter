@@ -8,6 +8,11 @@ import 'package:ludicapp/core/models/game.dart';
 import 'package:ludicapp/core/providers/blurred_background_provider.dart';
 import 'package:ludicapp/theme/app_theme.dart';
 import 'package:ludicapp/services/category_service.dart';
+import 'package:ludicapp/services/model/response/paged_game_with_user_response.dart';
+import 'package:ludicapp/services/model/response/game_detail_with_user_info.dart';
+import 'package:ludicapp/services/repository/library_repository.dart';
+import 'package:ludicapp/features/home/presentation/controller/home_controller.dart';
+import 'package:ludicapp/services/model/response/user_game_actions.dart';
 
 enum SortOption {
   topRatedDesc,
@@ -22,6 +27,7 @@ class RelatedGamesPage extends StatefulWidget {
   final int? platformId;
   final int? genreId;
   final int? themeId;
+  final int? libraryId;
 
   const RelatedGamesPage({
     Key? key, 
@@ -30,6 +36,7 @@ class RelatedGamesPage extends StatefulWidget {
     this.platformId,
     this.genreId,
     this.themeId,
+    this.libraryId,
   }) : super(key: key);
 
   @override
@@ -39,10 +46,13 @@ class RelatedGamesPage extends StatefulWidget {
 class _RelatedGamesPageState extends State<RelatedGamesPage> {
   final GameRepository _gameRepository = GameRepository();
   final CategoryService _categoryService = CategoryService();
+  final LibraryRepository _libraryRepository = LibraryRepository();
+  final HomeController _homeController = HomeController();
   List<GameSummary> games = [];
-  Set<int> savedGames = {};  // Changed from Map to Set
-  Set<int> ratedGames = {};  // Changed from Map to Set
-  Map<int, int> userRatings = {};  // gameId -> rating
+  Map<int, GameDetailWithUserInfo> gameDetailsMap = {};
+  Set<int> savedGames = {};
+  Set<int> ratedGames = {};
+  Map<int, int> userRatings = {};
   bool _isLoading = false;
   bool _isInitialLoading = false;
   bool _hasMore = true;
@@ -105,22 +115,29 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
   }
 
   Future<void> _loadGames() async {
-    if (_isLoading || !_hasMore) {
-      print('Skipping load: isLoading=$_isLoading, hasMore=$_hasMore');
-      return;
-    }
+    if (_isLoading || (!_hasMore && _currentPage > 0)) return;
 
-    print('Loading games for ${widget.categoryTitle} - Page: $_currentPage');
-    
     setState(() {
       _isLoading = true;
+      if (_currentPage == 0) _isInitialLoading = true;
     });
 
     try {
-      if (widget.platformId != null) {
+      if (widget.libraryId != null) {
+        print('Fetching games for library: ${widget.libraryId} - Page: $_currentPage');
+        final response = await _libraryRepository.getGamesByLibraryId(
+          widget.libraryId!,
+          page: _currentPage,
+          size: _pageSize,
+        );
+
+        if (!mounted) return;
+        handleResponseWithUserInfo(response);
+      }
+      else if (widget.platformId != null) {
         print('Fetching games for platform: ${widget.platformId} - Page: $_currentPage');
         final (sortBy, sortDirection) = _getSortParams(_currentSort);
-        final response = await _gameRepository.fetchGamesByPlatform(
+        final response = await _gameRepository.fetchGamesByPlatformWithUserInfo(
           platformId: widget.platformId!,
           sortBy: sortBy,
           sortDirection: sortDirection,
@@ -129,12 +146,12 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
         );
 
         if (!mounted) return;
-        handleResponse(response);
+        handleResponseWithUserInfo(response);
       }
       else if (widget.genreId != null) {
-        print('Fetching games for genre ID: ${widget.genreId} - Page: $_currentPage');
+        print('Fetching games for genre: ${widget.genreId} - Page: $_currentPage');
         final (sortBy, sortDirection) = _getSortParams(_currentSort);
-        final response = await _gameRepository.fetchGamesByGenre(
+        final response = await _gameRepository.fetchGamesByGenreWithUserInfo(
           genreId: widget.genreId!,
           sortBy: sortBy,
           sortDirection: sortDirection,
@@ -143,12 +160,12 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
         );
 
         if (!mounted) return;
-        handleResponse(response);
+        handleResponseWithUserInfo(response);
       }
       else if (widget.themeId != null) {
-        print('Fetching games for theme ID: ${widget.themeId} - Page: $_currentPage');
+        print('Fetching games for theme: ${widget.themeId} - Page: $_currentPage');
         final (sortBy, sortDirection) = _getSortParams(_currentSort);
-        final response = await _gameRepository.fetchGamesByTheme(
+        final response = await _gameRepository.fetchGamesByThemeWithUserInfo(
           themeId: widget.themeId!,
           sortBy: sortBy,
           sortDirection: sortDirection,
@@ -157,7 +174,7 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
         );
 
         if (!mounted) return;
-        handleResponse(response);
+        handleResponseWithUserInfo(response);
       }
       else if (widget.popularityTypeId != null) {
         print('Fetching games for popularity type: ${widget.popularityTypeId} - Page: $_currentPage');
@@ -171,42 +188,42 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
         );
 
         if (!mounted) return;
-        handleResponse(response);
+        handleResponseWithUserInfo(response);
       }
       else if (widget.categoryTitle == 'New Releases') {
         print('Fetching new releases - Page: $_currentPage');
-        final response = await _gameRepository.fetchNewReleases(
+        final response = await _gameRepository.fetchNewReleasesWithUserInfo(
           page: _currentPage,
-          size: _pageSize,
+          pageSize: _pageSize,
         );
         
         if (!mounted) return;
-        handleResponse(response);
+        handleResponseWithUserInfo(response);
       } 
       else if (widget.categoryTitle == 'Top Rated') {
         print('Fetching top rated games - Page: $_currentPage');
-        final response = await _gameRepository.fetchTopRatedGames(
+        final response = await _gameRepository.fetchTopRatedGamesWithUserInfo(
           page: _currentPage,
-          size: _pageSize,
+          pageSize: _pageSize,
         );
 
         if (!mounted) return;
-        handleResponse(response);
+        handleResponseWithUserInfo(response);
       }
       else if (widget.categoryTitle == 'Coming Soon') {
         print('Fetching coming soon games - Page: $_currentPage');
-        final response = await _gameRepository.fetchComingSoon(
+        final response = await _gameRepository.fetchComingSoonWithUserInfo(
           page: _currentPage,
-          size: _pageSize,
+          pageSize: _pageSize,
         );
 
         if (!mounted) return;
-        handleResponse(response);
+        handleResponseWithUserInfo(response);
       }
       else if (genres.contains(widget.categoryTitle)) {
         print('Fetching games for genre: ${widget.categoryTitle} - Page: $_currentPage');
         final (sortBy, sortDirection) = _getSortParams(_currentSort);
-        final response = await _gameRepository.fetchGamesByGenre(
+        final response = await _gameRepository.fetchGamesByGenreWithUserInfo(
           genreId: _getGenreId(widget.categoryTitle),
           sortBy: sortBy,
           sortDirection: sortDirection,
@@ -215,12 +232,12 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
         );
 
         if (!mounted) return;
-        handleResponse(response);
+        handleResponseWithUserInfo(response);
       }
       else if (themes.contains(widget.categoryTitle)) {
         print('Fetching games for theme: ${widget.categoryTitle} - Page: $_currentPage');
         final (sortBy, sortDirection) = _getSortParams(_currentSort);
-        final response = await _gameRepository.fetchGamesByTheme(
+        final response = await _gameRepository.fetchGamesByThemeWithUserInfo(
           themeId: _getThemeId(widget.categoryTitle),
           sortBy: sortBy,
           sortDirection: sortDirection,
@@ -229,7 +246,7 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
         );
 
         if (!mounted) return;
-        handleResponse(response);
+        handleResponseWithUserInfo(response);
       }
       else {
         print('Unknown category: ${widget.categoryTitle}');
@@ -238,12 +255,12 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
           _hasMore = false;
         });
       }
-    } catch (error) {
-      print('Error loading games: $error');
+    } catch (e) {
+      print('Error loading games: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _hasMore = false;
+          _isInitialLoading = false;
         });
       }
     }
@@ -264,13 +281,54 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
 
   void handleResponse(PageableResponse<GameSummary> response) {
     setState(() {
-      games.addAll(response.content);
+      if (_currentPage == 0) {
+        games = response.content;
+      } else {
+        games.addAll(response.content);
+      }
       _hasMore = !response.last;
+      _currentPage++;
       _isLoading = false;
+      _isInitialLoading = false;
     });
+  }
+
+  void handleResponseWithUserInfo(PagedGameWithUserResponse response) {
+    setState(() {
+      if (_currentPage == 0) {
+        games = response.content.map((gameWithUser) {
+          _processUserGameInfo(gameWithUser);
+          gameDetailsMap[gameWithUser.gameDetails.id] = gameWithUser;
+          return gameWithUser.gameDetails;
+        }).toList();
+      } else {
+        games.addAll(response.content.map((gameWithUser) {
+          _processUserGameInfo(gameWithUser);
+          gameDetailsMap[gameWithUser.gameDetails.id] = gameWithUser;
+          return gameWithUser.gameDetails;
+        }));
+      }
+      _hasMore = response.last != null ? !response.last! : false;
+      _currentPage++;
+      _isLoading = false;
+      _isInitialLoading = false;
+    });
+  }
+
+  void _processUserGameInfo(GameDetailWithUserInfo gameWithUser) {
+    final gameId = gameWithUser.gameDetails.id;
+    final userActions = gameWithUser.userActions;
     
-    print('Response received: ${response.content.length} items');
-    print('Updated state - Total games: ${games.length}, hasMore: $_hasMore');
+    if (userActions != null) {
+      if (userActions.userRating != null) {
+        userRatings[gameId] = userActions.userRating!;
+        ratedGames.add(gameId);
+      }
+      
+      if (userActions.isSaved == true) {
+        savedGames.add(gameId);
+      }
+    }
   }
 
   int _getGenreId(String genreName) {
@@ -612,6 +670,7 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
                               }
                               return GameCard(
                                 game: games[index],
+                                gameDetail: gameDetailsMap[games[index].id],
                                 onSave: _handleSaveGame,
                                 onRate: _showRatingDialog,
                                 onHide: _handleHideGame,
@@ -646,13 +705,15 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => GameDetailPage(game: Game.fromGameSummary(game)),
+            builder: (context) => GameDetailPage(
+              game: Game.fromGameSummary(game),
+            ),
           ),
         );
       },
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.grey[900]?.withOpacity(0.3),
+          color: Theme.of(context).scaffoldBackgroundColor,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -801,7 +862,6 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
       context,
       gameName: game.name,
       coverUrl: game.coverUrl ?? '',
-      releaseYear: game.releaseDate,
       initialRating: userRatings[game.id],
       onRatingSelected: (rating) {
         setState(() {
@@ -813,12 +873,37 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
   }
 
   Future<void> _handleSaveGame(GameSummary game) async {
-    await _saveGame(game);
-    if (mounted) {
-      setState(() {
-        savedGames.add(game.id);  // Changed from Map to Set usage
-      });
-      _showSavedNotification();
+    final gameDetail = gameDetailsMap[game.id];
+    final isSaved = gameDetail?.userActions?.isSaved ?? false;
+
+    try {
+      final bool success = isSaved 
+        ? await _libraryRepository.unsaveGame(game.id)
+        : await _libraryRepository.saveGame(game.id);
+
+      if (success && mounted) {
+        setState(() {
+          // Update the game's userActions in gameDetailsMap
+          if (gameDetail != null) {
+            final updatedActions = gameDetail.userActions?.copyWith(isSaved: !isSaved) ?? 
+                UserGameActions(isSaved: !isSaved);
+            gameDetailsMap[game.id] = GameDetailWithUserInfo(
+              gameDetails: gameDetail.gameDetails,
+              userActions: updatedActions,
+            );
+          }
+        });
+        
+        // Update in HomeController for other pages
+        _homeController.updateGameSaveState(game.id, !isSaved);
+
+        // Show save animation if game is being saved (not unsaved)
+        if (!isSaved) {
+          _showSavedNotification();
+        }
+      }
+    } catch (e) {
+      print('Error saving game: $e');
     }
   }
 
@@ -890,14 +975,11 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
       overlayEntry.remove();
     });
   }
-
-  Future<void> _saveGame(GameSummary game) async {
-    // TODO: Implement save functionality with backend
-  }
 }
 
 class GameCard extends StatefulWidget {
   final GameSummary game;
+  final GameDetailWithUserInfo? gameDetail;
   final Function(GameSummary) onSave;
   final Function(GameSummary) onRate;
   final Function(GameSummary) onHide;
@@ -905,6 +987,7 @@ class GameCard extends StatefulWidget {
   const GameCard({
     Key? key,
     required this.game,
+    this.gameDetail,
     required this.onSave,
     required this.onRate,
     required this.onHide,
@@ -915,8 +998,8 @@ class GameCard extends StatefulWidget {
 }
 
 class _GameCardState extends State<GameCard> {
-  bool isSaved = false;
-  bool isRated = false;
+  bool get isSaved => widget.gameDetail?.userActions?.isSaved ?? false;
+  bool get isRated => widget.gameDetail?.userActions?.isRated ?? false;
 
   @override
   Widget build(BuildContext context) {
@@ -936,13 +1019,17 @@ class _GameCardState extends State<GameCard> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => GameDetailPage(game: Game.fromGameSummary(widget.game)),
+            builder: (context) => GameDetailPage(
+              game: widget.gameDetail != null 
+                ? Game.fromGameDetailWithUserInfo(widget.gameDetail!)
+                : Game.fromGameSummary(widget.game),
+            ),
           ),
         );
       },
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.grey[900]?.withOpacity(0.3),
+          color: Theme.of(context).scaffoldBackgroundColor,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -1035,9 +1122,6 @@ class _GameCardState extends State<GameCard> {
                         child: IconButton(
                           onPressed: (!isSaved && !isRated) ? () {
                             widget.onHide(widget.game);
-                            setState(() {
-                              isSaved = false;
-                            });
                           } : null,
                           icon: const Icon(
                             Icons.thumb_down_outlined,
@@ -1053,9 +1137,6 @@ class _GameCardState extends State<GameCard> {
                         child: IconButton(
                           onPressed: (!isSaved && !isRated) ? () {
                             widget.onRate(widget.game);
-                            setState(() {
-                              isRated = true;
-                            });
                           } : null,
                           icon: const Icon(
                             Icons.check_outlined,
@@ -1071,9 +1152,6 @@ class _GameCardState extends State<GameCard> {
                         child: IconButton(
                           onPressed: (!isSaved && !isRated) ? () {
                             widget.onSave(widget.game);
-                            setState(() {
-                              isSaved = true;
-                            });
                           } : null,
                           icon: const Icon(
                             Icons.favorite_border_outlined,

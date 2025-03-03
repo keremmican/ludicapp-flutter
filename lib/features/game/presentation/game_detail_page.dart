@@ -14,6 +14,11 @@ import 'package:ludicapp/features/profile/presentation/related_games_page.dart';
 import 'package:ludicapp/core/widgets/review_modal.dart';
 import 'package:ludicapp/core/providers/blurred_background_provider.dart';
 import 'package:ludicapp/core/utils/date_formatter.dart';
+import 'package:ludicapp/services/model/response/paged_game_with_user_response.dart';
+import 'package:ludicapp/services/model/response/user_game_info.dart';
+import 'package:ludicapp/services/repository/library_repository.dart';
+import 'package:ludicapp/services/model/response/user_game_actions.dart';
+import 'package:ludicapp/features/home/presentation/controller/home_controller.dart';
 
 class GameDetailPage extends StatefulWidget {
   final Game game;
@@ -32,18 +37,28 @@ class GameDetailPage extends StatefulWidget {
 class _GameDetailPageState extends State<GameDetailPage> {
   final _backgroundProvider = BlurredBackgroundProvider();
   final _gameRepository = GameRepository();
+  final _libraryRepository = LibraryRepository();
+  final _homeController = HomeController();
   final List<Image> _cachedImages = [];
   bool _areImagesLoaded = false;
   bool _isExpandedSummary = false;
   bool _showAllLanguages = false;
   int? _userRating;
+  bool _isSaved = false;
   late Game _game;
-  bool _isLoading = false;
+  bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
     _game = widget.game;
+    
+    // Set user actions from the game object if available
+    if (widget.game.userActions != null) {
+      _userRating = widget.game.userActions!.userRating;
+      _isSaved = widget.game.userActions!.isSaved ?? false;
+    }
     
     // Clear previous background cache and set new background
     _backgroundProvider.clearCache();
@@ -51,44 +66,41 @@ class _GameDetailPageState extends State<GameDetailPage> {
       _backgroundProvider.cacheBackground(_game.gameId.toString(), _game.coverUrl);
     }
     
-    _initializeGame();
+    // Only initialize game details if coming from search
+    if (widget.fromSearch) {
+      _initializeGame();
+    } else {
+      _isLoading = false;
+      _preloadImages();
+    }
   }
 
   Future<void> _initializeGame() async {
-    if (widget.fromSearch) {
-      setState(() => _isLoading = true);
-      try {
-        final gameDetail = await _gameRepository.fetchGameDetails(_game.gameId);
-        if (mounted) {
-          setState(() {
-            try {
-              _game = Game.fromGameSummary(gameDetail);
-              print('Error converting game summary:' + _game.releaseDate.toString());
-            } catch (e) {
-              print('Error converting game summary: $e');
-              throw Exception('Failed to process game details');
-            }
-            _isLoading = false;
-          });
-          
-          if (_game.coverUrl != null && _game.coverUrl != widget.game.coverUrl) {
-            _backgroundProvider.clearCache();
-            if (_game.gameId != null) {
-              _backgroundProvider.cacheBackground(_game.gameId.toString(), _game.coverUrl);
-            }
-          }
-          _preloadImages();
-        }
-      } catch (e) {
-        print('Error loading game details: $e');
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-        }
+    if (!widget.fromSearch) return;
+    
+    setState(() => _isLoading = true);
+    try {
+      // Fetch game details with user info
+      final gameWithUserInfo = await _gameRepository.fetchGameDetailsWithUserInfo(_game.gameId);
+      
+      if (mounted) {
+        setState(() {
+          // Update game with user actions
+          _game = gameWithUserInfo.toGame();
+          _userRating = gameWithUserInfo.userActions?.userRating;
+          _isSaved = gameWithUserInfo.userActions?.isSaved ?? false;
+          _isLoading = false;
+        });
+        
+        _preloadImages();
       }
-    } else {
-      _preloadImages();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = e.toString();
+        });
+      }
     }
   }
 
@@ -335,6 +347,12 @@ class _GameDetailPageState extends State<GameDetailPage> {
   @override
   Widget build(BuildContext context) {
     final cachedBackground = _game.gameId != null ? _backgroundProvider.getBackground(_game.gameId.toString()) : null;
+
+    print('build - _isSaved: $_isSaved');
+    print('build - userActions: ${widget.game.userActions}');
+    if (widget.game.userActions != null) {
+      print('build - userActions.isSaved: ${widget.game.userActions!.isSaved}');
+    }
 
     if (_isLoading) {
       return const Scaffold(
@@ -587,7 +605,27 @@ class _GameDetailPageState extends State<GameDetailPage> {
                         const SizedBox(width: 50),
                         _buildActionButton(FontAwesomeIcons.circleCheck, 'Seen'),
                         const SizedBox(width: 50),
-                        _buildActionButton(FontAwesomeIcons.bookmark, 'Save'),
+                        InkWell(
+                          onTap: _handleSaveGame,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _isSaved ? FontAwesomeIcons.solidBookmark : FontAwesomeIcons.bookmark,
+                                color: _isSaved ? Colors.orange[400] : Colors.white70,
+                                size: 24,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Save',
+                                style: TextStyle(
+                                  color: _isSaved ? Colors.orange[400] : Colors.white70,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -1339,7 +1377,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
         ),
       );
     }
-
+    
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1365,7 +1403,6 @@ class _GameDetailPageState extends State<GameDetailPage> {
       context,
       gameName: _game.name,
       coverUrl: _game.coverUrl ?? '',
-      releaseYear: _game.releaseDate,
       onReviewSubmitted: (review) {
         // TODO: Submit review
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1398,7 +1435,6 @@ class _GameDetailPageState extends State<GameDetailPage> {
       context,
       gameName: _game.name,
       coverUrl: _game.coverUrl ?? '',
-      releaseYear: _game.releaseDate,
       initialRating: _userRating,
       onRatingSelected: (rating) {
         setState(() {
@@ -2077,5 +2113,59 @@ class _GameDetailPageState extends State<GameDetailPage> {
       print('Error getting developer text: $e');
       return 'N/A';
     }
+  }
+
+  Future<void> _handleSaveGame() async {
+    if (_game.gameId == null) return;
+
+    try {
+      final bool success = _isSaved 
+        ? await _libraryRepository.unsaveGame(_game.gameId!)
+        : await _libraryRepository.saveGame(_game.gameId!);
+
+      if (success && mounted) {
+        setState(() {
+          _isSaved = !_isSaved;
+          // Update the game's userActions
+          _game.userActions = _game.userActions?.copyWith(isSaved: _isSaved) ?? 
+              UserGameActions(isSaved: _isSaved);
+        });
+        
+        // Update in HomeController for other pages
+        _homeController.updateGameSaveState(_game.gameId!, _isSaved);
+      }
+    } catch (e) {
+      print('Error saving game: $e');
+    }
+  }
+
+  void _showSavedNotification() {
+    final overlayState = Overlay.of(context);
+    final overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).size.height / 2 - 32,
+        left: MediaQuery.of(context).size.width / 2 - 32,
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.0, end: 1.0),
+          duration: const Duration(milliseconds: 300),
+          builder: (context, value, child) {
+            return Opacity(
+              opacity: value,
+              child: Icon(
+                Icons.favorite,
+                color: Colors.orange[400],
+                size: 64,
+              ),
+            );
+          },
+        ),
+      ),
+    );
+
+    overlayState.insert(overlayEntry);
+
+    Future.delayed(const Duration(milliseconds: 800), () {
+      overlayEntry.remove();
+    });
   }
 }

@@ -650,89 +650,90 @@ class _SearchPageState extends State<SearchPage> with SingleTickerProviderStateM
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: AppTheme.primaryDark,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        scrolledUnderElevation: 0,
-        surfaceTintColor: Colors.transparent,
-        title: Row(
-          children: [
-            Expanded(
-              child: Container(
-                height: 36,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1C1C1E),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: TextField(
-                  controller: _searchController,
-                  focusNode: _searchFocusNode,
-                  style: const TextStyle(color: Colors.white, fontSize: 15),
-                  decoration: InputDecoration(
-                    hintText: 'Search',
-                    prefixIcon: Icon(Icons.search, color: Colors.grey[600], size: 20),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: Icon(Icons.clear, color: Colors.grey[600], size: 20),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() {
-                                _searchGamesResults = [];
-                                _searchUsersResults = [];
-                                _lastQuery = '';
-                                _currentPage = 0;
-                                _hasMore = true;
-                              });
-                            },
-                          )
-                        : null,
-                    hintStyle: TextStyle(color: Colors.grey[600], fontSize: 15),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                  ),
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+    appBar: AppBar(
+      backgroundColor: AppTheme.primaryDark,
+      elevation: 0,
+      automaticallyImplyLeading: false,
+      scrolledUnderElevation: 0,
+      surfaceTintColor: Colors.transparent,
+      title: Row(
+        children: [
+          Expanded(
+            child: Container(
+              height: 36,
+              decoration: BoxDecoration(
+                color: const Color(0xFF1C1C1E),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: TextField(
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                style: const TextStyle(color: Colors.white, fontSize: 15),
+                decoration: InputDecoration(
+                  hintText: 'Search',
+                  prefixIcon: Icon(Icons.search, color: Colors.grey[600], size: 20),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: Icon(Icons.clear, color: Colors.grey[600], size: 20),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {
+                              _searchGamesResults = [];
+                              _searchUsersResults = [];
+                              _lastQuery = '';
+                              _currentPage = 0;
+                              _hasMore = true;
+                            });
+                          },
+                        )
+                      : null,
+                  hintStyle: TextStyle(color: Colors.grey[600], fontSize: 15),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                 ),
               ),
             ),
-            TextButton(
-              onPressed: _handleCancel,
-              child: Text(
-                'Cancel',
-                style: TextStyle(color: Colors.grey[400], fontSize: 14),
-              ),
+          ),
+          TextButton(
+            onPressed: _handleCancel,
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: Colors.grey[400], fontSize: 14),
             ),
-          ],
-        ),
-        bottom: _isSearchFocused || _searchController.text.isNotEmpty
-            ? PreferredSize(
-                preferredSize: const Size.fromHeight(48),
-                child: Container(
-                  decoration: BoxDecoration(
-                    border: Border(
-                      bottom: BorderSide(
-                        color: Colors.grey[900]!,
-                        width: 1,
-                      ),
-                    ),
-                  ),
-                  child: TabBar(
-                    controller: _tabController,
-                    tabs: const [
-                      Tab(text: 'Games'),
-                      Tab(text: 'Users'),
-                    ],
-                    labelColor: AppTheme.accentColor,
-                    unselectedLabelColor: Colors.grey[400],
-                    indicatorColor: AppTheme.accentColor,
-                    indicatorWeight: 3,
-                  ),
-                ),
-              )
-            : null,
+          ),
+        ],
       ),
+      bottom: PreferredSize(
+        preferredSize: Size.fromHeight(_isSearchFocused || _searchController.text.isNotEmpty ? 48 : 0),
+        child: Visibility(
+          visible: _isSearchFocused || _searchController.text.isNotEmpty,
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: Colors.grey[900]!,
+                  width: 1,
+                ),
+              ),
+            ),
+            child: TabBar(
+              controller: _tabController,
+              tabs: const [
+                Tab(text: 'Games'),
+                Tab(text: 'Users'),
+              ],
+              labelColor: AppTheme.accentColor,
+              unselectedLabelColor: Colors.grey[400],
+              indicatorColor: AppTheme.accentColor,
+              indicatorWeight: 3,
+            ),
+          ),
+        ),
+      ),
+    ),
       body: _isSearchFocused || _searchController.text.isNotEmpty
           ? Column(
               children: [

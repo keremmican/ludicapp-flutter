@@ -11,8 +11,11 @@ import 'package:ludicapp/services/api_service.dart';
 import 'package:ludicapp/services/token_service.dart';
 import 'package:ludicapp/routes.dart';
 import 'package:ludicapp/core/middleware/auth_middleware.dart';
+import 'dart:developer' as developer;
 
 void main() {
+  // Enable debug logging
+  developer.log('Starting app...', name: 'LudicApp');
   runApp(const MyApp());
 }
 

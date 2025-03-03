@@ -8,18 +8,22 @@ import 'package:ludicapp/features/splash/presentation/splash_screen.dart';
 import 'package:ludicapp/services/repository/user_repository.dart';
 import 'package:ludicapp/services/token_service.dart';
 import 'package:ludicapp/models/profile_response.dart';
+import 'package:ludicapp/services/model/response/library_summary_response.dart';
 import 'dart:math';
 import 'settings_page.dart';
 import 'related_games_page.dart';
+import 'package:ludicapp/services/repository/library_repository.dart';
 
 class ProfilePage extends StatefulWidget {
   final String? userId;
   final bool fromSearch;
+  final bool isBottomNavigation;
 
   const ProfilePage({
     Key? key, 
     this.userId,
     this.fromSearch = false,
+    this.isBottomNavigation = false,
   }) : super(key: key);
 
   @override
@@ -29,9 +33,10 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   final UserRepository _userRepository = UserRepository();
   final TokenService _tokenService = TokenService();
+  final LibraryRepository _libraryRepository = LibraryRepository();
   ProfileResponse? _profileData;
   bool _isCurrentUser = false;
-  bool _isLoading = true;
+  bool _isLoading = false;
   bool _isFollowing = false;
 
   static const List<String> mockImages = [
@@ -46,25 +51,81 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
-    _loadProfile();
+    _initializeProfile();
+  }
+
+  void _initializeProfile() {
+    if (widget.isBottomNavigation) {
+      // Bottom navigation'dan geliyorsa direkt SplashScreen verilerini kullan
+      setState(() {
+        _profileData = SplashScreen.profileData;
+        _isCurrentUser = true;
+      });
+      // Arkaplanda güncelle
+      _refreshCurrentUserData();
+    } else {
+      _loadProfile();
+    }
   }
 
   Future<void> _loadProfile() async {
     try {
-      setState(() => _isLoading = true);
-      
       final currentUserId = await _tokenService.getUserId();
       _isCurrentUser = widget.userId == null || widget.userId == currentUserId.toString();
 
       if (_isCurrentUser) {
-        // If it's the current user's profile, use the cached data from splash screen
         setState(() {
           _profileData = SplashScreen.profileData;
-          _isLoading = false;
         });
+        // Arkaplanda güncelle
+        _refreshCurrentUserData();
       } else {
-        // If it's another user's profile, fetch from API
-        final response = await _userRepository.fetchUserProfile(userId: widget.userId);
+        setState(() => _isLoading = true);
+        await _loadOtherUserProfile();
+      }
+    } catch (e) {
+      print('Error loading profile: $e');
+      if (!_isCurrentUser) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _refreshCurrentUserData() async {
+    try {
+      // Profil verilerini güncelle
+      final updatedProfile = await _userRepository.fetchUserProfile();
+      
+      // Library verilerini güncelle
+      final userId = await _tokenService.getUserId();
+      final updatedLibrarySummaries = await _libraryRepository.getAllLibrarySummaries(
+        userId: userId.toString(),
+      );
+
+      if (mounted) {
+        setState(() {
+          _profileData = updatedProfile;
+          SplashScreen.profileData = updatedProfile;
+          SplashScreen.librarySummaries = updatedLibrarySummaries;
+        });
+      }
+    } catch (e) {
+      print('Error refreshing current user data: $e');
+    }
+  }
+
+  Future<void> _loadOtherUserProfile() async {
+    try {
+      setState(() => _isLoading = true);
+      
+      final response = await _userRepository.fetchUserProfile(userId: widget.userId);
+      final librarySummaries = await _libraryRepository.getAllLibrarySummaries(
+        userId: widget.userId,
+      );
+      
+      response.librarySummaries = librarySummaries;
+      
+      if (mounted) {
         setState(() {
           _profileData = response;
           _isLoading = false;
@@ -72,8 +133,10 @@ class _ProfilePageState extends State<ProfilePage> {
         });
       }
     } catch (e) {
-      print('Error loading profile: $e');
-      setState(() => _isLoading = false);
+      print('Error loading other user profile: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -124,18 +187,37 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    // Bottom navigation'dan geliyorsa direkt SplashScreen verilerini kullan
+    if (widget.isBottomNavigation) {
+      _profileData = SplashScreen.profileData;
+      return _buildProfileContent();
+    }
+
+    // Kendi profilimiz için SplashScreen verilerini kullan
+    if (_isCurrentUser) {
+      _profileData = SplashScreen.profileData;
+      return _buildProfileContent();
+    }
+
+    // Diğer durumlar için loading ve error kontrolü
     if (_isLoading) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
     }
 
-    if (_profileData == null) {
+    // Başka kullanıcının profili için data kontrolü
+    if (!widget.isBottomNavigation && _profileData == null) {
+      print(widget.isBottomNavigation);
       return const Scaffold(
         body: Center(child: Text('Error loading profile')),
       );
     }
 
+    return _buildProfileContent();
+  }
+
+  Widget _buildProfileContent() {
     return Scaffold(
       body: Column(
         children: [
@@ -343,33 +425,18 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _buildGameLibrary(BuildContext context) {
-    final categories = [
-      {
-        'title': 'Top Matches',
-        'image': mockImages[Random().nextInt(mockImages.length)],
-        'count': '24',
-      },
-      {
-        'title': 'Saved',
-        'image': mockImages[Random().nextInt(mockImages.length)],
-        'count': '12',
-      },
-      {
-        'title': 'Rated',
-        'image': mockImages[Random().nextInt(mockImages.length)],
-        'count': '36',
-      },
-      {
-        'title': 'New Releases',
-        'image': mockImages[Random().nextInt(mockImages.length)],
-        'count': '8',
-      },
-      {
-        'title': 'Coming Soon',
-        'image': mockImages[Random().nextInt(mockImages.length)],
-        'count': '15',
-      },
-    ];
+    final librarySummaries = _isCurrentUser 
+      ? (SplashScreen.librarySummaries ?? [])
+      : (_profileData?.librarySummaries ?? []);
+    
+    if (librarySummaries.isEmpty) {
+      return const Center(
+        child: Text(
+          'No libraries found',
+          style: TextStyle(color: Colors.white),
+        ),
+      );
+    }
 
     return GridView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -381,20 +448,23 @@ class _ProfilePageState extends State<ProfilePage> {
         mainAxisSpacing: 12,
         childAspectRatio: 1.5,
       ),
-      itemCount: categories.length,
+      itemCount: librarySummaries.length,
       itemBuilder: (context, index) {
-        final category = categories[index];
+        final summary = librarySummaries[index];
         return _buildCategoryCard(
           context,
-          title: category['title']!,
-          imagePath: category['image']!,
-          count: category['count']!,
+          title: summary.displayName,
+          imagePath: summary.coverUrl ?? mockImages[Random().nextInt(mockImages.length)],
+          count: summary.gameCount.toString(),
           onTap: () {
             Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) =>
-                    RelatedGamesPage(categoryTitle: category['title']!),
+                    RelatedGamesPage(
+                      categoryTitle: summary.displayName,
+                      libraryId: summary.id,
+                    ),
               ),
             );
           },
@@ -410,15 +480,58 @@ class _ProfilePageState extends State<ProfilePage> {
     required String count,
     required VoidCallback onTap,
   }) {
+    IconData getLibraryIcon() {
+      switch (title) {
+        case 'Saved':
+          return Icons.bookmark;
+        case 'Hidden':
+          return Icons.visibility_off;
+        case 'Rated':
+          return Icons.star;
+        case 'Currently Playing':
+          return Icons.sports_esports;
+        default:
+          return Icons.games;
+      }
+    }
+
+    List<Color> getLibraryGradient() {
+      switch (title) {
+        case 'Saved':
+          return [Color(0xFF6A3093), Color(0xFFA044FF)];
+        case 'Hidden':
+          return [Color(0xFF434343), Color(0xFF000000)];
+        case 'Rated':
+          return [Color(0xFFFF512F), Color(0xFFDD2476)];
+        case 'Currently Playing':
+          return [Color(0xFF1A2980), Color(0xFF26D0CE)];
+        default:
+          return [Color(0xFF4B79A1), Color(0xFF283E51)];
+      }
+    }
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          image: DecorationImage(
-            image: AssetImage(imagePath),
-            fit: BoxFit.cover,
-          ),
+          gradient: imagePath.startsWith('http')
+              ? null
+              : LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: getLibraryGradient(),
+                ),
+          image: imagePath.startsWith('http')
+              ? DecorationImage(
+                  image: NetworkImage(imagePath),
+                  fit: BoxFit.cover,
+                  colorFilter: ColorFilter.mode(
+                    Colors.black.withOpacity(0.2),
+                    BlendMode.darken,
+                  ),
+                )
+              : null,
         ),
         child: Container(
           decoration: BoxDecoration(
@@ -428,7 +541,7 @@ class _ProfilePageState extends State<ProfilePage> {
               end: Alignment.bottomCenter,
               colors: [
                 Colors.transparent,
-                Colors.black.withOpacity(0.7),
+                Colors.black.withOpacity(0.8),
               ],
             ),
           ),
@@ -437,6 +550,18 @@ class _ProfilePageState extends State<ProfilePage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
+              if (!imagePath.startsWith('http')) ...[
+                Expanded(
+                  child: Center(
+                    child: Icon(
+                      getLibraryIcon(),
+                      color: Colors.white.withOpacity(0.9),
+                      size: 40,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
               Text(
                 title,
                 style: const TextStyle(

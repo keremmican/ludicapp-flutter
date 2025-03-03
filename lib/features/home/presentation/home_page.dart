@@ -341,7 +341,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
               if (_controller.newReleases.isNotEmpty)
                 GameSection(
                   title: 'New Releases',
-                  games: _controller.newReleases.map((game) => Game.fromGameSummary(game)).toList(),
+                  games: _controller.newReleases.map((game) => _controller.getGameWithUserActions(game)).toList(),
                   onGameTap: (game) {
                     Navigator.push(
                       context,
@@ -367,7 +367,10 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
               if (_controller.topRatedGames.isNotEmpty)
                 GameSection(
                   title: 'Top Rated',
-                  games: _controller.topRatedGames.map((game) => Game.fromGameSummary(game)).toList(),
+                  games: _controller.topRatedGames.map((game) {
+                    final gameWithActions = _controller.getGameWithUserActions(game);
+                    return gameWithActions;
+                  }).toList(),
                   onGameTap: (game) {
                     Navigator.push(
                       context,
@@ -384,7 +387,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
               if (_controller.comingSoonGames.isNotEmpty)
                 GameSection(
                   title: 'Coming Soon',
-                  games: _controller.comingSoonGames.map((game) => Game.fromGameSummary(game)).toList(),
+                  games: _controller.comingSoonGames.map((game) => _controller.getGameWithUserActions(game)).toList(),
                   onGameTap: (game) {
                     Navigator.push(
                       context,
@@ -411,7 +414,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
   }
 
   Widget _buildShowcaseGame(BuildContext context, GameSummary gameSummary) {
-    final game = Game.fromGameSummary(gameSummary);
+    final game = _controller.getGameWithUserActions(gameSummary);
     return Padding(
       padding: const EdgeInsets.all(15.0),
       child: MainPageGame(
@@ -524,7 +527,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
         ? LargeGameSection(
             key: ValueKey('large_section_${popularityType.id}'),
             title: _controller.getPopularityTypeTitle(popularityType.id),
-            games: games.map((game) => Game.fromGameSummary(game)).toList(),
+            games: games.map((game) => _controller.getGameWithUserActions(game)).toList(),
             onGameTap: (game) {
               Navigator.push(
                 context,
@@ -538,7 +541,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
         : GameSection(
             key: ValueKey('game_section_${popularityType.id}'),
             title: _controller.getPopularityTypeTitle(popularityType.id),
-            games: games.map((game) => Game.fromGameSummary(game)).toList(),
+            games: games.map((game) => _controller.getGameWithUserActions(game)).toList(),
             onGameTap: (game) {
               Navigator.push(
                 context,

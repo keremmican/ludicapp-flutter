@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:ludicapp/services/model/response/game_summary.dart';
+import 'package:ludicapp/services/model/response/user_game_info.dart';
+import 'package:ludicapp/services/model/response/game_detail_with_user_info.dart';
+import 'package:ludicapp/services/model/response/user_game_actions.dart';
 
 class GameMode {
   final int id;
@@ -73,7 +76,7 @@ class Game {
   final List<Map<String, dynamic>> companies;
   final List<String> screenshots;
   final String? summary;
-  final List<Map<String, String>> gameVideos;
+  final List<Map<String, dynamic>> gameVideos;
   final Map<String, String>? websites;
   final String? releaseFullDate;
   final Map<String, int>? gameTimeToBeats;
@@ -82,6 +85,12 @@ class Game {
   final List<GameMode> gameModes;
   final List<PlayerPerspective> playerPerspectives;
   final List<LanguageSupport> languageSupports;
+  UserGameActions? _userActions;
+
+  UserGameActions? get userActions => _userActions;
+  set userActions(UserGameActions? value) {
+    _userActions = value;
+  }
 
   Game({
     required this.gameId,
@@ -106,10 +115,13 @@ class Game {
     required this.gameModes,
     required this.playerPerspectives,
     required this.languageSupports,
-  });
+    UserGameActions? userActions,
+  }) {
+    _userActions = userActions;
+  }
 
   // Backward compatibility getters
-  String? get gameVideo => gameVideos.isNotEmpty ? gameVideos.first['url'] : null;
+  String? get gameVideo => gameVideos.isNotEmpty ? gameVideos.first['url'] as String? : null;
   int? get hastilyGameTime => gameTimeToBeats?['hastily'];
   int? get normallyGameTime => gameTimeToBeats?['normally'];
   int? get completelyGameTime => gameTimeToBeats?['completely'];
@@ -131,7 +143,7 @@ class Game {
       genres: summary.genres,
       themes: summary.themes,
       platforms: summary.platforms,
-      companies: summary.companies,
+      companies: summary.companies ?? [],
       screenshots: summary.screenshots,
       summary: summary.summary,
       gameVideos: summary.gameVideos,
@@ -142,6 +154,34 @@ class Game {
       gameModes: summary.gameModes.map((m) => GameMode.fromJson(m)).toList(),
       playerPerspectives: summary.playerPerspectives.map((p) => PlayerPerspective.fromJson(p)).toList(),
       languageSupports: summary.languageSupports.map((l) => LanguageSupport.fromJson(Map<String, dynamic>.from(l))).toList(),
+      userActions: null,
+    );
+  }
+
+  factory Game.fromGameDetailWithUserInfo(GameDetailWithUserInfo gameDetail) {
+    return Game(
+      gameId: gameDetail.gameDetails.id,
+      name: gameDetail.gameDetails.name,
+      slug: gameDetail.gameDetails.slug,
+      coverUrl: gameDetail.gameDetails.coverUrl,
+      totalRating: gameDetail.gameDetails.totalRating,
+      totalRatingCount: gameDetail.gameDetails.totalRatingCount,
+      releaseDate: gameDetail.gameDetails.releaseDate,
+      genres: gameDetail.gameDetails.genres,
+      themes: gameDetail.gameDetails.themes,
+      platforms: gameDetail.gameDetails.platforms,
+      companies: gameDetail.gameDetails.companies ?? [],
+      screenshots: gameDetail.gameDetails.screenshots,
+      summary: gameDetail.gameDetails.summary,
+      gameVideos: gameDetail.gameDetails.gameVideos,
+      websites: gameDetail.gameDetails.websites,
+      gameTimeToBeats: gameDetail.gameDetails.gameTimeToBeats,
+      pegiAgeRating: gameDetail.gameDetails.pegiAgeRating,
+      franchises: gameDetail.gameDetails.franchises.map((f) => Franchise.fromJson(f)).toList(),
+      gameModes: gameDetail.gameDetails.gameModes.map((m) => GameMode.fromJson(m)).toList(),
+      playerPerspectives: gameDetail.gameDetails.playerPerspectives.map((p) => PlayerPerspective.fromJson(p)).toList(),
+      languageSupports: gameDetail.gameDetails.languageSupports.map((l) => LanguageSupport.fromJson(Map<String, dynamic>.from(l))).toList(),
+      userActions: gameDetail.userActions,
     );
   }
 
@@ -158,5 +198,57 @@ class Game {
 
   static void clearCache() {
     _screenshotCache.clear();
+  }
+
+  Game copyWith({
+    int? gameId,
+    String? name,
+    String? slug,
+    String? coverUrl,
+    double? totalRating,
+    int? totalRatingCount,
+    String? releaseDate,
+    List<Map<String, dynamic>>? genres,
+    List<Map<String, dynamic>>? themes,
+    List<Map<String, dynamic>>? platforms,
+    List<Map<String, dynamic>>? companies,
+    List<String>? screenshots,
+    String? summary,
+    List<Map<String, dynamic>>? gameVideos,
+    Map<String, String>? websites,
+    String? releaseFullDate,
+    Map<String, int>? gameTimeToBeats,
+    String? pegiAgeRating,
+    List<Franchise>? franchises,
+    List<GameMode>? gameModes,
+    List<PlayerPerspective>? playerPerspectives,
+    List<LanguageSupport>? languageSupports,
+    UserGameActions? userActions,
+  }) {
+    return Game(
+      gameId: gameId ?? this.gameId,
+      name: name ?? this.name,
+      slug: slug ?? this.slug,
+      coverUrl: coverUrl ?? this.coverUrl,
+      totalRating: totalRating ?? this.totalRating,
+      totalRatingCount: totalRatingCount ?? this.totalRatingCount,
+      releaseDate: releaseDate ?? this.releaseDate,
+      genres: genres ?? this.genres,
+      themes: themes ?? this.themes,
+      platforms: platforms ?? this.platforms,
+      companies: companies ?? this.companies,
+      screenshots: screenshots ?? this.screenshots,
+      summary: summary ?? this.summary,
+      gameVideos: gameVideos ?? this.gameVideos,
+      websites: websites ?? this.websites,
+      releaseFullDate: releaseFullDate ?? this.releaseFullDate,
+      gameTimeToBeats: gameTimeToBeats ?? this.gameTimeToBeats,
+      pegiAgeRating: pegiAgeRating ?? this.pegiAgeRating,
+      franchises: franchises ?? this.franchises,
+      gameModes: gameModes ?? this.gameModes,
+      playerPerspectives: playerPerspectives ?? this.playerPerspectives,
+      languageSupports: languageSupports ?? this.languageSupports,
+      userActions: userActions ?? this.userActions,
+    );
   }
 } 

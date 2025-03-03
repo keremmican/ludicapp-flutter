@@ -12,7 +12,7 @@ class GameSummary {
   final List<Map<String, dynamic>> platforms;
   final List<Map<String, dynamic>> companies;
   final List<String> screenshots;
-  final List<Map<String, String>> gameVideos;
+  final List<Map<String, dynamic>> gameVideos;
   final Map<String, String>? websites;
   final Map<String, int>? gameTimeToBeats;
   final String? pegiAgeRating;
@@ -91,11 +91,14 @@ class GameSummary {
         }).toList();
       }
 
+      // Check both 'id' and 'gameId' fields for backward compatibility
+      final gameId = json['gameId'] ?? json['id'];
+      
       return GameSummary(
-        id: json['id'] != null 
-            ? (json['id'] is int 
-                ? json['id'] 
-                : (json['id'] as num).toInt()) 
+        id: gameId != null 
+            ? (gameId is int 
+                ? gameId 
+                : (gameId as num).toInt()) 
             : 0,
         name: json['name'] as String? ?? 'Unknown Game',
         slug: json['slug'] as String? ?? 'unknown-game',
@@ -135,7 +138,7 @@ class GameSummary {
 
   Map<String, dynamic> toJson() {
     return {
-      'gameId': id,
+      'gameId': id,  // Keep this as 'gameId' since API expects it
       'name': name,
       'slug': slug,
       'coverUrl': coverUrl,

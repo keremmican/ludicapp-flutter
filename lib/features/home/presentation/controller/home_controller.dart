@@ -2,6 +2,11 @@ import 'package:ludicapp/services/model/response/game_summary.dart';
 import 'package:ludicapp/services/model/response/name_id_response.dart';
 import 'package:ludicapp/services/repository/game_repository.dart';
 import 'package:ludicapp/features/splash/presentation/splash_screen.dart';
+import 'package:ludicapp/services/model/response/paged_game_with_user_response.dart';
+import 'package:ludicapp/services/model/response/game_detail_with_user_info.dart';
+import 'package:ludicapp/core/models/game.dart';
+import 'package:ludicapp/services/model/response/user_game_info.dart';
+import 'package:ludicapp/services/model/response/user_game_actions.dart';
 
 class HomeController {
   static final HomeController _instance = HomeController._internal();
@@ -15,9 +20,15 @@ class HomeController {
   List<GameSummary> comingSoonGames = [];
   GameSummary? randomGame;
   GameSummary? popularGameByVisits;
-  Map<GameSummary, List<GameSummary>> popularityTypeGames = {};
+  Map<int, List<GameDetailWithUserInfo>> popularityTypeGames = {};
   bool isLoadingMoreSections = false;
   String? error;
+
+  // User-specific information
+  Map<int, int> userRatings = {}; // gameId -> rating
+  Set<int> savedGames = {}; // gameIds that are saved
+  Set<int> ratedGames = {}; // gameIds that are rated
+  Set<int> hiddenGames = {}; // gameIds that are hidden
 
   bool _isInitialized = false;
   int _currentBatchIndex = 0;
@@ -52,16 +63,41 @@ class HomeController {
       SplashScreen.popularityTypes?.where((type) => type.id != SplashScreen.visitsPopularityTypeId).toList() ?? [];
 
   // Belirli bir popülerlik tipi için oyunları döndüren metot
-  List<GameSummary> getGamesForPopularityType(int popularityTypeId) {
-    final typeObj = popularityTypes.firstWhere(
-      (type) => type.id == popularityTypeId,
-      orElse: () => NameIdResponse(id: popularityTypeId, name: getPopularityTypeTitle(popularityTypeId)),
-    );
-    
-    return popularityTypeGames.entries
-      .where((entry) => entry.key.id == typeObj.id)
-      .map((entry) => entry.value)
-      .firstOrNull ?? [];
+  List<GameSummary> getGamesForPopularityType(int popularityType) {
+    if (!popularityTypeGames.containsKey(popularityType)) return [];
+    return popularityTypeGames[popularityType]!.map((gameWithUser) => gameWithUser.gameDetails).toList();
+  }
+
+  // GameSummary'den Game nesnesi oluşturan ve userActions bilgisini ekleyen metod
+  Game getGameWithUserActions(GameSummary gameSummary) {
+    final game = Game.fromGameSummary(gameSummary);
+    if (game.gameId != null) {
+      game.userActions = UserGameActions(
+        isSaved: savedGames.contains(game.gameId),
+        isRated: ratedGames.contains(game.gameId),
+        isHidden: hiddenGames.contains(game.gameId),
+        userRating: userRatings[game.gameId],
+      );
+    }
+    return game;
+  }
+
+  void processUserGameInfo(GameDetailWithUserInfo gameWithUserInfo) {
+    final gameId = gameWithUserInfo.gameDetails.id;
+    if (gameWithUserInfo.userActions != null) {
+      if (gameWithUserInfo.userActions!.isSaved ?? false) {
+        savedGames.add(gameId);
+      }
+      if (gameWithUserInfo.userActions!.isRated ?? false) {
+        ratedGames.add(gameId);
+      }
+      if (gameWithUserInfo.userActions!.isHidden ?? false) {
+        hiddenGames.add(gameId);
+      }
+      if (gameWithUserInfo.userActions!.userRating != null) {
+        userRatings[gameId] = gameWithUserInfo.userActions!.userRating!;
+      }
+    }
   }
 
   // Belirli bir bölüm için veri yükleyen metot
@@ -71,35 +107,19 @@ class HomeController {
       
       // Belirtilen popülerlik tipleri için oyunları yükle
       for (final popularityType in popularityTypeIds) {
-        if (!popularityTypeGames.values.any((games) => games.isNotEmpty && games.first.id == popularityType)) {
-          final response = await _gameRepository.fetchGamesByPopularityType(
+        if (!popularityTypeGames.containsKey(popularityType)) {
+          final response = await _gameRepository.fetchGamesByPopularityTypeWithUserInfo(
             popularityType: popularityType,
           );
           
-          // Popularity type'ı bul
-          final typeObj = popularityTypes.firstWhere(
-            (type) => type.id == popularityType,
-            orElse: () => NameIdResponse(id: popularityType, name: getPopularityTypeTitle(popularityType)),
-          );
+          // Store games with user info
+          final gamesWithUserInfo = response.content;
+          popularityTypeGames[popularityType] = gamesWithUserInfo;
           
-          // NameIdResponse'u GameSummary'ye dönüştür
-          final gameSummary = GameSummary(
-            id: typeObj.id,
-            name: typeObj.name,
-            slug: typeObj.name.toLowerCase().replaceAll(' ', '-'),
-            genres: [],
-            themes: [],
-            platforms: [],
-            companies: [],
-            screenshots: [],
-            gameVideos: [],
-            franchises: [],
-            gameModes: [],
-            playerPerspectives: [],
-            languageSupports: [],
-          );
-          
-          popularityTypeGames[gameSummary] = response.content;
+          // Process user-specific information
+          for (final gameWithUser in gamesWithUserInfo) {
+            processUserGameInfo(gameWithUser);
+          }
         }
       }
     } catch (e) {
@@ -119,29 +139,39 @@ class HomeController {
     this.newReleases = newReleases;
     this.topRatedGames = topRatedGames;
     this.comingSoonGames = comingSoonGames;
-    this.randomGame = newReleases.isNotEmpty ? newReleases.first : null;
     this.popularGameByVisits = popularGameByVisits;
-    _isInitialized = true;
   }
 
   Future<void> loadData() async {
     if (_isInitialized) return;
 
     try {
-      // Splash screen'de yüklenen verileri kullan
+      // Use the new endpoints that include user info
       if (newReleases.isEmpty) {
-        final newReleasesResponse = await _gameRepository.fetchNewReleases();
-        newReleases = newReleasesResponse.content;
+        final newReleasesResponse = await _gameRepository.fetchNewReleasesWithUserInfo();
+        newReleases = newReleasesResponse.content.map((gameWithUser) {
+          // Store user-specific information
+          processUserGameInfo(gameWithUser);
+          return gameWithUser.gameDetails;
+        }).toList();
       }
       
       if (topRatedGames.isEmpty) {
-        final topRatedResponse = await _gameRepository.fetchTopRatedGames();
-        topRatedGames = topRatedResponse.content;
+        final topRatedResponse = await _gameRepository.fetchTopRatedGamesWithUserInfo();
+        topRatedGames = topRatedResponse.content.map((gameWithUser) {
+          // Store user-specific information
+          processUserGameInfo(gameWithUser);
+          return gameWithUser.gameDetails;
+        }).toList();
       }
       
       if (comingSoonGames.isEmpty) {
-        final comingSoonResponse = await _gameRepository.fetchComingSoon();
-        comingSoonGames = comingSoonResponse.content;
+        final comingSoonResponse = await _gameRepository.fetchComingSoonWithUserInfo();
+        comingSoonGames = comingSoonResponse.content.map((gameWithUser) {
+          // Store user-specific information
+          processUserGameInfo(gameWithUser);
+          return gameWithUser.gameDetails;
+        }).toList();
       }
       
       if (randomGame == null && newReleases.isNotEmpty) {
@@ -149,6 +179,7 @@ class HomeController {
       }
 
       if (popularGameByVisits == null && SplashScreen.visitsPopularityTypeId != null) {
+        // For now, keep using the old endpoint for this specific case
         popularGameByVisits = await _gameRepository.getSingleGameByPopularityType(
           SplashScreen.visitsPopularityTypeId!
         );
@@ -159,6 +190,28 @@ class HomeController {
       error = e.toString();
       throw e; // Hatayı yukarı ilet
     }
+  }
+
+  // Get user rating for a game
+  int? getUserRating(int gameId) {
+    return userRatings[gameId];
+  }
+
+  // Check if a game is saved
+  bool isGameSaved(int gameId) {
+    print('isGameSaved - Game ID: $gameId, Result: ${savedGames.contains(gameId)}');
+    print('isGameSaved - savedGames: $savedGames');
+    return savedGames.contains(gameId);
+  }
+
+  // Check if a game is rated
+  bool isGameRated(int gameId) {
+    return ratedGames.contains(gameId);
+  }
+
+  // Check if a game is hidden
+  bool isGameHidden(int gameId) {
+    return hiddenGames.contains(gameId);
   }
 
   Future<void> initializeData() async {
@@ -176,43 +229,26 @@ class HomeController {
       
       // Load games for each popularity type in this batch
       for (final popularityType in currentBatch) {
-        if (!popularityTypeGames.values.any((games) => games.isNotEmpty && games.first.id == popularityType)) {
-          final response = await _gameRepository.fetchGamesByPopularityType(
+        if (!popularityTypeGames.containsKey(popularityType)) {
+          final response = await _gameRepository.fetchGamesByPopularityTypeWithUserInfo(
             popularityType: popularityType,
           );
           
-          // Popularity type'ı bul
-          final typeObj = popularityTypes.firstWhere(
-            (type) => type.id == popularityType,
-            orElse: () => NameIdResponse(id: popularityType, name: getPopularityTypeTitle(popularityType)),
-          );
+          // Store games with user info
+          final gamesWithUserInfo = response.content;
+          popularityTypeGames[popularityType] = gamesWithUserInfo;
           
-          // NameIdResponse'u GameSummary'ye dönüştür
-          final gameSummary = GameSummary(
-            id: typeObj.id,
-            name: typeObj.name,
-            slug: typeObj.name.toLowerCase().replaceAll(' ', '-'),
-            genres: [],
-            themes: [],
-            platforms: [],
-            companies: [],
-            screenshots: [],
-            gameVideos: [],
-            franchises: [],
-            gameModes: [],
-            playerPerspectives: [],
-            languageSupports: [],
-          );
-          
-          popularityTypeGames[gameSummary] = response.content;
+          // Process user-specific information
+          for (final gameWithUser in gamesWithUserInfo) {
+            processUserGameInfo(gameWithUser);
+          }
         }
       }
-
-      // Move to next batch
+      
       _currentBatchIndex++;
     } catch (e) {
       error = e.toString();
-      throw e; // Hatayı yukarı ilet
+      print('Error loading more sections: $e');
     } finally {
       isLoadingMoreSections = false;
     }
@@ -222,5 +258,50 @@ class HomeController {
 
   String getPopularityTypeTitle(int popularityType) {
     return popularityTypeTitles[popularityType] ?? 'Popular Games';
+  }
+
+  // Add this method to update game save state
+  void updateGameSaveState(int gameId, bool isSaved) {
+    if (isSaved) {
+      savedGames.add(gameId);
+    } else {
+      savedGames.remove(gameId);
+    }
+
+    // Update in popularity type games
+    for (var games in popularityTypeGames.values) {
+      for (var gameWithUser in games) {
+        if (gameWithUser.gameDetails.id == gameId) {
+          final updatedActions = gameWithUser.userActions?.copyWith(isSaved: isSaved) ?? 
+              UserGameActions(isSaved: isSaved);
+          gameWithUser = GameDetailWithUserInfo(
+            gameDetails: gameWithUser.gameDetails,
+            userActions: updatedActions,
+          );
+        }
+      }
+    }
+
+    // Update in other lists
+    void updateGameInList(List<GameSummary> list) {
+      for (var game in list) {
+        if (game.id == gameId) {
+          final gameWithActions = getGameWithUserActions(game);
+          gameWithActions.userActions = UserGameActions(
+            isSaved: isSaved,
+            isRated: gameWithActions.userActions?.isRated,
+            isHidden: gameWithActions.userActions?.isHidden,
+            userRating: gameWithActions.userActions?.userRating,
+          );
+        }
+      }
+    }
+
+    updateGameInList(newReleases);
+    updateGameInList(topRatedGames);
+    updateGameInList(comingSoonGames);
+    
+    print('Game save state updated - Game ID: $gameId, isSaved: $isSaved');
+    print('Current saved games: $savedGames');
   }
 } 
