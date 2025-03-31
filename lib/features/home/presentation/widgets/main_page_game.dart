@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:ludicapp/core/utils/date_formatter.dart';
 import 'package:ludicapp/services/model/response/game_summary.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class MainPageGame extends StatefulWidget {
   final GameSummary game;
   final VoidCallback onTap;
+  final ImageProvider? initialCoverProvider;
 
   const MainPageGame({
     super.key,
     required this.game,
     required this.onTap,
+    this.initialCoverProvider,
   });
 
   @override
@@ -17,47 +20,8 @@ class MainPageGame extends StatefulWidget {
 }
 
 class _MainPageGameState extends State<MainPageGame> with AutomaticKeepAliveClientMixin {
-  bool _isImageLoaded = false;
-  late final NetworkImage _imageProvider;
-  bool _hasError = false;
-
   @override
   bool get wantKeepAlive => true;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.game.coverUrl?.isNotEmpty ?? false) {
-      _imageProvider = NetworkImage(widget.game.coverUrl!);
-      _loadImage();
-    }
-  }
-
-  void _loadImage() {
-    if (widget.game.coverUrl?.isEmpty ?? true) return;
-    
-    // Doğrudan ImageProvider'ı kullanarak resmi yükle
-    final image = _imageProvider.resolve(const ImageConfiguration());
-    
-    final listener = ImageStreamListener(
-      (ImageInfo info, bool synchronousCall) {
-        if (mounted && !_isImageLoaded) {
-          setState(() {
-            _isImageLoaded = true;
-          });
-        }
-      },
-      onError: (exception, stackTrace) {
-        if (mounted && !_hasError) {
-          setState(() {
-            _hasError = true;
-          });
-        }
-      },
-    );
-    
-    image.addListener(listener);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -85,14 +49,27 @@ class _MainPageGameState extends State<MainPageGame> with AutomaticKeepAliveClie
             children: [
               // Game Image with Hero animation
               Hero(
-                tag: 'game-${widget.game.id}',
+                tag: 'main_game_cover_${widget.game.id}',
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(24),
-                  child: Container(
-                    width: double.infinity,
-                    height: double.infinity,
-                    child: _buildGameImage(),
-                  ),
+                  child: widget.initialCoverProvider != null
+                    ? Image(
+                        image: widget.initialCoverProvider!,
+                        fit: BoxFit.cover,
+                        frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                          if (wasSynchronouslyLoaded) return child;
+                          return AnimatedOpacity(
+                            child: child,
+                            opacity: frame == null ? 0 : 1,
+                            duration: const Duration(milliseconds: 150),
+                            curve: Curves.easeOut,
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return _buildCachedImageFallback();
+                        },
+                      )
+                    : _buildCachedImageFallback(),
                 ),
               ),
 
@@ -190,45 +167,25 @@ class _MainPageGameState extends State<MainPageGame> with AutomaticKeepAliveClie
     );
   }
 
-  Widget _buildGameImage() {
-    if (widget.game.coverUrl?.isEmpty ?? true) {
-      return _buildErrorWidget();
-    }
-    
-    if (_hasError) {
-      return _buildErrorWidget();
-    }
-    
-    if (_isImageLoaded) {
-      return Image(
-        image: _imageProvider,
-        fit: BoxFit.cover,
-        alignment: Alignment.center,
-        errorBuilder: (context, error, stackTrace) => _buildErrorWidget(),
-      );
-    }
-    
-    return _buildLoadingWidget();
-  }
-
-  Widget _buildErrorWidget() {
-    return Container(
-      color: Colors.grey[900],
-      child: const Center(
-        child: Icon(
-          Icons.error_outline,
-          color: Colors.white54,
-          size: 48,
-        ),
+  Widget _buildCachedImageFallback() {
+    return CachedNetworkImage(
+      imageUrl: widget.game.coverUrl ?? '',
+      fit: BoxFit.cover,
+      fadeInDuration: const Duration(milliseconds: 150),
+      fadeOutDuration: const Duration(milliseconds: 150),
+      placeholder: (context, url) => Container(
+        color: Colors.grey[900],
+        child: const Center(child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white70)),
       ),
-    );
-  }
-
-  Widget _buildLoadingWidget() {
-    return Container(
-      color: Colors.grey[900],
-      child: const Center(
-        child: CircularProgressIndicator(),
+      errorWidget: (context, url, error) => Container(
+        color: Colors.grey[900],
+        child: const Center(
+          child: Icon(
+            Icons.error_outline,
+            color: Colors.white54,
+            size: 48,
+          ),
+        ),
       ),
     );
   }

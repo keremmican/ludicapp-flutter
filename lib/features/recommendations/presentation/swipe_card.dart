@@ -2,6 +2,8 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:ludicapp/theme/app_theme.dart';
 import 'package:ludicapp/core/utils/date_formatter.dart';
+import 'dart:math' as math;
+import 'package:cached_network_image/cached_network_image.dart';
 
 /// A widget that represents a single swipeable recommendation card.
 class SwipeCard extends StatelessWidget {
@@ -54,19 +56,18 @@ class SwipeCard extends StatelessWidget {
                   children: [
                     // Game Image
                     SizedBox.expand(
-                      child: Image.network(
-                        game['image']!,
+                      child: CachedNetworkImage(
+                        imageUrl: game['image']!,
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: Colors.grey[900],
-                            child: const Icon(
-                              Icons.error_outline,
-                              color: Colors.white,
-                              size: 48,
-                            ),
-                          );
-                        },
+                        placeholder: (context, url) => Container(color: Colors.grey[900]),
+                        errorWidget: (context, url, error) => Container(
+                          color: Colors.grey[900],
+                          child: const Icon(
+                            Icons.error_outline,
+                            color: Colors.white,
+                            size: 48,
+                          ),
+                        ),
                       ),
                     ),
                     // Dark Overlay for better readability

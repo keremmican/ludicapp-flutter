@@ -36,6 +36,7 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
             child: Image.asset(
               'lib/assets/images/app_logo.png',
               fit: BoxFit.contain,
+              gaplessPlayback: true,
             ),
           ),
 

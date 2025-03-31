@@ -4,12 +4,14 @@ class ReviewModal extends StatefulWidget {
   final String gameName;
   final String coverUrl;
   final Function(String) onReviewSubmitted;
+  final String? initialReview;
 
   const ReviewModal({
     Key? key,
     required this.gameName,
     required this.coverUrl,
     required this.onReviewSubmitted,
+    this.initialReview,
   }) : super(key: key);
 
   static void show(
@@ -17,6 +19,7 @@ class ReviewModal extends StatefulWidget {
     required String gameName,
     required String coverUrl,
     required Function(String) onReviewSubmitted,
+    String? initialReview,
   }) {
     showModalBottomSheet(
       context: context,
@@ -26,10 +29,16 @@ class ReviewModal extends StatefulWidget {
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
-        child: ReviewModal(
-          gameName: gameName,
-          coverUrl: coverUrl,
-          onReviewSubmitted: onReviewSubmitted,
+        child: DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          builder: (_, controller) => ReviewModal(
+            gameName: gameName,
+            coverUrl: coverUrl,
+            onReviewSubmitted: onReviewSubmitted,
+            initialReview: initialReview,
+          ),
         ),
       ),
     );
@@ -40,16 +49,23 @@ class ReviewModal extends StatefulWidget {
 }
 
 class _ReviewModalState extends State<ReviewModal> {
-  final TextEditingController _reviewController = TextEditingController();
+  late TextEditingController _reviewController;
   final int maxCharacters = 140;
+  final FocusNode _focusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
+    _reviewController = TextEditingController(text: widget.initialReview);
     _reviewController.addListener(() {
-      setState(() {
-        // Update character counter
-      });
+      setState(() {});
+    });
+    
+    // Add slight delay to focus to ensure smooth animation
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        _focusNode.requestFocus();
+      }
     });
   }
 
@@ -57,6 +73,7 @@ class _ReviewModalState extends State<ReviewModal> {
   void dispose() {
     _reviewController.removeListener(() {});
     _reviewController.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -147,6 +164,7 @@ class _ReviewModalState extends State<ReviewModal> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: TextField(
                   controller: _reviewController,
+                  focusNode: _focusNode,
                   maxLength: maxCharacters,
                   maxLines: null,
                   style: const TextStyle(

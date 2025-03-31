@@ -11,6 +11,7 @@ import 'package:ludicapp/services/model/response/name_id_response.dart';
 import 'package:ludicapp/core/models/game.dart';
 import 'package:ludicapp/features/home/presentation/widgets/skeleton_game_section.dart';
 import 'package:ludicapp/features/home/presentation/widgets/skeleton_large_game_section.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -342,11 +343,14 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
                 GameSection(
                   title: 'New Releases',
                   games: _controller.newReleases.map((game) => _controller.getGameWithUserActions(game)).toList(),
-                  onGameTap: (game) {
+                  onGameTap: (game, coverProvider) { 
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => GameDetailPage(game: game),
+                        builder: (context) => GameDetailPage(
+                          game: game,
+                          initialCoverProvider: coverProvider,
+                        ),
                       ),
                     );
                   },
@@ -371,11 +375,14 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
                     final gameWithActions = _controller.getGameWithUserActions(game);
                     return gameWithActions;
                   }).toList(),
-                  onGameTap: (game) {
+                  onGameTap: (game, coverProvider) { 
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => GameDetailPage(game: game),
+                        builder: (context) => GameDetailPage(
+                          game: game, 
+                          initialCoverProvider: coverProvider, 
+                        ),
                       ),
                     );
                   },
@@ -388,11 +395,14 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
                 GameSection(
                   title: 'Coming Soon',
                   games: _controller.comingSoonGames.map((game) => _controller.getGameWithUserActions(game)).toList(),
-                  onGameTap: (game) {
+                  onGameTap: (game, coverProvider) { 
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => GameDetailPage(game: game),
+                        builder: (context) => GameDetailPage(
+                          game: game,
+                          initialCoverProvider: coverProvider,
+                        ),
                       ),
                     );
                   },
@@ -421,15 +431,45 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
         key: ValueKey('main_game_${gameSummary.id}'),
         game: gameSummary,
         onTap: () {
+          ImageProvider? coverProvider;
+          // Create provider and initiate pre-cache WITHOUT awaiting
+          if (game.coverUrl != null && game.coverUrl!.isNotEmpty) {
+            coverProvider = CachedNetworkImageProvider(game.coverUrl!);
+            try {
+              // Ensure context is valid before precaching
+              precacheImage(coverProvider, context)
+                  .catchError((e) => print('Error pre-caching showcase cover: $e')); 
+              print('Initiated pre-cache for showcase cover: ${game.name}');
+            } catch (e) { 
+              print('Sync error initiating showcase cover pre-cache: $e');
+            }
+          }
+          // Pre-cache first screenshot (fire-and-forget)
+          if (game.screenshots != null && game.screenshots!.isNotEmpty) {
+             try {
+                precacheImage(CachedNetworkImageProvider(game.screenshots![0]), context)
+                   .catchError((e) => print('Error pre-caching showcase screenshot: $e'));
+                print('Initiated pre-cache for showcase screenshot: ${game.name}');
+            } catch (e) { 
+               print('Sync error initiating showcase screenshot pre-cache: $e');
+            }
+          }
+
+          // Navigate immediately, passing the provider
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => GameDetailPage(
                 game: game,
+                initialCoverProvider: coverProvider, // Pass provider
               ),
             ),
           );
         },
+        // Pass the provider to MainPageGame widget itself (optional but good practice)
+        initialCoverProvider: (game.coverUrl != null && game.coverUrl!.isNotEmpty) 
+                              ? CachedNetworkImageProvider(game.coverUrl!) 
+                              : null,
       ),
     );
   }
@@ -532,7 +572,9 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => GameDetailPage(game: game),
+                  builder: (context) => GameDetailPage(
+                    game: game,
+                  ),
                 ),
               );
             },
@@ -542,11 +584,14 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
             key: ValueKey('game_section_${popularityType.id}'),
             title: _controller.getPopularityTypeTitle(popularityType.id),
             games: games.map((game) => _controller.getGameWithUserActions(game)).toList(),
-            onGameTap: (game) {
+            onGameTap: (game, coverProvider) { 
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => GameDetailPage(game: game),
+                  builder: (context) => GameDetailPage(
+                    game: game,
+                    initialCoverProvider: coverProvider,
+                  ),
                 ),
               );
             },

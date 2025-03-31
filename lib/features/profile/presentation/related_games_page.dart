@@ -13,6 +13,7 @@ import 'package:ludicapp/services/model/response/game_detail_with_user_info.dart
 import 'package:ludicapp/services/repository/library_repository.dart';
 import 'package:ludicapp/features/home/presentation/controller/home_controller.dart';
 import 'package:ludicapp/services/model/response/user_game_actions.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 enum SortOption {
   topRatedDesc,
@@ -294,22 +295,46 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
   }
 
   void handleResponseWithUserInfo(PagedGameWithUserResponse response) {
+    // Extract newly added games BEFORE updating the main list
+    final newGames = response.content.map((gameWithUser) {
+      _processUserGameInfo(gameWithUser);
+      gameDetailsMap[gameWithUser.gameDetails.id] = gameWithUser;
+      return gameWithUser.gameDetails;
+    }).toList();
+
+    // Initiate pre-caching for new games in the background
+    if (mounted) {
+      for (final game in newGames) {
+        if (game.coverUrl != null && game.coverUrl!.isNotEmpty) {
+           try {
+             precacheImage(CachedNetworkImageProvider(game.coverUrl!), context)
+               .catchError((e) => print('BG Pre-cache Error (Cover ${game.id}): $e'));
+             print('BG Pre-cache Initiated (Cover ${game.id})');
+           } catch (e) {
+             print('Sync BG Pre-cache Error (Cover ${game.id}): $e');
+           }
+        }
+        if (game.screenshots.isNotEmpty) {
+           try {
+             precacheImage(CachedNetworkImageProvider(game.screenshots[0]), context)
+               .catchError((e) => print('BG Pre-cache Error (SS ${game.id}): $e'));
+             print('BG Pre-cache Initiated (SS ${game.id})');
+           } catch (e) {
+             print('Sync BG Pre-cache Error (SS ${game.id}): $e');
+           }
+        }
+      }
+    }
+
     setState(() {
       if (_currentPage == 0) {
-        games = response.content.map((gameWithUser) {
-          _processUserGameInfo(gameWithUser);
-          gameDetailsMap[gameWithUser.gameDetails.id] = gameWithUser;
-          return gameWithUser.gameDetails;
-        }).toList();
+        games = newGames; // Assign the already processed new games
       } else {
-        games.addAll(response.content.map((gameWithUser) {
-          _processUserGameInfo(gameWithUser);
-          gameDetailsMap[gameWithUser.gameDetails.id] = gameWithUser;
-          return gameWithUser.gameDetails;
-        }));
+        games.addAll(newGames); // Add the already processed new games
       }
       _hasMore = response.last != null ? !response.last! : false;
-      _currentPage++;
+      // Increment page number AFTER processing the current page's response
+      // _currentPage++; // Moved page increment to _loadGames initiation in _onScroll
       _isLoading = false;
       _isInitialLoading = false;
     });
@@ -674,6 +699,76 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
                                 onSave: _handleSaveGame,
                                 onRate: _showRatingDialog,
                                 onHide: _handleHideGame,
+                                onGameUpdated: (gameId, updatedGame) {
+                                  print('RelatedGamesPage - Received updated game: gameId=$gameId, isSaved=${updatedGame.userActions?.isSaved}, isRated=${updatedGame.userActions?.isRated}, userRating=${updatedGame.userActions?.userRating}');
+                                  
+                                  if (gameDetailsMap.containsKey(gameId)) {
+                                    final existingGameDetail = gameDetailsMap[gameId]!;
+                                    final updatedUserActions = UserGameActions(
+                                      isSaved: updatedGame.userActions?.isSaved ?? false,
+                                      isRated: updatedGame.userActions?.isRated ?? false,
+                                      userRating: updatedGame.userActions?.userRating,
+                                    );
+
+                                    print('RelatedGamesPage - Creating updated game detail with actions: isSaved=${updatedUserActions.isSaved}, isRated=${updatedUserActions.isRated}, userRating=${updatedUserActions.userRating}');
+
+                                    // savedGames ve ratedGames Set'lerini güncelle
+                                    if (updatedUserActions.isSaved == true) {
+                                      print('RelatedGamesPage - Adding game $gameId to savedGames');
+                                      savedGames.add(gameId);
+                                    } else {
+                                      print('RelatedGamesPage - Removing game $gameId from savedGames');
+                                      savedGames.remove(gameId);
+                                    }
+
+                                    if (updatedUserActions.isRated == true) {
+                                      print('RelatedGamesPage - Adding game $gameId to ratedGames');
+                                      ratedGames.add(gameId);
+                                      if (updatedUserActions.userRating != null) {
+                                        print('RelatedGamesPage - Setting rating ${updatedUserActions.userRating} for game $gameId');
+                                        userRatings[gameId] = updatedUserActions.userRating!;
+                                      }
+                                    } else {
+                                      print('RelatedGamesPage - Removing game $gameId from ratedGames');
+                                      ratedGames.remove(gameId);
+                                      userRatings.remove(gameId);
+                                    }
+
+                                    // Yeni bir GameDetailWithUserInfo nesnesi oluştur
+                                    final updatedGameDetail = GameDetailWithUserInfo(
+                                      gameDetails: existingGameDetail.gameDetails,
+                                      userActions: updatedUserActions,
+                                    );
+
+                                    setState(() {
+                                      // gameDetailsMap'i güncelle
+                                      gameDetailsMap[gameId] = updatedGameDetail;
+
+                                      // GameCard'ı zorla yeniden oluştur
+                                      final gameIndex = games.indexWhere((game) => game.id == gameId);
+                                      if (gameIndex != -1) {
+                                        // Yeni bir GameSummary nesnesi oluştur
+                                        games[gameIndex] = GameSummary(
+                                          id: games[gameIndex].id,
+                                          name: games[gameIndex].name,
+                                          coverUrl: games[gameIndex].coverUrl,
+                                          totalRating: games[gameIndex].totalRating,
+                                          screenshots: games[gameIndex].screenshots,
+                                          slug: games[gameIndex].slug,
+                                          genres: games[gameIndex].genres,
+                                          themes: games[gameIndex].themes,
+                                          platforms: games[gameIndex].platforms,
+                                          companies: games[gameIndex].companies,
+                                          gameVideos: games[gameIndex].gameVideos,
+                                          franchises: games[gameIndex].franchises,
+                                          gameModes: games[gameIndex].gameModes,
+                                          playerPerspectives: games[gameIndex].playerPerspectives,
+                                          languageSupports: games[gameIndex].languageSupports,
+                                        );
+                                      }
+                                    });
+                                  }
+                                },
                               );
                             },
                           ),
@@ -686,187 +781,81 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
     );
   }
 
-  Widget _buildGameCard(GameSummary game) {
-    final bool isSaved = savedGames.contains(game.id);
-    final bool isRated = ratedGames.contains(game.id);
-    final _backgroundProvider = BlurredBackgroundProvider();
-    
-    // Cache the blurred background and preload screenshots
-    _backgroundProvider.cacheBackground(game.id.toString(), game.coverUrl);
-    if (game.screenshots.isNotEmpty) {
-      Game.preloadScreenshots(game.id, game.screenshots);
-      for (final screenshot in game.screenshots) {
-        _backgroundProvider.cacheBackground('${game.id}_${screenshot.hashCode}', screenshot);
-      }
-    }
-    
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => GameDetailPage(
-              game: Game.fromGameSummary(game),
-            ),
-          ),
-        );
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Game Cover Image with Container
-            Expanded(
-              child: Stack(
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey[900],
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.network(
-                        game.coverUrl ?? '',
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        height: double.infinity,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: Colors.grey[800],
-                            child: const Icon(Icons.error, color: Colors.white),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                  if (isSaved)
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.5),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.favorite,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            // Game Title and Rating Row
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          game.name,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        game.totalRating?.toStringAsFixed(0) ?? '--',
-                        style: TextStyle(
-                          color: Colors.green[400],
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  // Action Buttons - Always show but with opacity
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Opacity(
-                        opacity: (!isSaved && !isRated) ? 1.0 : 0.0,
-                        child: IconButton(
-                          onPressed: (!isSaved && !isRated) ? () {
-                            _showHideConfirmation(context, game);
-                          } : null,
-                          icon: const Icon(
-                            Icons.thumb_down_outlined,
-                            color: Colors.white70,
-                            size: 20,
-                          ),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        ),
-                      ),
-                      Opacity(
-                        opacity: (!isSaved && !isRated) ? 1.0 : 0.0,
-                        child: IconButton(
-                          onPressed: (!isSaved && !isRated) ? () {
-                            _showRatingDialog(game);
-                          } : null,
-                          icon: const Icon(
-                            Icons.check_outlined,
-                            color: Colors.white70,
-                            size: 20,
-                          ),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        ),
-                      ),
-                      Opacity(
-                        opacity: (!isSaved && !isRated) ? 1.0 : 0.0,
-                        child: IconButton(
-                          onPressed: (!isSaved && !isRated) ? () {
-                            _handleSaveGame(game);
-                          } : null,
-                          icon: const Icon(
-                            Icons.favorite_border_outlined,
-                            color: Colors.white70,
-                            size: 20,
-                          ),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   void _showRatingDialog(GameSummary game) {
     RatingModal.show(
       context,
       gameName: game.name,
       coverUrl: game.coverUrl ?? '',
+      gameId: game.id,
       initialRating: userRatings[game.id],
       onRatingSelected: (rating) {
         setState(() {
-          userRatings[game.id] = rating;
-          ratedGames.add(game.id);  // Changed from Map to Set usage
+          if (rating > 0) {
+            userRatings[game.id] = rating;
+            ratedGames.add(game.id);
+            
+            // Update game detail if exists
+            if (gameDetailsMap.containsKey(game.id)) {
+              final existingGameDetail = gameDetailsMap[game.id]!;
+              final updatedActions = existingGameDetail.userActions?.copyWith(
+                isRated: true,
+                userRating: rating,
+              ) ?? UserGameActions(
+                isRated: true,
+                userRating: rating,
+                isSaved: existingGameDetail.userActions?.isSaved ?? false,
+              );
+              
+              gameDetailsMap[game.id] = GameDetailWithUserInfo(
+                gameDetails: existingGameDetail.gameDetails,
+                userActions: updatedActions,
+              );
+            }
+          } else {
+            // Ensure complete cleanup when rating is removed
+            userRatings.remove(game.id);
+            ratedGames.remove(game.id);
+            
+            // Update game detail if exists
+            if (gameDetailsMap.containsKey(game.id)) {
+              final existingGameDetail = gameDetailsMap[game.id]!;
+              final updatedActions = existingGameDetail.userActions?.copyWith(
+                isRated: false,
+                userRating: null,
+              ) ?? UserGameActions(
+                isRated: false,
+                userRating: null,
+                isSaved: existingGameDetail.userActions?.isSaved ?? false,
+              );
+              
+              gameDetailsMap[game.id] = GameDetailWithUserInfo(
+                gameDetails: existingGameDetail.gameDetails,
+                userActions: updatedActions,
+              );
+
+              // Force rebuild of the GameCard
+              final gameIndex = games.indexWhere((g) => g.id == game.id);
+              if (gameIndex != -1) {
+                games[gameIndex] = GameSummary(
+                  id: games[gameIndex].id,
+                  name: games[gameIndex].name,
+                  coverUrl: games[gameIndex].coverUrl,
+                  totalRating: games[gameIndex].totalRating,
+                  screenshots: games[gameIndex].screenshots,
+                  slug: games[gameIndex].slug,
+                  genres: games[gameIndex].genres,
+                  themes: games[gameIndex].themes,
+                  platforms: games[gameIndex].platforms,
+                  companies: games[gameIndex].companies,
+                  gameVideos: games[gameIndex].gameVideos,
+                  franchises: games[gameIndex].franchises,
+                  gameModes: games[gameIndex].gameModes,
+                  playerPerspectives: games[gameIndex].playerPerspectives,
+                  languageSupports: games[gameIndex].languageSupports,
+                );
+              }
+            }
+          }
         });
       },
     );
@@ -949,18 +938,28 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
     final overlayState = Overlay.of(context);
     final overlayEntry = OverlayEntry(
       builder: (context) => Positioned(
-        top: MediaQuery.of(context).size.height / 2 - 32,
-        left: MediaQuery.of(context).size.width / 2 - 32,
+        top: MediaQuery.of(context).size.height / 2 - 40,
+        left: MediaQuery.of(context).size.width / 2 - 40,
         child: TweenAnimationBuilder<double>(
           tween: Tween(begin: 0.0, end: 1.0),
           duration: const Duration(milliseconds: 300),
           builder: (context, value, child) {
             return Opacity(
               opacity: value,
-              child: Icon(
-                Icons.favorite,
-                color: Colors.red[400],
-                size: 64,
+              child: Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Center(
+                  child: Icon(
+                    Icons.favorite,
+                    color: Colors.red[400],
+                    size: 40,
+                  ),
+                ),
               ),
             );
           },
@@ -970,7 +969,6 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
 
     overlayState.insert(overlayEntry);
 
-    // Automatically remove after 800ms
     Future.delayed(const Duration(milliseconds: 800), () {
       overlayEntry.remove();
     });
@@ -983,6 +981,7 @@ class GameCard extends StatefulWidget {
   final Function(GameSummary) onSave;
   final Function(GameSummary) onRate;
   final Function(GameSummary) onHide;
+  final Function(int, Game) onGameUpdated;
 
   const GameCard({
     Key? key,
@@ -991,6 +990,7 @@ class GameCard extends StatefulWidget {
     required this.onSave,
     required this.onRate,
     required this.onHide,
+    required this.onGameUpdated,
   }) : super(key: key);
 
   @override
@@ -1003,19 +1003,38 @@ class _GameCardState extends State<GameCard> {
 
   @override
   Widget build(BuildContext context) {
-    final _backgroundProvider = BlurredBackgroundProvider();
-    
-    // Cache the blurred background and preload screenshots
-    _backgroundProvider.cacheBackground(widget.game.id.toString(), widget.game.coverUrl);
-    if (widget.game.screenshots.isNotEmpty) {
-      Game.preloadScreenshots(widget.game.id, widget.game.screenshots);
-      for (final screenshot in widget.game.screenshots) {
-        _backgroundProvider.cacheBackground('${widget.game.id}_${screenshot.hashCode}', screenshot);
-      }
-    }
+    print('GameCard build - gameId=${widget.game.id}, isSaved=$isSaved, isRated=$isRated, userActions=${widget.gameDetail?.userActions}');
     
     return GestureDetector(
       onTap: () {
+        ImageProvider? coverProvider;
+        // Create provider and initiate pre-cache WITHOUT awaiting
+        if (widget.game.coverUrl != null && widget.game.coverUrl!.isNotEmpty) {
+          coverProvider = CachedNetworkImageProvider(widget.game.coverUrl!);
+          try {
+            if (mounted) {
+              precacheImage(coverProvider, context)
+                  .catchError((e) => print('Error pre-caching cover: $e')); 
+              print('Initiated pre-cache for cover: ${widget.game.name}');
+            }
+          } catch (e) { 
+            print('Sync error initiating cover pre-cache: $e');
+          }
+        }
+        // Pre-cache first screenshot (fire-and-forget)
+        if (widget.game.screenshots.isNotEmpty) {
+           try {
+            if (mounted) {
+              precacheImage(CachedNetworkImageProvider(widget.game.screenshots[0]), context)
+                  .catchError((e) => print('Error pre-caching screenshot: $e')); 
+              print('Initiated pre-cache for screenshot: ${widget.game.name}');
+            }
+          } catch (e) { 
+             print('Sync error initiating screenshot pre-cache: $e');
+          }
+        }
+
+        // Navigate immediately, passing the provider
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -1023,9 +1042,18 @@ class _GameCardState extends State<GameCard> {
               game: widget.gameDetail != null 
                 ? Game.fromGameDetailWithUserInfo(widget.gameDetail!)
                 : Game.fromGameSummary(widget.game),
+              initialCoverProvider: coverProvider, // Pass the provider
             ),
           ),
-        );
+        ).then((result) {
+          if (result != null && result is Game) {
+            // GameDetailPage'den dönen güncellenmiş oyun bilgisini parent'a ilet
+            widget.onGameUpdated(widget.game.id, result);
+            
+            // State'i güncelle
+            setState(() {});
+          }
+        });
       },
       child: Container(
         decoration: BoxDecoration(
@@ -1046,17 +1074,19 @@ class _GameCardState extends State<GameCard> {
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: Image.network(
-                        widget.game.coverUrl ?? '',
+                      child: CachedNetworkImage(
+                        imageUrl: widget.game.coverUrl ?? '',
                         fit: BoxFit.cover,
                         width: double.infinity,
                         height: double.infinity,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: Colors.grey[800],
-                            child: const Icon(Icons.error, color: Colors.white),
-                          );
-                        },
+                        memCacheHeight: 300,
+                        memCacheWidth: 200,
+                        fadeInDuration: const Duration(milliseconds: 0),
+                        placeholder: (context, url) => Container(color: Colors.grey[800]),
+                        errorWidget: (context, url, error) => Container(
+                          color: Colors.grey[800],
+                          child: const Icon(Icons.error, color: Colors.white),
+                        ),
                       ),
                     ),
                   ),

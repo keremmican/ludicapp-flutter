@@ -14,6 +14,7 @@ import 'dart:convert';
 import 'package:ludicapp/services/api_service.dart';
 import 'package:ludicapp/features/profile/presentation/profile_page.dart';
 import 'package:ludicapp/features/home/presentation/controller/home_controller.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
@@ -431,12 +432,30 @@ class _SearchPageState extends State<SearchPage> with SingleTickerProviderStateM
     return GestureDetector(
       onTap: () {
         if (game.id != null) {
+          ImageProvider? coverProvider;
+          // Create provider and initiate pre-cache WITHOUT awaiting
+          if (game.imageUrl != null && game.imageUrl!.isNotEmpty) {
+            coverProvider = CachedNetworkImageProvider(game.imageUrl!);
+            try {
+              if (mounted) {
+                precacheImage(coverProvider, context)
+                   .catchError((e) => print('Error pre-caching cover: $e'));
+                print('Initiated pre-cache for cover: ${game.name}');
+              }
+            } catch (e) {
+              print('Sync error initiating cover pre-cache: $e');
+            }
+          }
+          // Placeholder for screenshot pre-caching logic if needed later
+          
+          // Navigate immediately, passing the provider
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => GameDetailPage(
                 game: Game.fromGameSummary(game.toGameSummary()),
                 fromSearch: true,
+                initialCoverProvider: coverProvider, // Pass the provider
               ),
             ),
           );
@@ -469,12 +488,16 @@ class _SearchPageState extends State<SearchPage> with SingleTickerProviderStateM
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: game.imageUrl != null && game.imageUrl!.isNotEmpty
-                          ? Image.network(
-                              game.imageUrl!,
+                          ? CachedNetworkImage(
+                              imageUrl: game.imageUrl!,
                               fit: BoxFit.cover,
                               width: double.infinity,
                               height: double.infinity,
-                              errorBuilder: (context, error, stackTrace) {
+                              placeholder: (context, url) => Container(
+                                color: Colors.grey[850],
+                                child: const Center(child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white70)),
+                              ),
+                              errorWidget: (context, url, error) {
                                 return Container(
                                   color: Colors.grey[850],
                                   child: const Center(
@@ -618,12 +641,13 @@ class _SearchPageState extends State<SearchPage> with SingleTickerProviderStateM
     }
 
     return ClipOval(
-      child: Image.network(
-        user.imageUrl!,
+      child: CachedNetworkImage(
+        imageUrl: user.imageUrl!,
         width: 50,
         height: 50,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => const Icon(
+        placeholder: (context, url) => const CircleAvatar(backgroundColor: AppTheme.primaryDark),
+        errorWidget: (context, url, error) => const Icon(
           Icons.person,
           color: AppTheme.textSecondary,
           size: 30,

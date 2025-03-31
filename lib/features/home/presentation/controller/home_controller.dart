@@ -7,8 +7,10 @@ import 'package:ludicapp/services/model/response/game_detail_with_user_info.dart
 import 'package:ludicapp/core/models/game.dart';
 import 'package:ludicapp/services/model/response/user_game_info.dart';
 import 'package:ludicapp/services/model/response/user_game_actions.dart';
+import 'package:flutter/foundation.dart';
 
-class HomeController {
+// ChangeNotifier'dan extend edelim
+class HomeController extends ChangeNotifier {
   static final HomeController _instance = HomeController._internal();
   factory HomeController() => _instance;
   HomeController._internal();
@@ -25,11 +27,16 @@ class HomeController {
   String? error;
 
   // User-specific information
-  Map<int, int> userRatings = {}; // gameId -> rating
+  // Map<int, int> userRatings = {}; // gameId -> rating // Kaldırıldı
   Set<int> savedGames = {}; // gameIds that are saved
-  Set<int> ratedGames = {}; // gameIds that are rated
+  // Set<int> ratedGames = {}; // gameIds that are rated // Kaldırıldı
   Set<int> hiddenGames = {}; // gameIds that are hidden
-
+  Map<int, int?> gameRatings = {}; // Rating null olabilir
+  Map<int, String?> gameComments = {}; // Comment null olabilir
+  
+  // savedGamesList değişkenini tanımlayalım
+  List<Game> savedGamesList = [];
+  
   bool _isInitialized = false;
   int _currentBatchIndex = 0;
 
@@ -72,11 +79,13 @@ class HomeController {
   Game getGameWithUserActions(GameSummary gameSummary) {
     final game = Game.fromGameSummary(gameSummary);
     if (game.gameId != null) {
+      final gameId = game.gameId!;
       game.userActions = UserGameActions(
-        isSaved: savedGames.contains(game.gameId),
-        isRated: ratedGames.contains(game.gameId),
-        isHidden: hiddenGames.contains(game.gameId),
-        userRating: userRatings[game.gameId],
+        isSaved: savedGames.contains(gameId),
+        isRated: isGameRated(gameId),
+        isHidden: hiddenGames.contains(gameId),
+        userRating: gameRatings[gameId],
+        comment: gameComments[gameId],
       );
     }
     return game;
@@ -85,17 +94,19 @@ class HomeController {
   void processUserGameInfo(GameDetailWithUserInfo gameWithUserInfo) {
     final gameId = gameWithUserInfo.gameDetails.id;
     if (gameWithUserInfo.userActions != null) {
-      if (gameWithUserInfo.userActions!.isSaved ?? false) {
+      final actions = gameWithUserInfo.userActions!;
+      
+      if (actions.isSaved ?? false) {
         savedGames.add(gameId);
       }
-      if (gameWithUserInfo.userActions!.isRated ?? false) {
-        ratedGames.add(gameId);
-      }
-      if (gameWithUserInfo.userActions!.isHidden ?? false) {
+      if (actions.isHidden ?? false) {
         hiddenGames.add(gameId);
       }
-      if (gameWithUserInfo.userActions!.userRating != null) {
-        userRatings[gameId] = gameWithUserInfo.userActions!.userRating!;
+      if (actions.userRating != null) {
+        gameRatings[gameId] = actions.userRating;
+      }
+      if (actions.comment != null) {
+        gameComments[gameId] = actions.comment;
       }
     }
   }
@@ -194,7 +205,7 @@ class HomeController {
 
   // Get user rating for a game
   int? getUserRating(int gameId) {
-    return userRatings[gameId];
+    return gameRatings[gameId];
   }
 
   // Check if a game is saved
@@ -206,7 +217,7 @@ class HomeController {
 
   // Check if a game is rated
   bool isGameRated(int gameId) {
-    return ratedGames.contains(gameId);
+    return gameRatings.containsKey(gameId) && gameRatings[gameId] != null;
   }
 
   // Check if a game is hidden
@@ -303,5 +314,28 @@ class HomeController {
     
     print('Game save state updated - Game ID: $gameId, isSaved: $isSaved');
     print('Current saved games: $savedGames');
+    notifyListeners();
+  }
+
+  // Rating durumunu güncelle (rating silme ve değiştirme dahil)
+  void updateGameRatingState(int gameId, int? rating) {
+    if (rating != null && rating > 0) {
+      gameRatings[gameId] = rating;
+    } else {
+      gameRatings.remove(gameId);
+    }
+    notifyListeners();
+    print('HomeController - Updated gameRating for $gameId: $rating');
+  }
+
+  // Update game comment
+  void updateGameComment(int gameId, String? comment) {
+    if (comment != null && comment.isNotEmpty) {
+      gameComments[gameId] = comment;
+    } else {
+      gameComments.remove(gameId); // Yorum null veya boş ise kaldır
+    }
+    notifyListeners();
+    print('HomeController - Updated comment for $gameId: $comment');
   }
 } 

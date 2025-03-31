@@ -19,15 +19,19 @@ import 'package:ludicapp/services/model/response/user_game_info.dart';
 import 'package:ludicapp/services/repository/library_repository.dart';
 import 'package:ludicapp/services/model/response/user_game_actions.dart';
 import 'package:ludicapp/features/home/presentation/controller/home_controller.dart';
+import 'package:ludicapp/services/repository/rating_repository.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class GameDetailPage extends StatefulWidget {
   final Game game;
   final bool fromSearch;
+  final ImageProvider? initialCoverProvider;
 
   const GameDetailPage({
     Key? key, 
     required this.game,
     this.fromSearch = false,
+    this.initialCoverProvider,
   }) : super(key: key);
 
   @override
@@ -58,12 +62,76 @@ class _GameDetailPageState extends State<GameDetailPage> {
     if (widget.game.userActions != null) {
       _userRating = widget.game.userActions!.userRating;
       _isSaved = widget.game.userActions!.isSaved ?? false;
+      final initialComment = widget.game.userActions!.comment; // Comment'i al
+      
+      // _game'in userActions'ını comment ile başlat/güncelle
+      _game = _game.copyWith(
+        userActions: (_game.userActions ?? UserGameActions()).copyWith(
+          userRating: _userRating,
+          isSaved: _isSaved,
+          comment: initialComment, // Comment'i ata
+        )
+      );
+
+      // Debug için değerleri kontrol et
+      print('initState - userRating from widget: $_userRating');
+      print('initState - isSaved from widget: $_isSaved');
+      print('initState - comment from widget: $initialComment'); // Comment log'u eklendi
+      print('initState - userActions from widget: ${_game.userActions}'); // Güncellenmiş userActions log'u
+    }
+    
+    // Game ID varsa, HomeController'dan rating, save ve comment durumunu da kontrol edelim
+    if (_game.gameId != null) {
+      // HomeController'dan bu oyun için rating değeri var mı kontrol et
+      final gameId = _game.gameId!;
+      
+      // Eğer HomeController'da rating varsa, onu kullan
+      if (_homeController.gameRatings.containsKey(gameId)) {
+        _userRating = _homeController.gameRatings[gameId];
+        print('initState - Using rating from HomeController: $_userRating');
+        
+        // Game nesnesinin userActions'ını da güncelle
+        _game = _game.copyWith(
+          userActions: (_game.userActions ?? UserGameActions()).copyWith(
+            isRated: _userRating != null && _userRating! > 0, // Rating varsa isRated true
+            userRating: _userRating,
+          )
+        );
+      }
+      
+      // Eğer HomeController'da save durumu varsa, onu kullan
+      if (_homeController.savedGames.contains(gameId)) {
+        _isSaved = true;
+        print('initState - Using save state from HomeController: $_isSaved');
+        
+        // Game nesnesinin userActions'ını da güncelle
+        _game = _game.copyWith(
+          userActions: (_game.userActions ?? UserGameActions()).copyWith(
+            isSaved: true,
+          )
+        );
+      }
+      
+      // Eğer HomeController'da comment varsa ve widget'tan gelen comment null ise, onu kullan
+      final bool commentExistsInWidget = _game.userActions?.comment != null;
+      if (!commentExistsInWidget && _homeController.gameComments.containsKey(gameId)) {
+        final commentFromController = _homeController.gameComments[gameId];
+        if (commentFromController != null) { // Controller'dan gelen yorumun null olmadığından emin ol
+          print('initState - Using comment from HomeController because initial comment was null: $commentFromController');
+          // Game nesnesinin userActions'ını da güncelle
+          _game = _game.copyWith(
+            userActions: (_game.userActions ?? UserGameActions()).copyWith(
+              comment: commentFromController,
+            )
+          );
+        }
+      }
     }
     
     // Clear previous background cache and set new background
     _backgroundProvider.clearCache();
     if (_game.coverUrl != null) {
-      _backgroundProvider.cacheBackground(_game.gameId.toString(), _game.coverUrl);
+      _backgroundProvider.cacheBackground(_game.gameId.toString(), _game.coverUrl!);
     }
     
     // Only initialize game details if coming from search
@@ -76,19 +144,34 @@ class _GameDetailPageState extends State<GameDetailPage> {
   }
 
   Future<void> _initializeGame() async {
-    if (!widget.fromSearch) return;
+    if (!widget.fromSearch || _game.gameId == null) return; // gameId null ise çık
     
     setState(() => _isLoading = true);
     try {
       // Fetch game details with user info
-      final gameWithUserInfo = await _gameRepository.fetchGameDetailsWithUserInfo(_game.gameId);
+      final gameWithUserInfo = await _gameRepository.fetchGameDetailsWithUserInfo(_game.gameId!);
       
       if (mounted) {
         setState(() {
-          // Update game with user actions
-          _game = gameWithUserInfo.toGame();
+          // Update game with user actions from fetched data
+          _game = gameWithUserInfo.toGame(); // Bu metodun userActions'ı doğru atadığını varsayıyoruz
           _userRating = gameWithUserInfo.userActions?.userRating;
           _isSaved = gameWithUserInfo.userActions?.isSaved ?? false;
+          final fetchedComment = gameWithUserInfo.userActions?.comment; // Backend'den gelen comment'i al
+
+          // Emin olmak için _game.userActions'ı fetched comment ile güncelle
+          _game = _game.copyWith(
+            userActions: (_game.userActions ?? UserGameActions()).copyWith(
+              userRating: _userRating,
+              isRated: _userRating != null && _userRating! > 0,
+              isSaved: _isSaved,
+              comment: fetchedComment, // Fetched comment'i ata
+            )
+          );
+
+          print('_initializeGame - Fetched comment: $fetchedComment'); // Log eklendi
+          print('_initializeGame - Updated _game.userActions: ${_game.userActions}'); // Log eklendi
+
           _isLoading = false;
         });
         
@@ -99,53 +182,68 @@ class _GameDetailPageState extends State<GameDetailPage> {
         setState(() {
           _isLoading = false;
           _errorMessage = e.toString();
+          print('Error in _initializeGame: $e'); // Hata log'u
         });
       }
     }
   }
 
   Future<void> _preloadImages() async {
-    try {
-      // Cache cover image
-      if (_game.coverUrl != null && _game.gameId != null) {
-        _backgroundProvider.cacheBackground(_game.gameId.toString(), _game.coverUrl!);
-      }
+    // Only run if images aren't already marked as loaded
+    if (_areImagesLoaded) return;
 
-      if (_game.screenshots?.isNotEmpty ?? false) {
-        // Get preloaded screenshots or load them if not available
-        final preloadedImages = _game.gameId != null ? Game.getPreloadedScreenshots(_game.gameId!) : null;
-        if (preloadedImages != null) {
-          _cachedImages.addAll(preloadedImages);
-          for (final image in preloadedImages) {
-            if (mounted) {
-              await precacheImage(image.image, context);
-            }
-          }
-        } else {
-          // Cache screenshots
-          for (final screenshot in _game.screenshots!) {
-            if (_game.gameId != null) {
-              _backgroundProvider.cacheBackground('${_game.gameId}_${screenshot.hashCode}', screenshot);
-            }
-            final image = Image.network(screenshot);
-            _cachedImages.add(image);
-            if (mounted) {
-              await precacheImage(image.image, context);
-            }
-          }
+    try {
+      bool imagesMarkedLoaded = false;
+      // Preload cover image FIRST if available and mounted, WITHOUT await
+      if (_game.coverUrl != null && _game.coverUrl!.isNotEmpty && mounted) {
+        print('Initiating pre-cache for cover in GameDetailPage for ${_game.name}');
+        precacheImage(CachedNetworkImageProvider(_game.coverUrl!), context)
+            .then((_) => print('Pre-cache completed for cover: ${_game.name}'))
+            .catchError((e) => print('Error pre-caching cover in GameDetailPage: $e'));
+        // Mark loaded after initiating cover preload attempt
+        if (mounted && !_areImagesLoaded) {
+           setState(() { _areImagesLoaded = true; });
+           imagesMarkedLoaded = true;
         }
+      }
+      
+      // Then preload screenshots if available, WITHOUT await
+      if (_game.screenshots != null && _game.screenshots!.isNotEmpty) {
+        // Remove the backgroundProvider call here
+        // if (_game.gameId != null) {
+        //   if (_game.coverUrl == null || _game.coverUrl!.isEmpty) {
+        //      _backgroundProvider.cacheBackground(_game.gameId.toString(), _game.screenshots![0]);
+        //   }
+        // }
         
+        // Precaching screenshots with CachedNetworkImage provider (fire and forget)
         if (mounted) {
+          print('Initiating pre-cache for screenshots in GameDetailPage for ${_game.name}');
+          Future.wait(_game.screenshots!.map((url) => 
+            precacheImage(CachedNetworkImageProvider(url), context)
+          ).toList()).then((_) => print('Pre-cache completed for screenshots: ${_game.name}'))
+          .catchError((e) {
+            print("Error pre-caching screenshots in GameDetailPage: $e");
+          });
+        }
+
+        // Mark images as 'loaded' if not already done
+        if (mounted && !imagesMarkedLoaded && !_areImagesLoaded) {
           setState(() {
             _areImagesLoaded = true;
           });
         }
+      } else if (mounted && !imagesMarkedLoaded && !_areImagesLoaded && _game.coverUrl != null && _game.coverUrl!.isNotEmpty) {
+        // If only cover exists and wasn't marked loaded before, mark now.
+        setState(() {
+          _areImagesLoaded = true;
+        });
       }
     } catch (e) {
-      print('Error preloading images: $e');
-      if (mounted) {
+      print('Error during image preloading initiation: $e');
+      if (mounted && !_areImagesLoaded) { // Check _areImagesLoaded again
         setState(() {
-          _areImagesLoaded = false;
+          _areImagesLoaded = false; // Indicate loading potentially failed
         });
       }
     }
@@ -284,15 +382,14 @@ class _GameDetailPageState extends State<GameDetailPage> {
                                     ),
                                     child: ClipRRect(
                                       borderRadius: BorderRadius.circular(8),
-                                      child: Image.network(
-                                        _game.coverUrl ?? '',
+                                      child: CachedNetworkImage(
+                                        imageUrl: _game.coverUrl ?? '',
                                         fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) {
-                                          return Container(
-                                            color: Colors.grey[900],
-                                            child: const Icon(Icons.error_outline, color: Colors.white),
-                                          );
-                                        },
+                                        placeholder: (context, url) => Container(color: Colors.grey[900]),
+                                        errorWidget: (context, url, error) => Container(
+                                          color: Colors.grey[900],
+                                          child: const Icon(Icons.error_outline, color: Colors.white),
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -318,15 +415,18 @@ class _GameDetailPageState extends State<GameDetailPage> {
                             ),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                _game.coverUrl ?? '',
+                              child: CachedNetworkImage(
+                                imageUrl: _game.coverUrl ?? '',
                                 fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    color: Colors.grey[900],
-                                    child: const Icon(Icons.error_outline, color: Colors.white),
-                                  );
-                                },
+                                memCacheWidth: (MediaQuery.of(context).size.width * 0.5 * 2).round(), // Optimize cache size
+                                memCacheHeight: (MediaQuery.of(context).size.width * 0.5 * (180/135) * 2).round(), // Optimize cache size
+                                fadeInDuration: Duration.zero, // Instant fade in
+                                fadeOutDuration: Duration.zero, // Instant fade out
+                                placeholder: (context, url) => Container(color: Colors.grey[900]),
+                                errorWidget: (context, url, error) => Container(
+                                  color: Colors.grey[900],
+                                  child: const Icon(Icons.error_outline, color: Colors.white),
+                                ),
                               ),
                             ),
                           ),
@@ -346,92 +446,48 @@ class _GameDetailPageState extends State<GameDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final cachedBackground = _game.gameId != null ? _backgroundProvider.getBackground(_game.gameId.toString()) : null;
+    // Always try to get background, even if loading
+    final cachedBackground = _game?.gameId != null ? _backgroundProvider.getBackground(_game!.gameId.toString()) : null;
+    final coverUrl = _game?.coverUrl; // Get cover URL even if loading
+    final firstScreenshotUrl = (_game?.screenshots?.isNotEmpty ?? false) ? _game!.screenshots![0] : null; // Get first screenshot URL
 
+    // Use coverUrl for main caching key, fallback to first screenshot if no cover
+    final backgroundImageUrl = coverUrl ?? firstScreenshotUrl;
+
+    print('build - _isLoading: $_isLoading');
     print('build - _isSaved: $_isSaved');
-    print('build - userActions: ${widget.game.userActions}');
-    if (widget.game.userActions != null) {
-      print('build - userActions.isSaved: ${widget.game.userActions!.isSaved}');
+    print('build - userActions: ${_game?.userActions}');
+    if (_game?.userActions != null) {
+      print('build - userActions.isSaved: ${_game!.userActions!.isSaved}');
     }
 
-    if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Colors.black,
-        body: Center(
-          child: CircularProgressIndicator(
-            color: Colors.white,
-          ),
-        ),
-      );
-    }
-
-    // Error state
-    if (_game == null) {
-      return Scaffold(
-        backgroundColor: Colors.black,
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.error_outline,
-                size: 64,
-                color: Colors.grey[600],
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Could not load game details',
-                style: TextStyle(
-                  color: Colors.grey[500],
-                  fontSize: 16,
-                ),
-              ),
-              const SizedBox(height: 24),
-              TextButton.icon(
-                onPressed: _initializeGame,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Try Again'),
-                style: TextButton.styleFrom(
-                  foregroundColor: Colors.blue[300],
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
+    // Show main structure immediately, overlay progress indicator if needed
     return Scaffold(
       body: Stack(
         children: [
-          // Background image with blur
+          // Background image with blur (Always attempt to show from cache)
           Positioned.fill(
             child: Container(
               clipBehavior: Clip.hardEdge,
               decoration: const BoxDecoration(
                 color: Colors.black,
               ),
-              child: cachedBackground != null
-                  ? Image(
-                      image: cachedBackground,
+              child: backgroundImageUrl != null
+                  ? CachedNetworkImage(
+                      // Use the determined background image URL
+                      imageUrl: backgroundImageUrl,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(color: Colors.black);
-                      },
+                      placeholder: (context, url) => Container(color: Colors.black),
+                      errorWidget: (context, url, error) => Container(color: Colors.black),
+                      // Consider adding memCache optimization here too if needed
+                      fadeInDuration: Duration.zero,
+                      fadeOutDuration: Duration.zero,
                     )
-                  : _game.screenshots?.isNotEmpty ?? false
-                      ? Image.network(
-                          _game.screenshots![0],
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(color: Colors.black);
-                          },
-                        )
-                      : Container(color: Colors.black),
+                  : Container(color: Colors.black), // Fallback if no image URL
             ),
           ),
 
-          // Blur overlay
+          // Blur overlay (Always show)
           Positioned.fill(
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
@@ -441,842 +497,1071 @@ class _GameDetailPageState extends State<GameDetailPage> {
             ),
           ),
 
-          SafeArea(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.zero,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    height: 220,
-                    width: double.infinity,
-                    child: Stack(
-                      children: [
-                        // Cover image in center
-                        Center(
-                          child: GestureDetector(
-                            onTap: () => _openCoverImage(context),
-                            child: Hero(
-                              tag: 'cover_${_game.gameId}',
-                              child: Container(
-                                height: 180,
-                                width: 135,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(12),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.3),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Image.network(
-                                    _game.coverUrl ?? '',
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return Container(
-                                        color: Colors.grey[900],
-                                        child: const Icon(Icons.error_outline, color: Colors.white),
-                                      );
-                                    },
+          // Main content area (conditionally shown or overlaid with loader)
+          if (!_isLoading && _game != null)
+            SafeArea(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.zero,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      height: 220,
+                      width: double.infinity,
+                      child: Stack(
+                        children: [
+                          // Cover image in center (Always attempt to show from cache)
+                          Center(
+                            child: GestureDetector(
+                              onTap: () => _game != null ? _openCoverImage(context) : null,
+                              child: Hero(
+                                // Ensure tag is unique even if _game is initially null temporarily
+                                tag: 'cover_${widget.game.gameId}', 
+                                child: Container(
+                                  height: 180,
+                                  width: 135,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.3),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    // *** Use passed provider first, fallback to CachedNetworkImage ***
+                                    child: widget.initialCoverProvider != null 
+                                      ? Image(
+                                          image: widget.initialCoverProvider!, 
+                                          fit: BoxFit.cover,
+                                          // Remove frameBuilder for instant appearance
+                                          /* frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                                            if (wasSynchronouslyLoaded) return child;
+                                            return AnimatedOpacity(
+                                              child: child,
+                                              opacity: frame == null ? 0 : 1,
+                                              duration: const Duration(milliseconds: 100), // Short fade
+                                              curve: Curves.easeOut,
+                                            );
+                                          }, */
+                                          errorBuilder: (context, error, stackTrace) {
+                                            // Fallback if the provider fails 
+                                            print("Error with initialCoverProvider, falling back: $error");
+                                            return CachedNetworkImage(
+                                              imageUrl: coverUrl ?? '',
+                                              fit: BoxFit.cover,
+                                              memCacheWidth: 270, 
+                                              memCacheHeight: 360, 
+                                              fadeInDuration: Duration.zero, 
+                                              fadeOutDuration: Duration.zero, 
+                                              placeholder: (context, url) => Container(color: Colors.grey[900]),
+                                              errorWidget: (context, url, error) => Container(
+                                                color: Colors.grey[900],
+                                                child: const Icon(Icons.error_outline, color: Colors.white),
+                                              ),
+                                            );
+                                          },
+                                        )
+                                      // Fallback if provider wasn't passed or direct Image fails
+                                      : CachedNetworkImage(
+                                          imageUrl: coverUrl ?? '',
+                                          fit: BoxFit.cover,
+                                          memCacheWidth: 270, 
+                                          memCacheHeight: 360, 
+                                          fadeInDuration: Duration.zero, 
+                                          fadeOutDuration: Duration.zero, 
+                                          placeholder: (context, url) => Container(color: Colors.grey[900]),
+                                          errorWidget: (context, url, error) => Container(
+                                            color: Colors.grey[900],
+                                            child: const Icon(Icons.error_outline, color: Colors.white),
+                                          ),
+                                        ),
                                   ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                        // Back button
-                        Positioned(
-                          top: 16,
-                          left: 16,
-                          child: GestureDetector(
-                            onTap: () => Navigator.pop(context),
-                            child: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.3),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(
-                                Icons.arrow_back_ios_new,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Text(
-                          _game.name,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Center(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.green.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: Colors.green.withOpacity(0.3)),
-                            ),
-                            child: const Text(
-                              "75% Match",
-                              style: TextStyle(
-                                color: Colors.green,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // Game Summary
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Text(
-                          _game.summary ?? 'No description available.',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 16,
-                            height: 1.5,
-                          ),
-                          maxLines: _isExpandedSummary ? null : 3,
-                          overflow: _isExpandedSummary ? null : TextOverflow.ellipsis,
-                        ),
-                        if (_game.summary != null && _game.summary!.length > 150)
-                          TextButton(
-                            onPressed: () {
-                              setState(() {
-                                _isExpandedSummary = !_isExpandedSummary;
-                              });
-                            },
-                            style: TextButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                            ),
-                            child: Text(
-                              _isExpandedSummary ? 'Show Less' : 'Read More',
-                              style: const TextStyle(
-                                color: Colors.blue,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Action buttons
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildActionButton(FontAwesomeIcons.shareFromSquare, 'Share'),
-                        const SizedBox(width: 50),
-                        _buildActionButton(FontAwesomeIcons.eyeSlash, 'Hide'),
-                        const SizedBox(width: 50),
-                        _buildActionButton(FontAwesomeIcons.circleCheck, 'Seen'),
-                        const SizedBox(width: 50),
-                        InkWell(
-                          onTap: _handleSaveGame,
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                _isSaved ? FontAwesomeIcons.solidBookmark : FontAwesomeIcons.bookmark,
-                                color: _isSaved ? Colors.orange[400] : Colors.white70,
-                                size: 24,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Save',
-                                style: TextStyle(
-                                  color: _isSaved ? Colors.orange[400] : Colors.white70,
-                                  fontSize: 12,
+                          // Back button (Always show)
+                          Positioned(
+                            top: 16,
+                            left: 16,
+                            child: GestureDetector(
+                              onTap: () {
+                                print('GameDetailPage - Returning game from back button: isSaved=${_game?.userActions?.isSaved}, isRated=${_game?.userActions?.isRated}, userRating=${_game?.userActions?.userRating}');
+                                // Return the potentially updated _game or the initial widget.game if _game is null
+                                Navigator.pop(context, _game ?? widget.game); 
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                  Icons.arrow_back_ios_new,
+                                  color: Colors.white,
+                                  size: 20,
                                 ),
                               ),
-                            ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: 14),
-
-                  Divider(
-                    color: Colors.grey.withOpacity(0.3), // Çizginin rengi
-                    thickness: 1, // Çizginin kalınlığı
-                    indent: 0, // Soldan boşluk
-                    endIndent: 0, // Sağdan boşluk
-                  ),
-
-                  const SizedBox(height: 5),
-
-                  // User Reviews Section
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 24),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Row(
-                            children: [
-                              if (_game.totalRating != null)
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.star_rounded,
-                                      color: Colors.amber[400],
-                                      size: 20,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      "${_game.totalRating!.toStringAsFixed(1)}",
-                                      style: TextStyle(
-                                        color: Colors.amber[400],
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                            ],
+                          Text(
+                            _game!.name, // Now safe to use ! because of !_isLoading && _game != null check
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            height: 160,
-                            child: ListView.builder(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: 5,
-                              padding: EdgeInsets.zero,
-                              itemBuilder: (context, index) {
-                                return Container(
-                                  width: 280,
-                                  margin: const EdgeInsets.only(right: 12),
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.05),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: Colors.white.withOpacity(0.1),
-                                    ),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                          const SizedBox(height: 8),
+                          Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: Colors.green.withOpacity(0.3)),
+                              ),
+                              child: const Text(
+                                "75% Match",
+                                style: TextStyle(
+                                  color: Colors.green,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // Game Summary
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Text(
+                            _game.summary ?? 'No description available.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 16,
+                              height: 1.5,
+                            ),
+                            maxLines: _isExpandedSummary ? null : 3,
+                            overflow: _isExpandedSummary ? null : TextOverflow.ellipsis,
+                          ),
+                          if (_game.summary != null && _game.summary!.length > 150)
+                            TextButton(
+                              onPressed: () {
+                                setState(() {
+                                  _isExpandedSummary = !_isExpandedSummary;
+                                });
+                              },
+                              style: TextButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                              ),
+                              child: Text(
+                                _isExpandedSummary ? 'Show Less' : 'Read More',
+                                style: const TextStyle(
+                                  color: Colors.blue,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Action buttons
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _buildActionButton(FontAwesomeIcons.shareFromSquare, 'Share'),
+                          const SizedBox(width: 20),
+                          _buildActionButton(FontAwesomeIcons.eyeSlash, 'Hide'),
+                          const SizedBox(width: 20),
+                          _buildActionButton(FontAwesomeIcons.circleCheck, 'Seen'),
+                          const SizedBox(width: 20),
+                          _buildActionButton(FontAwesomeIcons.bookmark, 'Save'),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    Divider(
+                      color: Colors.grey.withOpacity(0.3), // Çizginin rengi
+                      thickness: 1, // Çizginin kalınlığı
+                      indent: 0, // Soldan boşluk
+                      endIndent: 0, // Sağdan boşluk
+                    ),
+
+                    const SizedBox(height: 5),
+
+                    // User Reviews Section
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                if (_game.totalRating != null)
+                                  Row(
                                     children: [
-                                      Row(
-                                        children: [
-                                          const CircleAvatar(
-                                            radius: 16,
-                                            backgroundImage: NetworkImage(
-                                              "https://i.pravatar.cc/100",
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              const Text(
-                                                "John Doe",
-                                                style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                              ),
-                                              Row(
-                                                children: [
-                                                  Icon(
-                                                    Icons.star,
-                                                    color: Colors.amber[400],
-                                                    size: 14,
-                                                  ),
-                                                  const SizedBox(width: 4),
-                                                  Text(
-                                                    "4.5",
-                                                    style: TextStyle(
-                                                      color: Colors.grey[400],
-                                                      fontSize: 12,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
-                                          ),
-                                        ],
+                                      Icon(
+                                        Icons.star_rounded,
+                                        color: Colors.amber[400],
+                                        size: 20,
                                       ),
-                                      const SizedBox(height: 12),
-                                      const Expanded(
-                                        child: Text(
-                                          "Great game! The story and gameplay mechanics are amazing. Highly recommended for all players.",
-                                          style: TextStyle(
-                                            color: Colors.white70,
-                                            fontSize: 13,
-                                            height: 1.5,
-                                          ),
-                                          maxLines: 3,
-                                          overflow: TextOverflow.ellipsis,
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        "${_game.totalRating!.toStringAsFixed(1)}",
+                                        style: TextStyle(
+                                          color: Colors.amber[400],
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
                                         ),
                                       ),
                                     ],
                                   ),
-                                );
-                              },
+                              ],
                             ),
-                          ),
-                          const SizedBox(height: 10),
-                          ElevatedButton(
-                            onPressed: () {
-                              // TODO: Navigate to reviews page
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white.withOpacity(0.1),
-                              minimumSize: const Size(double.infinity, 40),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Text(
-                              "Show All Reviews",
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  Divider(
-                    color: Colors.grey.withOpacity(0.3), // Çizginin rengi
-                    thickness: 1, // Çizginin kalınlığı
-                    indent: 0, // Soldan boşluk
-                    endIndent: 0, // Sağdan boşluk
-                  ),
-
-                  const SizedBox(height: 5),
-
-                  // Screenshots Section
-                  if (_game.screenshots?.isNotEmpty ?? false) ...[
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SizedBox(
-                            height: 180,
-                            child: ListView.builder(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: _game.screenshots?.length ?? 0,
-                              itemBuilder: (context, index) {
-                                final screenshot = _game.screenshots?[index];
-                                if (screenshot == null) return const SizedBox();
-                                
-                                return GestureDetector(
-                                  onTap: () => _openImageGallery(context, index),
-                                  child: Container(
-                                    width: 280,
-                                    margin: const EdgeInsets.only(right: 12),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: Image.network(
-                                        screenshot,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) {
-                                          return Container(
-                                            color: Colors.grey[900],
-                                            child: const Icon(Icons.error_outline, color: Colors.white),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    Divider(
-                      color: Colors.grey.withOpacity(0.3),
-                      thickness: 1,
-                      indent: 0,
-                      endIndent: 0,
-                    ),
-
-                    const SizedBox(height: 8),
-                  ],
-
-                  // Additional Details Section
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (_game.platforms?.isNotEmpty ?? false) ...[
-                          _buildDetailRow('Platforms', _getPlatformsText()),
-                          const SizedBox(height: 16),
-                        ],
-                        if (_game.genres?.isNotEmpty ?? false) ...[
-                          _buildDetailRow('Genres', _getGenresText()),
-                          const SizedBox(height: 16),
-                        ],
-                        if (_game.themes?.isNotEmpty ?? false) ...[
-                          _buildDetailRow('Themes', _getThemesText()),
-                          const SizedBox(height: 16),
-                        ],
-                        if (_game.releaseDate != null) ...[
-                          _buildDetailRow('Release Date', DateFormatter.formatDate(_game.releaseDate!)),
-                          const SizedBox(height: 16),
-                        ],
-                        if (_game.companies?.isNotEmpty ?? false) ...[
-                          _buildDetailRow('Publisher', _getPublisherText()),
-                          const SizedBox(height: 16),
-                          _buildDetailRow('Developer', _getDeveloperText()),
-                          const SizedBox(height: 16),
-                        ],
-                        if (_game.gameModes?.isNotEmpty ?? false) ...[
-                          _buildDetailRow('Game Modes', _getGameModesText()),
-                          const SizedBox(height: 16),
-                        ],
-                        if (_game.playerPerspectives?.isNotEmpty ?? false) ...[
-                          _buildDetailRow('Player Perspectives', _getPlayerPerspectivesText()),
-                          const SizedBox(height: 16),
-                        ],
-                        if (_game.franchises?.isNotEmpty ?? false) ...[
-                          _buildDetailRow('Franchises', _getFranchisesText()),
-                          const SizedBox(height: 16),
-                        ],
-                        if (_game.pegiAgeRating != null)
-                          _buildDetailRow('Age Rating', _formatAgeRating(_game.pegiAgeRating)),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 14),
-
-                  Divider(
-                    color: Colors.grey.withOpacity(0.3),
-                    thickness: 1,
-                    indent: 0,
-                    endIndent: 0,
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  // Language Support Section
-                  if (_game.languageSupports?.isNotEmpty ?? false) ...[
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Language Support',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          _buildLanguageSupportsTable(),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    Divider(
-                      color: Colors.grey.withOpacity(0.3),
-                      thickness: 1,
-                      indent: 0,
-                      endIndent: 0,
-                    ),
-
-                    const SizedBox(height: 8),
-                  ],
-
-                  // Time to Beat Section
-                  if (_game.hastilyGameTime != null || 
-                      _game.normallyGameTime != null || 
-                      _game.completelyGameTime != null) ...[
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Time to Beat',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              _buildTimeInfoCard(
-                                'Hastily',
-                                _formatGameTime(_game.hastilyGameTime),
-                                Colors.orange,
-                              ),
-                              const SizedBox(width: 8),
-                              _buildTimeInfoCard(
-                                'Normally',
-                                _formatGameTime(_game.normallyGameTime),
-                                Colors.green,
-                              ),
-                              const SizedBox(width: 8),
-                              _buildTimeInfoCard(
-                                'Completely',
-                                _formatGameTime(_game.completelyGameTime),
-                                Colors.purple,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    Divider(
-                      color: Colors.grey.withOpacity(0.3),
-                      thickness: 1,
-                      indent: 0,
-                      endIndent: 0,
-                    ),
-
-                    const SizedBox(height: 8),
-                  ],
-
-                  // Social Media & Websites Section
-                  if (_game.websites?.entries.where((entry) => 
-                    ['OFFICIAL', 'INSTAGRAM', 'DISCORD', 'REDDIT', 'YOUTUBE', 'TWITCH', 'TWITTER']
-                    .contains(entry.key.toUpperCase())).isNotEmpty ?? false) ...[
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Social Media & Websites',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Container(
-                            child: Padding(
-                              padding: const EdgeInsets.all(1),
-                              child: Wrap(
-                                spacing: 12,
-                                runSpacing: 12,
-                                children: [
-                                  if (_game.websites?['OFFICIAL'] != null)
-                                    _buildSocialButton(
-                                      'Official',
-                                      FontAwesomeIcons.globe,
-                                      _game.websites!['OFFICIAL']!,
-                                    ),
-                                  if (_game.websites?['INSTAGRAM'] != null)
-                                    _buildSocialButton(
-                                      'Instagram',
-                                      FontAwesomeIcons.instagram,
-                                      _game.websites!['INSTAGRAM']!,
-                                    ),
-                                  if (_game.websites?['DISCORD'] != null)
-                                    _buildSocialButton(
-                                      'Discord',
-                                      FontAwesomeIcons.discord,
-                                      _game.websites!['DISCORD']!,
-                                    ),
-                                  if (_game.websites?['REDDIT'] != null)
-                                    _buildSocialButton(
-                                      'Reddit',
-                                      FontAwesomeIcons.reddit,
-                                      _game.websites!['REDDIT']!,
-                                    ),
-                                  if (_game.websites?['YOUTUBE'] != null)
-                                    _buildSocialButton(
-                                      'YouTube',
-                                      FontAwesomeIcons.youtube,
-                                      _game.websites!['YOUTUBE']!,
-                                    ),
-                                  if (_game.websites?['TWITCH'] != null)
-                                    _buildSocialButton(
-                                      'Twitch',
-                                      FontAwesomeIcons.twitch,
-                                      _game.websites!['TWITCH']!,
-                                    ),
-                                  if (_game.websites?['TWITTER'] != null)
-                                    _buildSocialButton(
-                                      'Twitter',
-                                      FontAwesomeIcons.twitter,
-                                      _game.websites!['TWITTER']!,
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    Divider(
-                      color: Colors.grey.withOpacity(0.3),
-                      thickness: 1,
-                      indent: 0,
-                      endIndent: 0,
-                    ),
-
-                    const SizedBox(height: 8),
-                  ],
-
-                  // Where to Buy Section
-                  if (_game.websites?.entries
-                      .where((entry) => ['STEAM', 'EPICGAMES', 'GOG']
-                          .contains(entry.key.toUpperCase()))
-                          .isNotEmpty ?? false) ...[
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Where to Buy',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.start,
-                              children: _game.websites?.entries
-                                  .where((entry) => ['STEAM', 'EPICGAMES', 'GOG']
-                                      .contains(entry.key.toUpperCase()))
-                                      .map((entry) => Padding(
-                                        padding: const EdgeInsets.only(right: 12),
-                                        child: GestureDetector(
-                                          onTap: () => _launchUrl(entry.value),
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 16, vertical: 12),
-                                            decoration: BoxDecoration(
-                                              color: Colors.white.withOpacity(0.1),
-                                              borderRadius: BorderRadius.circular(12),
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                _buildStoreIcon(entry.key),
-                                                const SizedBox(width: 8),
-                                                Text(
-                                                  _formatStoreName(entry.key),
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 14,
+                            const SizedBox(height: 16),
+                            
+                            // Yatay review listesi (kullanıcı reviewi ilk eleman olacak)
+                            SizedBox(
+                              height: 160,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: 6, // 1 kullanıcı + 5 mock review
+                                padding: EdgeInsets.zero,
+                                itemBuilder: (context, index) {
+                                  // Kullanıcının kendi review'i (ilk eleman)
+                                  if (index == 0) {
+                                    return GestureDetector(
+                                      onTap: () {
+                                        // Check if user has rated the game already
+                                        if (_userRating == null) {
+                                          // If no rating, show rating modal first
+                                          RatingModal.show(
+                                            context,
+                                            gameName: _game.name,
+                                            coverUrl: _game.coverUrl ?? '',
+                                            gameId: _game.gameId!,
+                                            initialRating: _userRating,
+                                            onRatingSelected: (rating) {
+                                              // Rating seçildikten sonra state'i güncelle
+                                              setState(() {
+                                                _userRating = rating > 0 ? rating : null;
+                                                
+                                                // Update game user actions
+                                                final currentActions = _game.userActions ?? UserGameActions();
+                                                final updatedRating = rating > 0 ? rating : null;
+                                                final updatedComment = (rating > 0) ? currentActions.comment : null; // Rating kaldırılırsa yorumu da kaldır
+                                                
+                                                _game = _game.copyWith(
+                                                  userActions: currentActions.copyWith(
+                                                    isRated: rating > 0,
+                                                    userRating: updatedRating,
+                                                    comment: updatedComment, // Yorumu güncelle
                                                   ),
-                                                ),
-                                              ],
-                                            ),
+                                                );
+                                                
+                                                print('RatingModal (via comment card) - Updated userRating: $_userRating');
+                                                print('RatingModal (via comment card) - Updated comment: ${_game.userActions?.comment}');
+                                              });
+                                              
+                                              // HomeController'ı güncelle
+                                              if (_game.gameId != null) {
+                                                _homeController.updateGameRatingState(_game.gameId!, rating > 0 ? rating : null);
+                                                if (rating <= 0) {
+                                                  _homeController.updateGameComment(_game.gameId!, null);
+                                                }
+                                              }
+                                              
+                                              // Eğer geçerli bir rating verildiyse (0 değil), review modalını göster
+                                              if (rating > 0) {
+                                                // Kısa bir gecikme ekleyerek state güncellenmesini bekleyelim
+                                                Future.delayed(const Duration(milliseconds: 100), () {
+                                                  if (mounted) { // Widget hala ağaçta mı kontrol et
+                                                    ReviewModal.show(
+                                                      context,
+                                                      gameName: _game.name,
+                                                      coverUrl: _game.coverUrl ?? '',
+                                                      initialReview: _game.userActions?.comment, // Mevcut yorumu ilet
+                                                      onReviewSubmitted: _handleReviewSubmitted,
+                                                    );
+                                                  }
+                                                });
+                                              }
+                                            },
+                                          );
+                                        } else {
+                                          // If already rated, show review modal directly
+                                          ReviewModal.show(
+                                            context,
+                                            gameName: _game.name,
+                                            coverUrl: _game.coverUrl ?? '',
+                                            initialReview: _game.userActions?.comment, // Mevcut yorumu ilet
+                                            onReviewSubmitted: _handleReviewSubmitted,
+                                          );
+                                        }
+                                      },
+                                      child: Container(
+                                        width: 280,
+                                        margin: const EdgeInsets.only(right: 12),
+                                        padding: const EdgeInsets.all(16),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.05),
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(
+                                            color: Colors.white.withOpacity(0.1),
                                           ),
                                         ),
-                                      ))
-                                  .toList() ?? [],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    Divider(
-                      color: Colors.grey.withOpacity(0.3),
-                      thickness: 1,
-                      indent: 0,
-                      endIndent: 0,
-                    ),
-
-                    const SizedBox(height: 8),
-                  ],
-
-                  // Videos Section
-                  if (_game.gameVideos != null && _game.gameVideos!.length > 0) ...[
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Videos',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: _game.gameVideos!.length,
-                            itemBuilder: (context, index) {
-                              final video = _game.gameVideos![index];
-                              final thumbnailUrl = _getYouTubeThumbnail(video['url'] ?? '');
-                              
-                              return Container(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.05),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    onTap: () => _launchUrl(video['url'] ?? ''),
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(12),
-                                      child: Row(
-                                        children: [
-                                          // Thumbnail
-                                          ClipRRect(
-                                            borderRadius: BorderRadius.circular(8),
-                                            child: Stack(
-                                              alignment: Alignment.center,
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
                                               children: [
-                                                Image.network(
-                                                  thumbnailUrl,
-                                                  width: 120,
-                                                  height: 68,
-                                                  fit: BoxFit.cover,
-                                                  errorBuilder: (context, error, stackTrace) {
-                                                    return Container(
-                                                      width: 120,
-                                                      height: 68,
-                                                      decoration: BoxDecoration(
-                                                        color: Colors.grey[900],
-                                                        gradient: LinearGradient(
-                                                          begin: Alignment.topLeft,
-                                                          end: Alignment.bottomRight,
-                                                          colors: [
-                                                            Colors.grey[900]!,
-                                                            Colors.grey[800]!,
-                                                          ],
-                                                        ),
+                                                const CircleAvatar(
+                                                  radius: 16,
+                                                  child: Icon(
+                                                    Icons.person,
+                                                    size: 20,
+                                                    color: Colors.white70,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    const Text(
+                                                      "Your Review",
+                                                      style: TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 14,
+                                                        fontWeight: FontWeight.w500,
                                                       ),
-                                                      child: Column(
-                                                        mainAxisAlignment: MainAxisAlignment.center,
+                                                    ),
+                                                    if (_userRating != null)
+                                                      Row(
                                                         children: [
                                                           Icon(
-                                                            FontAwesomeIcons.gamepad,
-                                                            color: Colors.grey[600],
-                                                            size: 24,
+                                                            Icons.star,
+                                                            color: Colors.amber[400],
+                                                            size: 14,
                                                           ),
-                                                          const SizedBox(height: 4),
+                                                          const SizedBox(width: 4),
                                                           Text(
-                                                            'No Preview',
+                                                            "$_userRating",
                                                             style: TextStyle(
-                                                              color: Colors.grey[600],
-                                                              fontSize: 10,
+                                                              color: Colors.grey[400],
+                                                              fontSize: 12,
                                                             ),
                                                           ),
                                                         ],
                                                       ),
-                                                    );
-                                                  },
+                                                  ],
                                                 ),
-                                                Container(
-                                                  width: 120,
-                                                  height: 68,
-                                                  color: Colors.black.withOpacity(0.2),
-                                                ),
-                                                Icon(
-                                                  Icons.play_circle_fill,
-                                                  color: Colors.white.withOpacity(0.8),
-                                                  size: 32,
+                                                const Spacer(),
+                                                const Icon(
+                                                  Icons.edit,
+                                                  color: Colors.white54,
+                                                  size: 16,
                                                 ),
                                               ],
                                             ),
-                                          ),
-                                          const SizedBox(width: 16),
-                                          // Video title
-                                          Expanded(
-                                            child: Text(
-                                              video['name'] ?? 'Unknown',
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 14,
-                                                height: 1.4,
+                                            const SizedBox(height: 12),
+                                            Expanded(
+                                              child: Text(
+                                                _game.userActions?.comment ?? "Write your thoughts...",
+                                                style: TextStyle(
+                                                  color: _game.userActions?.comment != null 
+                                                    ? Colors.white70 
+                                                    : Colors.grey[500],
+                                                  fontSize: 13,
+                                                  height: 1.5,
+                                                  fontStyle: _game.userActions?.comment != null 
+                                                    ? FontStyle.normal 
+                                                    : FontStyle.italic,
+                                                ),
+                                                maxLines: 3,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
                                             ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Icon(
-                                            Icons.arrow_forward_ios,
-                                            color: Colors.white.withOpacity(0.5),
-                                            size: 16,
-                                          ),
-                                        ],
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                  
+                                  // Mock reviewler (diğer elemanlar)
+                                  return Container(
+                                    width: 280,
+                                    margin: const EdgeInsets.only(right: 12),
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.05),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: Colors.white.withOpacity(0.1),
                                       ),
                                     ),
-                                  ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            const CircleAvatar(
+                                              radius: 16,
+                                              backgroundImage: NetworkImage(
+                                                "https://i.pravatar.cc/100",
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                const Text(
+                                                  "John Doe",
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                                Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.star,
+                                                      color: Colors.amber[400],
+                                                      size: 14,
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      "4.5",
+                                                      style: TextStyle(
+                                                        color: Colors.grey[400],
+                                                        fontSize: 12,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 12),
+                                        const Expanded(
+                                          child: Text(
+                                            "Great game! The story and gameplay mechanics are amazing. Highly recommended for all players.",
+                                            style: TextStyle(
+                                              color: Colors.white70,
+                                              fontSize: 13,
+                                              height: 1.5,
+                                            ),
+                                            maxLines: 3,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            
+                            const SizedBox(height: 10),
+                            ElevatedButton(
+                              onPressed: () {
+                                // TODO: Navigate to reviews page
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white.withOpacity(0.1),
+                                minimumSize: const Size(double.infinity, 40),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                              );
-                            },
-                          ),
+                              ),
+                              child: const Text(
+                                "Show All Reviews",
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    Divider(
+                      color: Colors.grey.withOpacity(0.3), // Çizginin rengi
+                      thickness: 1, // Çizginin kalınlığı
+                      indent: 0, // Soldan boşluk
+                      endIndent: 0, // Sağdan boşluk
+                    ),
+
+                    const SizedBox(height: 5),
+
+                    // Screenshots Section
+                    if (_game.screenshots?.isNotEmpty ?? false) ...[
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              height: 180,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: _game.screenshots?.length ?? 0,
+                                itemBuilder: (context, index) {
+                                  final screenshot = _game.screenshots?[index];
+                                  if (screenshot == null) return const SizedBox();
+                                  
+                                  return GestureDetector(
+                                    onTap: () => _openImageGallery(context, index),
+                                    child: Container(
+                                      width: 280,
+                                      margin: const EdgeInsets.only(right: 12),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: CachedNetworkImage(
+                                          imageUrl: screenshot,
+                                          fit: BoxFit.cover,
+                                          placeholder: (context, url) => Container(color: Colors.grey[900]),
+                                          errorWidget: (context, url, error) => Container(
+                                            color: Colors.grey[900],
+                                            child: const Icon(Icons.error_outline, color: Colors.white),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 14),
+
+                      Divider(
+                        color: Colors.grey.withOpacity(0.3),
+                        thickness: 1,
+                        indent: 0,
+                        endIndent: 0,
+                      ),
+
+                      const SizedBox(height: 8),
+                    ],
+
+                    // Additional Details Section
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (_game.platforms?.isNotEmpty ?? false) ...[
+                            _buildDetailRow('Platforms', _getPlatformsText()),
+                            const SizedBox(height: 16),
+                          ],
+                          if (_game.genres?.isNotEmpty ?? false) ...[
+                            _buildDetailRow('Genres', _getGenresText()),
+                            const SizedBox(height: 16),
+                          ],
+                          if (_game.themes?.isNotEmpty ?? false) ...[
+                            _buildDetailRow('Themes', _getThemesText()),
+                            const SizedBox(height: 16),
+                          ],
+                          if (_game.releaseDate != null) ...[
+                            _buildDetailRow('Release Date', DateFormatter.formatDate(_game.releaseDate!)),
+                            const SizedBox(height: 16),
+                          ],
+                          if (_game.companies?.isNotEmpty ?? false) ...[
+                            _buildDetailRow('Publisher', _getPublisherText()),
+                            const SizedBox(height: 16),
+                            _buildDetailRow('Developer', _getDeveloperText()),
+                            const SizedBox(height: 16),
+                          ],
+                          if (_game.gameModes?.isNotEmpty ?? false) ...[
+                            _buildDetailRow('Game Modes', _getGameModesText()),
+                            const SizedBox(height: 16),
+                          ],
+                          if (_game.playerPerspectives?.isNotEmpty ?? false) ...[
+                            _buildDetailRow('Player Perspectives', _getPlayerPerspectivesText()),
+                            const SizedBox(height: 16),
+                          ],
+                          if (_game.franchises?.isNotEmpty ?? false) ...[
+                            _buildDetailRow('Franchises', _getFranchisesText()),
+                            const SizedBox(height: 16),
+                          ],
+                          if (_game.pegiAgeRating != null)
+                            _buildDetailRow('Age Rating', _formatAgeRating(_game.pegiAgeRating)),
                         ],
                       ),
                     ),
 
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 14),
+
+                    Divider(
+                      color: Colors.grey.withOpacity(0.3),
+                      thickness: 1,
+                      indent: 0,
+                      endIndent: 0,
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    // Language Support Section
+                    if (_game.languageSupports?.isNotEmpty ?? false) ...[
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Language Support',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            _buildLanguageSupportsTable(),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 14),
+
+                      Divider(
+                        color: Colors.grey.withOpacity(0.3),
+                        thickness: 1,
+                        indent: 0,
+                        endIndent: 0,
+                      ),
+
+                      const SizedBox(height: 8),
+                    ],
+
+                    // Time to Beat Section
+                    if (_game.hastilyGameTime != null || 
+                        _game.normallyGameTime != null || 
+                        _game.completelyGameTime != null) ...[
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Time to Beat',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                _buildTimeInfoCard(
+                                  'Hastily',
+                                  _formatGameTime(_game.hastilyGameTime),
+                                  Colors.orange,
+                                ),
+                                const SizedBox(width: 8),
+                                _buildTimeInfoCard(
+                                  'Normally',
+                                  _formatGameTime(_game.normallyGameTime),
+                                  Colors.green,
+                                ),
+                                const SizedBox(width: 8),
+                                _buildTimeInfoCard(
+                                  'Completely',
+                                  _formatGameTime(_game.completelyGameTime),
+                                  Colors.purple,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 14),
+
+                      Divider(
+                        color: Colors.grey.withOpacity(0.3),
+                        thickness: 1,
+                        indent: 0,
+                        endIndent: 0,
+                      ),
+
+                      const SizedBox(height: 8),
+                    ],
+
+                    // Social Media & Websites Section
+                    if (_game.websites?.entries.where((entry) => 
+                      ['OFFICIAL', 'INSTAGRAM', 'DISCORD', 'REDDIT', 'YOUTUBE', 'TWITCH', 'TWITTER']
+                      .contains(entry.key.toUpperCase())).isNotEmpty ?? false) ...[
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Social Media & Websites',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Container(
+                              child: Padding(
+                                padding: const EdgeInsets.all(1),
+                                child: Wrap(
+                                  spacing: 12,
+                                  runSpacing: 12,
+                                  children: [
+                                    if (_game.websites?['OFFICIAL'] != null)
+                                      _buildSocialButton(
+                                        'Official',
+                                        FontAwesomeIcons.globe,
+                                        _game.websites!['OFFICIAL']!,
+                                      ),
+                                    if (_game.websites?['INSTAGRAM'] != null)
+                                      _buildSocialButton(
+                                        'Instagram',
+                                        FontAwesomeIcons.instagram,
+                                        _game.websites!['INSTAGRAM']!,
+                                      ),
+                                    if (_game.websites?['DISCORD'] != null)
+                                      _buildSocialButton(
+                                        'Discord',
+                                        FontAwesomeIcons.discord,
+                                        _game.websites!['DISCORD']!,
+                                      ),
+                                    if (_game.websites?['REDDIT'] != null)
+                                      _buildSocialButton(
+                                        'Reddit',
+                                        FontAwesomeIcons.reddit,
+                                        _game.websites!['REDDIT']!,
+                                      ),
+                                    if (_game.websites?['YOUTUBE'] != null)
+                                      _buildSocialButton(
+                                        'YouTube',
+                                        FontAwesomeIcons.youtube,
+                                        _game.websites!['YOUTUBE']!,
+                                      ),
+                                    if (_game.websites?['TWITCH'] != null)
+                                      _buildSocialButton(
+                                        'Twitch',
+                                        FontAwesomeIcons.twitch,
+                                        _game.websites!['TWITCH']!,
+                                      ),
+                                    if (_game.websites?['TWITTER'] != null)
+                                      _buildSocialButton(
+                                        'Twitter',
+                                        FontAwesomeIcons.twitter,
+                                        _game.websites!['TWITTER']!,
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 14),
+
+                      Divider(
+                        color: Colors.grey.withOpacity(0.3),
+                        thickness: 1,
+                        indent: 0,
+                        endIndent: 0,
+                      ),
+
+                      const SizedBox(height: 8),
+                    ],
+
+                    // Where to Buy Section
+                    if (_game.websites?.entries
+                        .where((entry) => ['STEAM', 'EPICGAMES', 'GOG']
+                            .contains(entry.key.toUpperCase()))
+                            .isNotEmpty ?? false) ...[
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Where to Buy',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.start,
+                                children: _game.websites?.entries
+                                    .where((entry) => ['STEAM', 'EPICGAMES', 'GOG']
+                                        .contains(entry.key.toUpperCase()))
+                                        .map((entry) => Padding(
+                                          padding: const EdgeInsets.only(right: 12),
+                                          child: GestureDetector(
+                                            onTap: () => _launchUrl(entry.value),
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                  horizontal: 16, vertical: 12),
+                                              decoration: BoxDecoration(
+                                                color: Colors.white.withOpacity(0.1),
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  _buildStoreIcon(entry.key),
+                                                  const SizedBox(width: 8),
+                                                  Text(
+                                                    _formatStoreName(entry.key),
+                                                    style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 14,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ))
+                                    .toList() ?? [],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 14),
+
+                      Divider(
+                        color: Colors.grey.withOpacity(0.3),
+                        thickness: 1,
+                        indent: 0,
+                        endIndent: 0,
+                      ),
+
+                      const SizedBox(height: 8),
+                    ],
+
+                    // Videos Section
+                    if (_game.gameVideos != null && _game.gameVideos!.length > 0) ...[
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Videos',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            ListView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: _game.gameVideos!.length,
+                              itemBuilder: (context, index) {
+                                final video = _game.gameVideos![index];
+                                final thumbnailUrl = _getYouTubeThumbnail(video['url'] ?? '');
+                                
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.05),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      onTap: () => _launchUrl(video['url'] ?? ''),
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(12),
+                                        child: Row(
+                                          children: [
+                                            // Thumbnail
+                                            ClipRRect(
+                                              borderRadius: BorderRadius.circular(8),
+                                              child: Stack(
+                                                alignment: Alignment.center,
+                                                children: [
+                                                  CachedNetworkImage(
+                                                    imageUrl: thumbnailUrl,
+                                                    width: 120,
+                                                    height: 68,
+                                                    fit: BoxFit.cover,
+                                                    placeholder: (context, url) => Container(
+                                                      width: 120,
+                                                      height: 68,
+                                                      color: Colors.grey[900],
+                                                    ),
+                                                    errorWidget: (context, url, error) {
+                                                      return Container(
+                                                        width: 120,
+                                                        height: 68,
+                                                        decoration: BoxDecoration(
+                                                          color: Colors.grey[900],
+                                                          gradient: LinearGradient(
+                                                            begin: Alignment.topLeft,
+                                                            end: Alignment.bottomRight,
+                                                            colors: [
+                                                              Colors.grey[900]!,
+                                                              Colors.grey[800]!,
+                                                            ],
+                                                          ),
+                                                        ),
+                                                        child: Column(
+                                                          mainAxisAlignment: MainAxisAlignment.center,
+                                                          children: [
+                                                            Icon(
+                                                              FontAwesomeIcons.gamepad,
+                                                              color: Colors.grey[600],
+                                                              size: 24,
+                                                            ),
+                                                            const SizedBox(height: 4),
+                                                            Text(
+                                                              'No Preview',
+                                                              style: TextStyle(
+                                                                color: Colors.grey[600],
+                                                                fontSize: 10,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      );
+                                                    },
+                                                  ),
+                                                  Container(
+                                                    width: 120,
+                                                    height: 68,
+                                                    color: Colors.black.withOpacity(0.2),
+                                                  ),
+                                                  Icon(
+                                                    Icons.play_circle_fill,
+                                                    color: Colors.white.withOpacity(0.8),
+                                                    size: 32,
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(width: 16),
+                                            // Video title
+                                            Expanded(
+                                              child: Text(
+                                                video['name'] ?? 'Unknown',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 14,
+                                                  height: 1.4,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Icon(
+                                              Icons.arrow_forward_ios,
+                                              color: Colors.white.withOpacity(0.5),
+                                              size: 16,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 32),
+                    ],
                   ],
+                ),
+              ),
+            )
+          // Loading Indicator or Error Message Overlay
+          else if (_isLoading)
+            const Center(
+              child: CircularProgressIndicator(color: Colors.white),
+            )
+          else // Error state (_errorMessage != null or _game is null and not loading)
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: Colors.grey[600],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    _errorMessage ?? 'Could not load game details',
+                    style: TextStyle(
+                      color: Colors.grey[500],
+                      fontSize: 16,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  // Only show Try Again if it came from search, otherwise it might be a different error
+                  if (widget.fromSearch) 
+                    TextButton.icon(
+                      onPressed: _initializeGame,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Try Again'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.blue[300],
+                      ),
+                    ),
                 ],
               ),
             ),
-          ),
         ],
       ),
     );
@@ -1345,56 +1630,173 @@ class _GameDetailPageState extends State<GameDetailPage> {
 
   Widget _buildActionButton(IconData icon, String label) {
     if (label == 'Seen') {
-      final hasRating = _userRating != null;
+      final hasRating = _userRating != null && _userRating! > 0;  // 0 veya null ise rating yok demektir
       final ratingColor = hasRating ? _getRatingColor(_userRating!) : Colors.white70;
       final ratingIcon = hasRating ? _getRatingIcon(_userRating!) : icon;
       
+      print('_buildActionButton - userRating: $_userRating'); // Debug için
+      print('_buildActionButton - hasRating: $hasRating'); // Debug için
+      
+      return InkWell(
+        onTap: _showRatingDialog,
+        splashColor: Colors.transparent, // Splash efekti olmasın
+        highlightColor: Colors.transparent, // Highlight efekti olmasın
+        borderRadius: BorderRadius.circular(20), // Kenarları yumuşat
+        // Yatay padding'i büyüt, böylece tıklama alanı genişlesin
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                ratingIcon,
+                color: ratingColor,
+                size: 24,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                hasRating ? _getRatingLabel(_userRating!) : label,
+                style: TextStyle(
+                  color: ratingColor,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    if (label == 'Share') {
       return InkWell(
         onTap: () {
-          if (hasRating) {
-            _showReviewDialog();
-          } else {
-            _showRatingDialog();
-          }
+          // Share işlevini burada çağır
+          print('Share button tapped');
         },
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        // Yatay padding'i büyüt, böylece tıklama alanı genişlesin
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                color: Colors.white70,
+                size: 24,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    if (label == 'Hide') {
+      return InkWell(
+        onTap: () {
+          // Hide işlevini burada çağır
+          print('Hide button tapped');
+        },
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        // Yatay padding'i büyüt, böylece tıklama alanı genişlesin
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                color: Colors.white70,
+                size: 24,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    // Save butonu için
+    if (label == 'Save') {
+      return InkWell(
+        onTap: _handleSaveGame,
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        // Yatay padding'i büyüt, böylece tıklama alanı genişlesin
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                _isSaved ? FontAwesomeIcons.solidBookmark : FontAwesomeIcons.bookmark,
+                color: _isSaved ? Colors.orange[400] : Colors.white70,
+                size: 24,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: _isSaved ? Colors.orange[400] : Colors.white70,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    // Default dönüş - diğer butonlar için (kullanılmıyor ancak güvenlik için)
+    return InkWell(
+      onTap: () {
+        print('Diğer buton tıklandı: $label');
+      },
+      splashColor: Colors.transparent,
+      highlightColor: Colors.transparent,
+      borderRadius: BorderRadius.circular(20),
+      // Yatay padding'i büyüt, böylece tıklama alanı genişlesin
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              ratingIcon,
-              color: ratingColor,
+              icon,
+              color: Colors.white70,
               size: 24,
             ),
             const SizedBox(height: 8),
             Text(
-              hasRating ? _getRatingLabel(_userRating!) : label,
-              style: TextStyle(
-                color: ratingColor,
+              label,
+              style: const TextStyle(
+                color: Colors.white70,
                 fontSize: 12,
               ),
             ),
           ],
         ),
-      );
-    }
-    
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          icon,
-          color: Colors.white70,
-          size: 24,
-        ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 12,
-          ),
-        ),
-      ],
+      ),
     );
   }
 
@@ -1435,11 +1837,52 @@ class _GameDetailPageState extends State<GameDetailPage> {
       context,
       gameName: _game.name,
       coverUrl: _game.coverUrl ?? '',
-      initialRating: _userRating,
+      gameId: _game.gameId,
+      initialRating: _userRating != null && _userRating! > 0 ? _userRating : null,
       onRatingSelected: (rating) {
+        print('Rating selected: $rating'); // Debug için
+        print('Previous userRating: $_userRating'); // Debug için
+        
         setState(() {
-          _userRating = rating;
+          // rating 0 ise null olacak
+          _userRating = rating > 0 ? rating : null;
+          
+          // Update game's user actions
+          final currentActions = _game.userActions ?? UserGameActions();
+          final updatedRating = rating > 0 ? rating : null;
+          
+          // Eğer rating kaldırıldıysa (0 veya null), yorumu da kaldır
+          final updatedComment = (rating > 0) ? currentActions.comment : null; 
+          
+          // Yeni UserGameActions objesi oluştur
+          final newUserActions = currentActions.copyWith(
+            isRated: rating > 0,  // rating 0'dan büyükse isRated true olmalı
+            userRating: updatedRating,
+            isSaved: currentActions.isSaved,
+            comment: updatedComment, // Güncellenmiş yorumu ata
+          );
+          
+          // Oyun nesnesini güncelle
+          _game = _game.copyWith(
+            userActions: newUserActions,
+          );
+          
+          print('Updated userRating: $_userRating'); // Debug için
+          print('Updated userActions rating: ${_game.userActions?.userRating}'); // Debug için
+          print('Updated isRated: ${_game.userActions?.isRated}'); // Debug için
+          print('Updated comment: ${_game.userActions?.comment}'); // Yorum log'u eklendi
         });
+        
+        // HomeController aracılığıyla tüm uygulamada rating durumunu güncelle
+        if (_game.gameId != null) {
+          _homeController.updateGameRatingState(_game.gameId!, rating > 0 ? rating : null);
+          
+          // Eğer rating kaldırıldıysa, HomeController'daki yorumu da kaldır
+          if (rating <= 0) {
+            _homeController.updateGameComment(_game.gameId!, null);
+            print('Comment removed from HomeController because rating was removed.'); // Log eklendi
+          }
+        }
       },
     );
   }
@@ -1447,9 +1890,9 @@ class _GameDetailPageState extends State<GameDetailPage> {
   String _getRatingLabel(int rating) {
     switch (rating) {
       case 1:
-        return 'Poor';
+        return 'Awful';
       case 2:
-        return 'Fair';
+        return 'Meh';
       case 3:
         return 'Good';
       case 4:
@@ -1459,7 +1902,10 @@ class _GameDetailPageState extends State<GameDetailPage> {
     }
   }
 
-  IconData _getRatingIcon(int rating) {
+  IconData _getRatingIcon(int? rating) {
+    if (rating == null || rating == 0) {
+      return FontAwesomeIcons.star;  // Default star icon for not rated
+    }
     switch (rating) {
       case 1:
         return FontAwesomeIcons.faceFrown;
@@ -1470,7 +1916,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
       case 4:
         return FontAwesomeIcons.faceGrinStars;
       default:
-        return FontAwesomeIcons.question;
+        return FontAwesomeIcons.star;
     }
   }
 
@@ -1785,10 +2231,10 @@ class _GameDetailPageState extends State<GameDetailPage> {
     // Sort languages into common and other
     final sortedCommonLanguages = languageMap.keys
         .where((lang) => commonLanguages.contains(lang))
-        .toList()..sort();
+            .toList()..sort();
     final sortedOtherLanguages = languageMap.keys
         .where((lang) => !commonLanguages.contains(lang))
-        .toList()..sort();
+            .toList()..sort();
 
     return Container(
       decoration: BoxDecoration(
@@ -1824,7 +2270,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Including audio, interface, and subtitle support',
+                  'Including audio, interface, and subtitle support. Tap to see.',
                   style: TextStyle(
                     color: Colors.grey[400],
                     fontSize: 12,
@@ -1963,10 +2409,8 @@ class _GameDetailPageState extends State<GameDetailPage> {
     if (supports['Interface']!) supportedFeatures.add('Interface');
     if (supports['Subtitles']!) supportedFeatures.add('Subtitles');
 
-    return Tooltip(
-      message: supportedFeatures.isEmpty
-          ? 'No support'
-          : 'Supports: ${supportedFeatures.join(', ')}',
+    return InkWell(
+      onTap: () => _showLanguageDetails(language, supports),
       child: Container(
         padding: const EdgeInsets.symmetric(
           horizontal: 12,
@@ -2003,6 +2447,143 @@ class _GameDetailPageState extends State<GameDetailPage> {
           ],
         ),
       ),
+    );
+  }
+
+  void _showLanguageDetails(String language, Map<String, bool> supports) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: Colors.grey[900],
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(20),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle bar
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[700],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Language header
+                  Row(
+                    children: [
+                      Text(
+                        language,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(
+                        Icons.translate_rounded,
+                        color: Colors.blue[300],
+                        size: 20,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  // Support details
+                  _buildSupportDetail(
+                    'Audio',
+                    supports['Audio']!,
+                    Icons.volume_up_rounded,
+                    'Voice acting and sound in this language',
+                  ),
+                  const SizedBox(height: 16),
+                  _buildSupportDetail(
+                    'Interface',
+                    supports['Interface']!,
+                    Icons.settings_rounded,
+                    'Menu and UI elements in this language',
+                  ),
+                  const SizedBox(height: 16),
+                  _buildSupportDetail(
+                    'Subtitles',
+                    supports['Subtitles']!,
+                    Icons.closed_caption_rounded,
+                    'Text and captions in this language',
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSupportDetail(String title, bool isSupported, IconData icon, String description) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: isSupported 
+                ? Colors.green[900]?.withOpacity(0.3)
+                : Colors.grey[800]?.withOpacity(0.3),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            color: isSupported ? Colors.green[300] : Colors.grey[500],
+            size: 20,
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    isSupported 
+                        ? Icons.check_circle_outline_rounded
+                        : Icons.cancel_outlined,
+                    color: isSupported ? Colors.green[300] : Colors.grey[500],
+                    size: 16,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                description,
+                style: TextStyle(
+                  color: Colors.grey[400],
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -2133,6 +2714,11 @@ class _GameDetailPageState extends State<GameDetailPage> {
         
         // Update in HomeController for other pages
         _homeController.updateGameSaveState(_game.gameId!, _isSaved);
+
+        // Show save animation if game is being saved (not unsaved)
+        if (_isSaved) {
+          _showSavedNotification();
+        }
       }
     } catch (e) {
       print('Error saving game: $e');
@@ -2143,18 +2729,28 @@ class _GameDetailPageState extends State<GameDetailPage> {
     final overlayState = Overlay.of(context);
     final overlayEntry = OverlayEntry(
       builder: (context) => Positioned(
-        top: MediaQuery.of(context).size.height / 2 - 32,
-        left: MediaQuery.of(context).size.width / 2 - 32,
+        top: MediaQuery.of(context).size.height / 2 - 40, // Biraz daha büyük container için ayarladım
+        left: MediaQuery.of(context).size.width / 2 - 40,  // Biraz daha büyük container için ayarladım
         child: TweenAnimationBuilder<double>(
           tween: Tween(begin: 0.0, end: 1.0),
           duration: const Duration(milliseconds: 300),
           builder: (context, value, child) {
             return Opacity(
               opacity: value,
-              child: Icon(
-                Icons.favorite,
-                color: Colors.orange[400],
-                size: 64,
+              child: Container(
+                width: 80, // Container boyutu
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.5), // Yarı şeffaf siyah arka plan
+                  borderRadius: BorderRadius.circular(16), // Yumuşak köşeler
+                ),
+                child: Center(
+                  child: Icon(
+                    FontAwesomeIcons.solidBookmark,
+                    color: Colors.orange[400],
+                    size: 40, // İkonu biraz küçülttüm container içinde daha iyi görünmesi için
+                  ),
+                ),
               ),
             );
           },
@@ -2167,5 +2763,100 @@ class _GameDetailPageState extends State<GameDetailPage> {
     Future.delayed(const Duration(milliseconds: 800), () {
       overlayEntry.remove();
     });
+  }
+
+  void _handleReviewSubmitted(String review) {
+    if (review.isNotEmpty) {
+      setState(() {
+        // Update game userActions with the comment
+        _game = _game.copyWith(
+          userActions: (_game.userActions ?? UserGameActions()).copyWith(
+            comment: review,
+          ),
+        );
+      });
+
+      // Update comment in HomeController for consistency
+      if (_game.gameId != null) {
+        _homeController.updateGameComment(_game.gameId!, review);
+      }
+
+      // Send the review to the backend
+      if (_game.gameId != null) {
+        try {
+          // Yorum gönderimini doğrudan HomeController'a kaydettikten sonra
+          // Başarı bildirimi gösterelim
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Row(
+                children: [
+                  Icon(
+                    FontAwesomeIcons.circleCheck,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                  SizedBox(width: 8),
+                  Text('Review saved!'),
+                ],
+              ),
+              backgroundColor: _userRating != null ? _getRatingColor(_userRating!) : Colors.green,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+          
+          // TODO: Backend entegrasyonu geçici olarak devre dışı bırakıldı
+          final RatingRepository _ratingRepository = RatingRepository();
+          _ratingRepository.commentGame(_game.gameId!, review).then((response) {
+            // Başarı durumunda gelen UserGameRating objesini işleyebiliriz (şimdilik sadece logluyoruz)
+            print('Comment submitted to backend successfully. Response: ${response.toJson()}');
+            // İsteğe bağlı: Backend'den dönen comment ile local state'i tekrar güncelle
+            // Bu, backend'in comment'i değiştirebileceği senaryolar için önemlidir.
+            /*
+            setState(() {
+              _game = _game.copyWith(
+                userActions: (_game.userActions ?? UserGameActions()).copyWith(
+                  comment: response.comment, // Backend'den dönen yorum
+                ),
+              );
+            });
+            _homeController.updateGameComment(_game.gameId!, response.comment);
+            */
+          }).catchError((error) {
+            print('Error submitting comment to backend: $error');
+            // Hata durumunda kullanıcıya bilgi verilebilir
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    Icon(
+                      FontAwesomeIcons.circleExclamation,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Text('Error saving review: ${error.toString()}'),
+                  ],
+                ),
+                backgroundColor: Colors.red[700],
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                margin: const EdgeInsets.all(16),
+              ),
+            );
+            // Comment is still saved locally even if backend fails
+          });
+          // /* Yorum satırını kaldırıyoruz */
+        } catch (e) {
+          print('Exception while submitting comment: $e');
+          // Comment is still saved locally even if backend fails
+        }
+      }
+    }
   }
 }

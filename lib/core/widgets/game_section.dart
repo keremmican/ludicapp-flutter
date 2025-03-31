@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:ludicapp/core/models/game.dart';
 import 'package:ludicapp/core/providers/blurred_background_provider.dart';
 import 'package:ludicapp/features/game/presentation/game_detail_page.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class GameSection extends StatefulWidget {
   final String title;
   final List<Game> games;
-  final Function(Game) onGameTap;
+  final Function(Game, ImageProvider?) onGameTap;
   final ScrollController? scrollController;
 
   const GameSection({
@@ -22,7 +23,6 @@ class GameSection extends StatefulWidget {
 }
 
 class _GameSectionState extends State<GameSection> {
-  final _backgroundProvider = BlurredBackgroundProvider();
   late ScrollController _scrollController;
   bool _isInternalController = false;
 
@@ -107,16 +107,39 @@ class _GameSectionState extends State<GameSection> {
               itemCount: widget.games.length,
               itemBuilder: (context, index) {
                 final game = widget.games[index];
-                // Cache the blurred background
-                _backgroundProvider.cacheBackground(game.gameId.toString(), game.coverUrl);
-                if (game.screenshots != null) {
-                  for (final screenshot in game.screenshots!) {
-                    _backgroundProvider.cacheBackground('${game.gameId}_${screenshot.hashCode}', screenshot);
-                  }
-                }
                 
                 return GestureDetector(
-                  onTap: () => widget.onGameTap(game),
+                  onTap: () {
+                    ImageProvider? coverProvider;
+                    // Create provider and initiate pre-cache WITHOUT awaiting
+                    if (game.coverUrl != null && game.coverUrl!.isNotEmpty) {
+                      coverProvider = CachedNetworkImageProvider(game.coverUrl!);
+                      try {
+                        if (mounted) {
+                          precacheImage(coverProvider, context)
+                             .catchError((e) => print('Error pre-caching cover: $e'));
+                          print('Initiated pre-cache for cover: ${game.name}');
+                        }
+                      } catch (e) {
+                        print('Sync error initiating cover pre-cache: $e');
+                      }
+                    }
+                    // Pre-cache first screenshot (fire-and-forget)
+                    if (game.screenshots != null && game.screenshots!.isNotEmpty) {
+                       try {
+                        if (mounted) {
+                          precacheImage(CachedNetworkImageProvider(game.screenshots![0]), context)
+                             .catchError((e) => print('Error pre-caching screenshot: $e'));
+                          print('Initiated pre-cache for screenshot: ${game.name}');
+                        }
+                      } catch (e) {
+                         print('Sync error initiating screenshot pre-cache: $e');
+                      }
+                    }
+
+                    // Navigate immediately, passing the provider via onGameTap
+                    widget.onGameTap(game, coverProvider);
+                  },
                   child: Container(
                     margin: EdgeInsets.only(
                       right: index != widget.games.length - 1 ? 12.0 : 0,
@@ -134,16 +157,16 @@ class _GameSectionState extends State<GameSection> {
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(10),
-                      child: Image.network(
-                        game.coverUrl ?? '',
+                      child: CachedNetworkImage(
+                        imageUrl: game.coverUrl ?? '',
                         fit: BoxFit.cover,
-                        gaplessPlayback: true,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: Colors.grey[900],
-                            child: const Icon(Icons.error, color: Colors.white),
-                          );
-                        },
+                        placeholder: (context, url) => Container(color: Colors.grey[900]),
+                        errorWidget: (context, url, error) => Container(
+                          color: Colors.grey[900],
+                          child: const Icon(Icons.error, color: Colors.white),
+                        ),
+                        fadeInDuration: const Duration(milliseconds: 100),
+                        fadeOutDuration: const Duration(milliseconds: 100),
                       ),
                     ),
                   ),

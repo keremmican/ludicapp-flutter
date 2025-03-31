@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:ludicapp/services/model/response/game_summary.dart';
 import 'package:ludicapp/services/model/response/user_game_info.dart';
 import 'package:ludicapp/services/model/response/game_detail_with_user_info.dart';
@@ -61,8 +62,6 @@ class LanguageSupport {
 }
 
 class Game {
-  static final Map<String, List<Image>> _screenshotCache = {};
-
   final int gameId;
   final String name;
   final String slug;
@@ -91,6 +90,10 @@ class Game {
   set userActions(UserGameActions? value) {
     _userActions = value;
   }
+
+  bool get isSaved => _userActions?.isSaved ?? false;
+  bool get isRated => _userActions?.isRated ?? false;
+  int? get userRating => _userActions?.userRating;
 
   Game({
     required this.gameId,
@@ -183,21 +186,6 @@ class Game {
       languageSupports: gameDetail.gameDetails.languageSupports.map((l) => LanguageSupport.fromJson(Map<String, dynamic>.from(l))).toList(),
       userActions: gameDetail.userActions,
     );
-  }
-
-  static void preloadScreenshots(int gameId, List<String> screenshots) {
-    final cacheKey = gameId.toString();
-    if (!_screenshotCache.containsKey(cacheKey)) {
-      _screenshotCache[cacheKey] = screenshots.map((url) => Image.network(url)).toList();
-    }
-  }
-
-  static List<Image>? getPreloadedScreenshots(int gameId) {
-    return _screenshotCache[gameId.toString()];
-  }
-
-  static void clearCache() {
-    _screenshotCache.clear();
   }
 
   Game copyWith({
