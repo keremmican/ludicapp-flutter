@@ -92,10 +92,10 @@ class _SkeletonGameSectionState extends State<SkeletonGameSection> with SingleTi
             padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 8.0),
             child: Text(
               widget.title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: Theme.of(context).textTheme.titleMedium?.color,
               ),
             ),
           ),

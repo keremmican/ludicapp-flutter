@@ -12,12 +12,19 @@ class BottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Tema renklerini al
+    final theme = Theme.of(context);
+    
     return BottomNavigationBar(
       currentIndex: currentIndex,
       onTap: onTap,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      selectedItemColor: const Color(0xFFBFE429), // Neon green
-      unselectedItemColor: Colors.white54,
+      // Accent rengi temadan al
+      selectedItemColor: theme.colorScheme.primary, // Tema accent rengi
+      // Temaya göre seçilmemiş item rengi (açık/koyu temada farklı)
+      unselectedItemColor: theme.brightness == Brightness.dark 
+          ? Colors.white54 // Koyu temada açık gri
+          : Colors.grey[700], // Açık temada koyu gri
       showSelectedLabels: false,
       showUnselectedLabels: false,
       items: const [

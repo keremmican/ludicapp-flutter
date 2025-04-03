@@ -60,47 +60,51 @@ class _LandingPageState extends State<LandingPage> {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 50, vertical: 15),
+                    textStyle: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'LeagueSpartan',
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30.0),
+                    ),
+                  ).copyWith(
+                    foregroundColor: MaterialStateProperty.all(Theme.of(context).colorScheme.onPrimary),
+                  ),
                   onPressed: () {
                     Navigator.pushNamed(context, '/register');
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'Get Started',
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  child: const Text('Register'),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
                 height: 56,
                 child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 50, vertical: 15),
+                    textStyle: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'LeagueSpartan',
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30.0),
+                    ),
+                  ).copyWith(
+                    foregroundColor: MaterialStateProperty.all(Theme.of(context).colorScheme.primary),
+                  ),
                   onPressed: () {
                     Navigator.pushNamed(context, '/login');
                   },
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Colors.white38),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'Sign In',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  child: const Text('Login'),
                 ),
               ),
               const SizedBox(height: 12),
@@ -136,7 +140,7 @@ class _LandingPageState extends State<LandingPage> {
                     TextSpan(
                       text: 'Terms of Use',
                       style: TextStyle(
-                        color: AppTheme.accentColor,
+                        color: Theme.of(context).colorScheme.primary,
                         decoration: TextDecoration.underline,
                       ),
                     ),
@@ -144,7 +148,7 @@ class _LandingPageState extends State<LandingPage> {
                     TextSpan(
                       text: 'Privacy Policy',
                       style: TextStyle(
-                        color: AppTheme.accentColor,
+                        color: Theme.of(context).colorScheme.primary,
                         decoration: TextDecoration.underline,
                       ),
                     ),

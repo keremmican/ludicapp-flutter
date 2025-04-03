@@ -88,8 +88,9 @@ class _GameSectionState extends State<GameSection> {
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Text(
               widget.title,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                // Temaya göre renk seçimi
+                color: Theme.of(context).textTheme.titleMedium?.color,
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),

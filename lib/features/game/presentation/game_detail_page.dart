@@ -21,6 +21,7 @@ import 'package:ludicapp/services/model/response/user_game_actions.dart';
 import 'package:ludicapp/features/home/presentation/controller/home_controller.dart';
 import 'package:ludicapp/services/repository/rating_repository.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:ludicapp/core/widgets/add_to_list_modal.dart'; // Import the modal
 
 class GameDetailPage extends StatefulWidget {
   final Game game;
@@ -49,6 +50,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
   bool _showAllLanguages = false;
   int? _userRating;
   bool _isSaved = false;
+  bool _isHidden = false; // <-- Add state for hidden status
   late Game _game;
   bool _isLoading = true;
   String? _errorMessage;
@@ -62,22 +64,24 @@ class _GameDetailPageState extends State<GameDetailPage> {
     if (widget.game.userActions != null) {
       _userRating = widget.game.userActions!.userRating;
       _isSaved = widget.game.userActions!.isSaved ?? false;
-      final initialComment = widget.game.userActions!.comment; // Comment'i al
+      _isHidden = widget.game.userActions!.isHidden ?? false; // <-- Initialize hidden status
+      final initialComment = widget.game.userActions!.comment; 
       
       // _game'in userActions'ını comment ile başlat/güncelle
       _game = _game.copyWith(
         userActions: (_game.userActions ?? UserGameActions()).copyWith(
           userRating: _userRating,
           isSaved: _isSaved,
-          comment: initialComment, // Comment'i ata
+          isHidden: _isHidden, // <-- Set hidden status in game object
+          comment: initialComment, 
         )
       );
 
-      // Debug için değerleri kontrol et
       print('initState - userRating from widget: $_userRating');
       print('initState - isSaved from widget: $_isSaved');
-      print('initState - comment from widget: $initialComment'); // Comment log'u eklendi
-      print('initState - userActions from widget: ${_game.userActions}'); // Güncellenmiş userActions log'u
+      print('initState - isHidden from widget: $_isHidden'); // <-- Log hidden status
+      print('initState - comment from widget: $initialComment'); 
+      print('initState - userActions from widget: ${_game.userActions}'); 
     }
     
     // Game ID varsa, HomeController'dan rating, save ve comment durumunu da kontrol edelim
@@ -95,6 +99,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
           userActions: (_game.userActions ?? UserGameActions()).copyWith(
             isRated: _userRating != null && _userRating! > 0, // Rating varsa isRated true
             userRating: _userRating,
+            isHidden: _isHidden, // <-- Ensure hidden status is preserved
           )
         );
       }
@@ -108,9 +113,17 @@ class _GameDetailPageState extends State<GameDetailPage> {
         _game = _game.copyWith(
           userActions: (_game.userActions ?? UserGameActions()).copyWith(
             isSaved: true,
+            isHidden: _isHidden, // <-- Ensure hidden status is preserved
           )
         );
       }
+      
+      // TODO: Check hidden status from HomeController if needed
+      // if (_homeController.hiddenGames.contains(gameId)) {
+      //    _isHidden = true;
+      //    print('initState - Using hidden state from HomeController: $_isHidden');
+      //    _game = _game.copyWith(userActions: (_game.userActions ?? UserGameActions()).copyWith(isHidden: true));
+      // }
       
       // Eğer HomeController'da comment varsa ve widget'tan gelen comment null ise, onu kullan
       final bool commentExistsInWidget = _game.userActions?.comment != null;
@@ -122,6 +135,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
           _game = _game.copyWith(
             userActions: (_game.userActions ?? UserGameActions()).copyWith(
               comment: commentFromController,
+              isHidden: _isHidden, // <-- Ensure hidden status is preserved
             )
           );
         }
@@ -157,6 +171,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
           _game = gameWithUserInfo.toGame(); // Bu metodun userActions'ı doğru atadığını varsayıyoruz
           _userRating = gameWithUserInfo.userActions?.userRating;
           _isSaved = gameWithUserInfo.userActions?.isSaved ?? false;
+          _isHidden = gameWithUserInfo.userActions?.isHidden ?? false; // <-- Get hidden status from fetch
           final fetchedComment = gameWithUserInfo.userActions?.comment; // Backend'den gelen comment'i al
 
           // Emin olmak için _game.userActions'ı fetched comment ile güncelle
@@ -165,11 +180,13 @@ class _GameDetailPageState extends State<GameDetailPage> {
               userRating: _userRating,
               isRated: _userRating != null && _userRating! > 0,
               isSaved: _isSaved,
+              isHidden: _isHidden, // <-- Set hidden status from fetch
               comment: fetchedComment, // Fetched comment'i ata
             )
           );
 
           print('_initializeGame - Fetched comment: $fetchedComment'); // Log eklendi
+          print('_initializeGame - Fetched isHidden: $_isHidden'); // <-- Log hidden status
           print('_initializeGame - Updated _game.userActions: ${_game.userActions}'); // Log eklendi
 
           _isLoading = false;
@@ -695,17 +712,27 @@ class _GameDetailPageState extends State<GameDetailPage> {
 
                     // Action buttons
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), // Added horizontal padding
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly, // Use spaceEvenly for consistent spacing
                         children: [
+                          // Always show Share button
                           _buildActionButton(FontAwesomeIcons.shareFromSquare, 'Share'),
-                          const SizedBox(width: 20),
-                          _buildActionButton(FontAwesomeIcons.eyeSlash, 'Hide'),
-                          const SizedBox(width: 20),
-                          _buildActionButton(FontAwesomeIcons.circleCheck, 'Seen'),
-                          const SizedBox(width: 20),
-                          _buildActionButton(FontAwesomeIcons.bookmark, 'Save'),
+                          
+                          // Conditionally show other buttons
+                          if (_userRating != null)
+                             _buildActionButton(FontAwesomeIcons.circleCheck, 'Seen') // Only Seen if rated
+                          else if (_isHidden)
+                             _buildActionButton(FontAwesomeIcons.eye, 'Unhide') // Only Unhide if hidden (and not rated)
+                          else ...[
+                            // Show Hide, Seen, Save if not rated and not hidden
+                            _buildActionButton(FontAwesomeIcons.eyeSlash, 'Hide'),
+                            _buildActionButton(FontAwesomeIcons.circleCheck, 'Seen'), // Default icon before rating
+                            _buildActionButton(FontAwesomeIcons.bookmark, 'Save'),
+                          ],
+                          
+                          // Always show Add to List button
+                          _buildActionButton(Icons.playlist_add_outlined, 'Add to List'),
                         ],
                       ),
                     ),
@@ -760,9 +787,14 @@ class _GameDetailPageState extends State<GameDetailPage> {
                                 itemCount: 6, // 1 kullanıcı + 5 mock review
                                 padding: EdgeInsets.zero,
                                 itemBuilder: (context, index) {
+                                  // Log comment state during build for user review card
+                                  if (index == 0) {
+                                    print('Building user review card - comment: ${_game.userActions?.comment}');
+                                  }
                                   // Kullanıcının kendi review'i (ilk eleman)
                                   if (index == 0) {
                                     return GestureDetector(
+                                      key: ValueKey('user_review_card_${_game.gameId}_${_userRating}'), 
                                       onTap: () {
                                         // Check if user has rated the game already
                                         if (_userRating == null) {
@@ -1629,35 +1661,62 @@ class _GameDetailPageState extends State<GameDetailPage> {
   }
 
   Widget _buildActionButton(IconData icon, String label) {
-    if (label == 'Seen') {
-      final hasRating = _userRating != null && _userRating! > 0;  // 0 veya null ise rating yok demektir
-      final ratingColor = hasRating ? _getRatingColor(_userRating!) : Colors.white70;
-      final ratingIcon = hasRating ? _getRatingIcon(_userRating!) : icon;
-      
-      print('_buildActionButton - userRating: $_userRating'); // Debug için
-      print('_buildActionButton - hasRating: $hasRating'); // Debug için
+    // --- ADD TO LIST BUTTON --- 
+    if (label == 'Add to List') {
+      return InkWell(
+        onTap: () {
+          if (_game.gameId != null) { // Ensure gameId is available
+            AddToListModal.show(
+              context,
+              gameId: _game.gameId!,
+              gameName: _game.name,
+            );
+          }
+        },
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: Colors.white70, size: 24),
+              const SizedBox(height: 8),
+              Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    // --- RATING BUTTON ('Seen') ---
+    if (label == 'Seen' || label == 'Awful' || label == 'Meh' || label == 'Good' || label == 'Amazing') {
+      final bool hasRating = _userRating != null && _userRating! > 0;
+      final Color displayColor = hasRating ? _getRatingColor(_userRating!) : Colors.white70;
+      final IconData displayIcon = hasRating ? _getRatingIcon(_userRating!) : FontAwesomeIcons.circleCheck; // Use check if rated, star otherwise? No, use specific rating icons. Default is circleCheck.
+      final String displayLabel = hasRating ? _getRatingLabel(_userRating!) : 'Seen';
       
       return InkWell(
         onTap: _showRatingDialog,
-        splashColor: Colors.transparent, // Splash efekti olmasın
-        highlightColor: Colors.transparent, // Highlight efekti olmasın
-        borderRadius: BorderRadius.circular(20), // Kenarları yumuşat
-        // Yatay padding'i büyüt, böylece tıklama alanı genişlesin
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                ratingIcon,
-                color: ratingColor,
+                displayIcon,
+                color: displayColor,
                 size: 24,
               ),
               const SizedBox(height: 8),
               Text(
-                hasRating ? _getRatingLabel(_userRating!) : label,
+                displayLabel,
                 style: TextStyle(
-                  color: ratingColor,
+                  color: displayColor,
                   fontSize: 12,
                 ),
               ),
@@ -1667,65 +1726,58 @@ class _GameDetailPageState extends State<GameDetailPage> {
       );
     }
     
+    // --- SHARE BUTTON ---
     if (label == 'Share') {
       return InkWell(
         onTap: () {
-          // Share işlevini burada çağır
-          print('Share button tapped');
+          // TODO: Implement share functionality
+          print('Share button tapped - (Snackbar removed)');
         },
         splashColor: Colors.transparent,
         highlightColor: Colors.transparent,
         borderRadius: BorderRadius.circular(20),
-        // Yatay padding'i büyüt, böylece tıklama alanı genişlesin
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                icon,
-                color: Colors.white70,
-                size: 24,
-              ),
+              Icon(icon, color: Colors.white70, size: 24),
               const SizedBox(height: 8),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 12,
-                ),
-              ),
+              Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
             ],
           ),
         ),
       );
     }
     
-    if (label == 'Hide') {
+    // --- HIDE / UNHIDE BUTTON ---
+    if (label == 'Hide' || label == 'Unhide') {
+      // Use `_isHidden` to determine the current state and action
+      final bool currentlyHidden = _isHidden; 
+      final IconData displayIcon = currentlyHidden ? FontAwesomeIcons.eye : FontAwesomeIcons.eyeSlash;
+      final String displayLabel = currentlyHidden ? 'Unhide' : 'Hide';
+      final Color displayColor = currentlyHidden ? Colors.blue[300]! : Colors.white70; // Highlight Unhide
+
       return InkWell(
-        onTap: () {
-          // Hide işlevini burada çağır
-          print('Hide button tapped');
-        },
+        onTap: _handleHideGame, // Use a dedicated handler
         splashColor: Colors.transparent,
         highlightColor: Colors.transparent,
         borderRadius: BorderRadius.circular(20),
-        // Yatay padding'i büyüt, böylece tıklama alanı genişlesin
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                icon,
-                color: Colors.white70,
+                displayIcon,
+                color: displayColor,
                 size: 24,
               ),
               const SizedBox(height: 8),
               Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white70,
+                displayLabel,
+                style: TextStyle(
+                  color: displayColor,
                   fontSize: 12,
                 ),
               ),
@@ -1735,29 +1787,31 @@ class _GameDetailPageState extends State<GameDetailPage> {
       );
     }
     
-    // Save butonu için
+    // --- SAVE BUTTON ---
     if (label == 'Save') {
+      final Color displayColor = _isSaved ? Colors.orange[400]! : Colors.white70;
+      final IconData displayIcon = _isSaved ? FontAwesomeIcons.solidBookmark : FontAwesomeIcons.bookmark;
+
       return InkWell(
         onTap: _handleSaveGame,
         splashColor: Colors.transparent,
         highlightColor: Colors.transparent,
         borderRadius: BorderRadius.circular(20),
-        // Yatay padding'i büyüt, böylece tıklama alanı genişlesin
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                _isSaved ? FontAwesomeIcons.solidBookmark : FontAwesomeIcons.bookmark,
-                color: _isSaved ? Colors.orange[400] : Colors.white70,
+                displayIcon,
+                color: displayColor,
                 size: 24,
               ),
               const SizedBox(height: 8),
               Text(
-                label,
+                label, // Label remains 'Save'
                 style: TextStyle(
-                  color: _isSaved ? Colors.orange[400] : Colors.white70,
+                  color: displayColor,
                   fontSize: 12,
                 ),
               ),
@@ -1767,37 +1821,8 @@ class _GameDetailPageState extends State<GameDetailPage> {
       );
     }
     
-    // Default dönüş - diğer butonlar için (kullanılmıyor ancak güvenlik için)
-    return InkWell(
-      onTap: () {
-        print('Diğer buton tıklandı: $label');
-      },
-      splashColor: Colors.transparent,
-      highlightColor: Colors.transparent,
-      borderRadius: BorderRadius.circular(20),
-      // Yatay padding'i büyüt, böylece tıklama alanı genişlesin
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: Colors.white70,
-              size: 24,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    // Default case (should not happen with current logic)
+    return const SizedBox.shrink(); 
   }
 
   void _showReviewDialog() {
@@ -1840,48 +1865,83 @@ class _GameDetailPageState extends State<GameDetailPage> {
       gameId: _game.gameId,
       initialRating: _userRating != null && _userRating! > 0 ? _userRating : null,
       onRatingSelected: (rating) {
-        print('Rating selected: $rating'); // Debug için
-        print('Previous userRating: $_userRating'); // Debug için
+        print('Rating selected: $rating'); 
+        print('Previous userRating: $_userRating'); 
+        print('Previous isHidden: $_isHidden'); // Log previous hidden state
         
+        final bool wasPreviouslyRated = _userRating != null && _userRating! > 0;
+        final bool isNowRated = rating > 0;
+        bool shouldUnhide = false;
+
+        // --- Rule: Rating a game removes hidden status ---
+        if (isNowRated && _isHidden) {
+          shouldUnhide = true;
+          print('Rating action is unhiding the game.');
+        }
+
         setState(() {
-          // rating 0 ise null olacak
-          _userRating = rating > 0 ? rating : null;
+          _userRating = isNowRated ? rating : null;
           
+          // Unhide if necessary
+          if (shouldUnhide) {
+            _isHidden = false;
+          }
+
           // Update game's user actions
           final currentActions = _game.userActions ?? UserGameActions();
-          final updatedRating = rating > 0 ? rating : null;
+          UserGameActions updatedUserActions;
+
+          if (isNowRated) {
+            // Rating is being set or changed
+            updatedUserActions = currentActions.copyWith(
+              isRated: true,
+              userRating: rating,
+              isHidden: _isHidden,
+              comment: currentActions.comment
+            );
+          } else {
+            // Rating is being removed (set to 0 or null)
+            // Explicitly create new actions with null rating/comment
+            updatedUserActions = UserGameActions(
+              isSaved: currentActions.isSaved,
+              isHidden: _isHidden,
+              isRated: false,
+              userRating: null,
+              comment: null
+            );
+          }
           
-          // Eğer rating kaldırıldıysa (0 veya null), yorumu da kaldır
-          final updatedComment = (rating > 0) ? currentActions.comment : null; 
-          
-          // Yeni UserGameActions objesi oluştur
-          final newUserActions = currentActions.copyWith(
-            isRated: rating > 0,  // rating 0'dan büyükse isRated true olmalı
-            userRating: updatedRating,
-            isSaved: currentActions.isSaved,
-            comment: updatedComment, // Güncellenmiş yorumu ata
-          );
-          
-          // Oyun nesnesini güncelle
+          // Update game object
           _game = _game.copyWith(
-            userActions: newUserActions,
+            userActions: updatedUserActions
           );
           
-          print('Updated userRating: $_userRating'); // Debug için
-          print('Updated userActions rating: ${_game.userActions?.userRating}'); // Debug için
-          print('Updated isRated: ${_game.userActions?.isRated}'); // Debug için
-          print('Updated comment: ${_game.userActions?.comment}'); // Yorum log'u eklendi
+          print('Updated userRating: $_userRating'); 
+          print('Updated isHidden: $_isHidden'); 
+          print('Updated userActions rating: ${_game.userActions?.userRating}'); 
+          print('Updated isRated: ${_game.userActions?.isRated}'); 
+          print('Updated userActions isHidden: ${_game.userActions?.isHidden}'); 
+          print('Updated comment: ${_game.userActions?.comment}'); 
         });
         
-        // HomeController aracılığıyla tüm uygulamada rating durumunu güncelle
+        // Update HomeController
         if (_game.gameId != null) {
-          _homeController.updateGameRatingState(_game.gameId!, rating > 0 ? rating : null);
-          
-          // Eğer rating kaldırıldıysa, HomeController'daki yorumu da kaldır
-          if (rating <= 0) {
-            _homeController.updateGameComment(_game.gameId!, null);
-            print('Comment removed from HomeController because rating was removed.'); // Log eklendi
+          _homeController.updateGameRatingState(_game.gameId!, isNowRated ? rating : null);
+          if (shouldUnhide) {
+            // TODO: Call HomeController to update hidden status
+            // _homeController.updateGameHiddenState(_game.gameId!, false); 
+            print('HomeController hidden state update needed for game ${_game.gameId}: false'); 
           }
+          if (!isNowRated) {
+            _homeController.updateGameComment(_game.gameId!, null);
+            print('Comment removed from HomeController because rating was removed.'); 
+          }
+        }
+
+        // TODO: Add backend call to unhide game if shouldUnhide is true
+        if (shouldUnhide && _game.gameId != null) {
+           print('Backend call needed: unhideGame(${_game.gameId})');
+           // try { await _libraryRepository.unhideGame(_game.gameId!); } catch (e) { ... }
         }
       },
     );
@@ -2699,30 +2759,161 @@ class _GameDetailPageState extends State<GameDetailPage> {
   Future<void> _handleSaveGame() async {
     if (_game.gameId == null) return;
 
+    final bool intendingToSave = !_isSaved;
+    bool shouldUnhide = false;
+
+    // --- Rule: Saving a game removes hidden status ---
+    if (intendingToSave && _isHidden) {
+      shouldUnhide = true;
+      print('Save action is unhiding the game.');
+    }
+
     try {
-      final bool success = _isSaved 
-        ? await _libraryRepository.unsaveGame(_game.gameId!)
-        : await _libraryRepository.saveGame(_game.gameId!);
+      // Perform save/unsave FIRST
+      final bool success = intendingToSave
+        ? await _libraryRepository.saveGame(_game.gameId!)
+        : await _libraryRepository.unsaveGame(_game.gameId!);
 
       if (success && mounted) {
         setState(() {
-          _isSaved = !_isSaved;
+          _isSaved = intendingToSave;
+          
+          // Unhide if necessary
+          if (shouldUnhide) {
+            _isHidden = false;
+          }
+          
           // Update the game's userActions
-          _game.userActions = _game.userActions?.copyWith(isSaved: _isSaved) ?? 
-              UserGameActions(isSaved: _isSaved);
+          _game.userActions = (_game.userActions ?? UserGameActions()).copyWith(
+             isSaved: _isSaved,
+             isHidden: _isHidden, // Update hidden status
+          );
+
+          print('Updated isSaved: $_isSaved');
+          print('Updated isHidden: $_isHidden');
+          print('Updated userActions: ${_game.userActions}');
         });
         
         // Update in HomeController for other pages
         _homeController.updateGameSaveState(_game.gameId!, _isSaved);
+        if (shouldUnhide) {
+           // TODO: Call HomeController to update hidden status
+           // _homeController.updateGameHiddenState(_game.gameId!, false);
+           print('HomeController hidden state update needed for game ${_game.gameId}: false'); 
+        }
 
-        // Show save animation if game is being saved (not unsaved)
+        // Show save animation if game is being saved
         if (_isSaved) {
           _showSavedNotification();
         }
+
+        // TODO: Add backend call to unhide game if shouldUnhide is true
+        // This might be redundant if saving implicitly unhides on the backend
+        if (shouldUnhide) {
+           print('Backend call needed: unhideGame(${_game.gameId})');
+           // try { await _libraryRepository.unhideGame(_game.gameId!); } catch (e) { ... }
+        }
       }
     } catch (e) {
-      print('Error saving game: $e');
+      print('Error saving/unhiding game: $e');
+       // SnackBar removed
+       // ScaffoldMessenger.of(context).showSnackBar(
+       //   SnackBar(content: Text('Error updating game: ${e.toString()}')),
+       // );
     }
+  }
+
+  // --- New handler for Hide/Unhide button ---
+  Future<void> _handleHideGame() async {
+    if (_game.gameId == null) return;
+
+    final bool intendToHide = !_isHidden;
+
+    // --- Rule: Hiding removes rating, review, saved status ---
+    int? previousRating;
+    String? previousComment;
+    bool wasSaved;
+
+    if (intendToHide) {
+      print('Hide action initiated. Clearing rating, review, save status.');
+      previousRating = _userRating;
+      previousComment = _game.userActions?.comment;
+      wasSaved = _isSaved;
+    } else {
+      // Unhiding doesn't automatically restore previous states
+      print('Unhide action initiated.');
+      wasSaved = false; // To avoid unnecessary backend call check later
+    }
+
+    // TODO: Add backend call placeholder for hide/unhide
+    print('Backend call needed: ${intendToHide ? 'hideGame' : 'unhideGame'}(${_game.gameId})');
+    // try {
+    //   final success = intendToHide 
+    //       ? await _libraryRepository.hideGame(_game.gameId!) 
+    //       : await _libraryRepository.unhideGame(_game.gameId!);
+    //   if (!success) throw Exception('Backend update failed');
+    // } catch (e) {
+    //    print('Error hiding/unhiding game: $e');
+    //    ScaffoldMessenger.of(context).showSnackBar(
+    //      SnackBar(content: Text('Error updating hidden status: ${e.toString()}')),
+    //    );
+    //    return; // Don't update UI if backend failed
+    // }
+
+
+    // Update state after successful backend call (or placeholder)
+    setState(() {
+      _isHidden = intendToHide;
+
+      // If hiding, clear related states
+      if (intendToHide) {
+        _userRating = null;
+        _isSaved = false;
+        // Update game object's actions
+        _game = _game.copyWith(
+          userActions: (_game.userActions ?? UserGameActions()).copyWith(
+            isHidden: true,
+            isRated: false,
+            userRating: null,
+            comment: null,
+            isSaved: false,
+          ),
+        );
+      } else {
+        // If unhiding, just update the hidden flag in the game object
+         _game = _game.copyWith(
+          userActions: (_game.userActions ?? UserGameActions()).copyWith(
+            isHidden: false,
+          ),
+        );
+      }
+       print('Updated isHidden: $_isHidden');
+       print('Updated userRating: $_userRating');
+       print('Updated isSaved: $_isSaved');
+       print('Updated userActions: ${_game.userActions}');
+    });
+
+    // Update HomeController
+    if (_game.gameId != null) {
+       // TODO: Call HomeController to update hidden status
+       // _homeController.updateGameHiddenState(_game.gameId!, _isHidden);
+       print('HomeController hidden state update needed for game ${_game.gameId}: $_isHidden'); 
+
+      // If hiding, update other states in HomeController too
+      if (intendToHide) {
+        _homeController.updateGameRatingState(_game.gameId!, null);
+        _homeController.updateGameComment(_game.gameId!, null);
+        _homeController.updateGameSaveState(_game.gameId!, false);
+      }
+    }
+
+    // TODO: Optional: Add backend calls to remove rating/review/save status if hiding
+    // These might be handled implicitly by the hideGame endpoint, or need separate calls.
+    // if (intendToHide) {
+    //    if (previousRating != null) { /* call remove rating endpoint */ }
+    //    if (previousComment != null) { /* call remove comment endpoint */ }
+    //    if (wasSaved) { /* call unsave endpoint */ }
+    // }
   }
 
   void _showSavedNotification() {
@@ -2767,11 +2958,19 @@ class _GameDetailPageState extends State<GameDetailPage> {
 
   void _handleReviewSubmitted(String review) {
     if (review.isNotEmpty) {
+      // If the game is hidden, submitting a review should ideally unhide it?
+      // Or should review submission be disabled if hidden?
+      // Current implementation allows review submission even if hidden,
+      // but the review UI might not be visible if hidden.
+      // Let's assume for now that the review UI is only accessible when not hidden.
+
       setState(() {
         // Update game userActions with the comment
         _game = _game.copyWith(
           userActions: (_game.userActions ?? UserGameActions()).copyWith(
             comment: review,
+            // Ensure isHidden is preserved
+            isHidden: _isHidden, 
           ),
         );
       });
@@ -2785,28 +2984,8 @@ class _GameDetailPageState extends State<GameDetailPage> {
       if (_game.gameId != null) {
         try {
           // Yorum gönderimini doğrudan HomeController'a kaydettikten sonra
-          // Başarı bildirimi gösterelim
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Row(
-                children: [
-                  Icon(
-                    FontAwesomeIcons.circleCheck,
-                    color: Colors.white,
-                    size: 16,
-                  ),
-                  SizedBox(width: 8),
-                  Text('Review saved!'),
-                ],
-              ),
-              backgroundColor: _userRating != null ? _getRatingColor(_userRating!) : Colors.green,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              margin: const EdgeInsets.all(16),
-            ),
-          );
+          // Başarı bildirimi (SnackBar) kaldırıldı
+          print('Review saved locally and updated in HomeController.');
           
           // TODO: Backend entegrasyonu geçici olarak devre dışı bırakıldı
           final RatingRepository _ratingRepository = RatingRepository();
@@ -2828,27 +3007,28 @@ class _GameDetailPageState extends State<GameDetailPage> {
           }).catchError((error) {
             print('Error submitting comment to backend: $error');
             // Hata durumunda kullanıcıya bilgi verilebilir
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Row(
-                  children: [
-                    Icon(
-                      FontAwesomeIcons.circleExclamation,
-                      color: Colors.white,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 8),
-                    Text('Error saving review: ${error.toString()}'),
-                  ],
-                ),
-                backgroundColor: Colors.red[700],
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                margin: const EdgeInsets.all(16),
-              ),
-            );
+            // Hata SnackBar'ı kaldırıldı
+            // ScaffoldMessenger.of(context).showSnackBar(
+            //   SnackBar(
+            //     content: Row(
+            //       children: [
+            //         Icon(
+            //           FontAwesomeIcons.circleExclamation,
+            //           color: Colors.white,
+            //           size: 16,
+            //         ),
+            //         const SizedBox(width: 8),
+            //         Text('Error saving review: ${error.toString()}'),
+            //       ],
+            //     ),
+            //     backgroundColor: Colors.red[700],
+            //     behavior: SnackBarBehavior.floating,
+            //     shape: RoundedRectangleBorder(
+            //       borderRadius: BorderRadius.circular(10),
+            //     ),
+            //     margin: const EdgeInsets.all(16),
+            //   ),
+            // );
             // Comment is still saved locally even if backend fails
           });
           // /* Yorum satırını kaldırıyoruz */

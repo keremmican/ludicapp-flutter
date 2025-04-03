@@ -43,29 +43,20 @@ class BannedPage extends StatelessWidget {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: () {
-                    // TODO: Add support email or contact form link
-                    // For now, just show a snackbar
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Support contact feature coming soon'),
-                      ),
-                    );
-                  },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.accentColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'Contact Support',
-                    style: TextStyle(
-                      color: Colors.black,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                    textStyle: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
+                      fontFamily: 'LeagueSpartan',
                     ),
                   ),
+                  onPressed: () {
+                    // TODO: Implement support contact logic
+                    print("Contact Support Pressed");
+                  },
+                  child: const Text('Contact Support'),
                 ),
               ),
             ],

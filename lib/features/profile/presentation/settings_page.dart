@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ludicapp/features/authentication/presentation/login_page.dart';
 import 'package:ludicapp/theme/app_theme.dart';
 import 'package:ludicapp/services/api_service.dart';
 import 'package:ludicapp/services/token_service.dart';
 import 'package:ludicapp/services/repository/auth_repository.dart';
+import 'package:ludicapp/providers/theme_provider.dart';
 
-class SettingsPage extends StatefulWidget {
+class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({Key? key}) : super(key: key);
 
   @override
-  State<SettingsPage> createState() => _SettingsPageState();
+  ConsumerState<SettingsPage> createState() => _SettingsPageState();
 }
 
-class _SettingsPageState extends State<SettingsPage> {
+class _SettingsPageState extends ConsumerState<SettingsPage> {
   final _apiService = ApiService();
   final _tokenService = TokenService();
   final _authRepository = AuthRepository();
@@ -52,19 +54,47 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final ThemeMode currentThemeMode = ref.watch(themeProvider);
+    final themeNotifier = ref.read(themeProvider.notifier);
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppTheme.surfaceDark,
-        title: const Text('Settings', style: TextStyle(color: Colors.white)),
-        iconTheme: const IconThemeData(color: Colors.white),
+        title: Text('Settings', style: theme.appBarTheme.titleTextStyle),
+        iconTheme: theme.appBarTheme.iconTheme,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
       ),
       body: ListView(
         padding: const EdgeInsets.all(10.0),
         children: [
-          // Account Section
+          _buildSectionHeader('APPEARANCE'),
+          _buildThemeSelectionTile(
+            title: 'Light',
+            mode: ThemeMode.light,
+            currentMode: currentThemeMode,
+            onChanged: (mode) => themeNotifier.setThemeMode(mode!),
+            theme: theme,
+          ),
+          _buildThemeSelectionTile(
+            title: 'Dark',
+            mode: ThemeMode.dark,
+            currentMode: currentThemeMode,
+            onChanged: (mode) => themeNotifier.setThemeMode(mode!),
+            theme: theme,
+          ),
+          _buildThemeSelectionTile(
+            title: 'System Default',
+            mode: ThemeMode.system,
+            currentMode: currentThemeMode,
+            onChanged: (mode) => themeNotifier.setThemeMode(mode!),
+            theme: theme,
+          ),
+
+          const SizedBox(height: 20),
+
           _buildSectionHeader('ACCOUNT'),
           _buildListTile('Profile', Icons.person, onTap: () {
             print('Profile clicked');
@@ -84,7 +114,6 @@ class _SettingsPageState extends State<SettingsPage> {
 
           const SizedBox(height: 20),
 
-          // Support Section
           _buildSectionHeader('SUPPORT'),
           _buildListTile('FAQ', Icons.help_outline, onTap: () {
             print('FAQ clicked');
@@ -107,13 +136,12 @@ class _SettingsPageState extends State<SettingsPage> {
             onTap: () {
               print('Delete Account clicked');
             },
-            textColor: Colors.red,
+            textColor: colorScheme.error,
           ),
 
           const SizedBox(height: 20),
 
-          // Sign Out Button
-          _buildSignOutButton(context),
+          _buildSignOutButton(context, colorScheme.error),
         ],
       ),
     );
@@ -124,35 +152,52 @@ class _SettingsPageState extends State<SettingsPage> {
       padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 15.0),
       child: Text(
         title,
-        style: const TextStyle(
-          color: Colors.grey,
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-        ),
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Theme.of(context).hintColor),
       ),
     );
   }
 
   Widget _buildListTile(String title, IconData icon,
-      {required VoidCallback onTap, Color textColor = Colors.white}) {
+      {required VoidCallback onTap, Color? textColor}) {
+    final theme = Theme.of(context);
+    final effectiveTextColor = textColor ?? theme.listTileTheme.textColor ?? theme.colorScheme.onSurface;
+    final iconColor = textColor ?? theme.listTileTheme.iconColor ?? theme.iconTheme.color;
+
     return ListTile(
       onTap: onTap,
       title: Text(
         title,
-        style: TextStyle(color: textColor, fontSize: 16),
+        style: TextStyle(color: effectiveTextColor, fontSize: 16),
       ),
-      leading: Icon(icon, color: textColor == Colors.red ? Colors.red : Colors.grey),
+      leading: Icon(icon, color: iconColor),
       contentPadding: const EdgeInsets.symmetric(horizontal: 15.0),
-      trailing: const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 16),
+      trailing: Icon(Icons.arrow_forward_ios, color: theme.hintColor, size: 16),
     );
   }
 
-  Widget _buildSignOutButton(BuildContext context) {
+  Widget _buildThemeSelectionTile({
+    required String title,
+    required ThemeMode mode,
+    required ThemeMode currentMode,
+    required ValueChanged<ThemeMode?> onChanged,
+    required ThemeData theme,
+  }) {
+    return RadioListTile<ThemeMode>(
+      title: Text(title, style: TextStyle(color: theme.colorScheme.onSurface)),
+      value: mode,
+      groupValue: currentMode,
+      onChanged: onChanged,
+      activeColor: theme.colorScheme.primary,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 15.0),
+    );
+  }
+
+  Widget _buildSignOutButton(BuildContext context, Color color) {
     return ListTile(
       onTap: () => _handleLogout(context),
-      title: const Text(
+      title: Text(
         'Sign Out',
-        style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16),
+        style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 16),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 15.0),
     );

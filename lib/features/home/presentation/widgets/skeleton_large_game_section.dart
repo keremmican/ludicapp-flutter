@@ -92,10 +92,11 @@ class _SkeletonLargeGameSectionState extends State<SkeletonLargeGameSection> wit
             padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 8.0),
             child: Text(
               widget.title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                // Temaya göre renk seçimi
+                color: Theme.of(context).textTheme.titleMedium?.color,
               ),
             ),
           ),
@@ -128,7 +129,8 @@ class _SkeletonLargeGameSectionState extends State<SkeletonLargeGameSection> wit
         final animValue = (_animation.value + delay) % 1.0;
         
         return Container(
-          width: 280,
+          width: 190,
+          height: 200 * (1942 / 1559),
           decoration: BoxDecoration(
             color: Colors.grey[850],
             borderRadius: BorderRadius.circular(12),

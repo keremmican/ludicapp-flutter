@@ -63,7 +63,7 @@ class ProfileHeader extends StatelessWidget {
             ),
             child: IconButton(
               onPressed: onSettingsPressed,
-              icon: const Icon(Icons.settings, color: Color(0xFFBFE429)),
+              icon: Icon(Icons.settings, color: Theme.of(context).colorScheme.primary),
             ),
           ),
         ),
@@ -87,7 +87,7 @@ class ProfileHeader extends StatelessWidget {
                   ),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: const Color(0xFFBFE429),
+                    color: Theme.of(context).colorScheme.primary,
                     width: 2,
                   ),
                 ),
@@ -97,8 +97,8 @@ class ProfileHeader extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 username,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: Theme.of(context).textTheme.titleLarge?.color,
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                 ),
@@ -130,6 +130,7 @@ class ProfileHeader extends StatelessWidget {
 
                     // Followers
                     _buildStat(
+                      context: context,
                       label: 'Followers',
                       value: followersCount.toString(),
                       onTap: onFollowersPressed,
@@ -139,6 +140,7 @@ class ProfileHeader extends StatelessWidget {
 
                     // Following
                     _buildStat(
+                      context: context,
                       label: 'Following',
                       value: followingCount.toString(),
                       onTap: onFollowingPressed,
@@ -162,6 +164,7 @@ class ProfileHeader extends StatelessWidget {
   }
 
   Widget _buildStat({
+    required BuildContext context,
     required String label,
     required String value,
     required VoidCallback onTap,
@@ -173,8 +176,8 @@ class ProfileHeader extends StatelessWidget {
         children: [
           Text(
             value,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: Theme.of(context).textTheme.bodyLarge?.color,
               fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
@@ -183,7 +186,7 @@ class ProfileHeader extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: Colors.grey[400],
+              color: Theme.of(context).hintColor,
               fontSize: 14,
             ),
           ),

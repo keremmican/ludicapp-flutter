@@ -108,7 +108,9 @@ class _SplashScreenState extends State<SplashScreen> {
       final newReleasesResponse = await _gameRepository.fetchNewReleasesWithUserInfo();
       final topRatedResponse = await _gameRepository.fetchTopRatedGamesWithUserInfo();
       final comingSoonResponse = await _gameRepository.fetchComingSoonWithUserInfo();
-      print('Game lists loaded');
+      // Fetch Currently Playing games
+      final currentlyPlayingGames = await _libraryRepository.getCurrentlyPlayingGames(); 
+      print('Game lists loaded (including Currently Playing)');
 
       GameSummary? popularGameByVisits;
       if (SplashScreen.visitsPopularityTypeId != null) {
@@ -143,15 +145,28 @@ class _SplashScreenState extends State<SplashScreen> {
           _homeController.processUserGameInfo(item);
           return item.gameDetails;
         }).toList(),
+        // Pass currently playing games to HomeController
+        currentlyPlayingGames: currentlyPlayingGames.map((item) {
+          _homeController.processUserGameInfo(item); // Process user info for these too
+          return item.gameDetails;
+        }).toList(),
         popularGameByVisits: popularGameByVisits,
       );
 
-      // Önemli resimleri önceden yükle
+      // Önemli resimleri önceden yükle (Include Currently Playing covers)
       final imagesToPreload = <String>[];
       
       if (popularGameByVisits?.coverUrl != null && 
           popularGameByVisits!.coverUrl!.startsWith('http')) {
         imagesToPreload.add(popularGameByVisits.coverUrl!);
+      }
+      
+      // Preload Currently Playing covers
+      for (int i = 0; i < min(3, currentlyPlayingGames.length); i++) {
+        final game = currentlyPlayingGames[i].gameDetails;
+        if (game.coverUrl != null && game.coverUrl!.startsWith('http')) {
+          imagesToPreload.add(game.coverUrl!);
+        }
       }
       
       for (int i = 0; i < min(3, newReleasesResponse.content.length); i++) {

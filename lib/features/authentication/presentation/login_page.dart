@@ -421,7 +421,7 @@ class _LoginPageState extends State<LoginPage> {
                                   'Resend Code',
                                   style: TextStyle(
                                     color: _remainingSeconds == 0 && !_isLoading 
-                                        ? AppTheme.accentColor 
+                                        ? Theme.of(context).colorScheme.primary
                                         : Colors.grey,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -444,18 +444,18 @@ class _LoginPageState extends State<LoginPage> {
                 child: ElevatedButton(
                   onPressed: _currentStep == 0 && !_isUserValid || _isLoading ? null : _handleContinue,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _isUserValid ? AppTheme.accentColor : Colors.grey,
+                    backgroundColor: _isUserValid ? Theme.of(context).colorScheme.primary : Colors.grey,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                   child: _isLoading
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 24,
                           height: 24,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+                            valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.primary),
                           ),
                         )
                       : Row(
@@ -502,7 +502,7 @@ class _LoginPageState extends State<LoginPage> {
           Container(
             padding: const EdgeInsets.symmetric(vertical: 12),
             decoration: BoxDecoration(
-              color: isSelected ? AppTheme.accentColor : Colors.transparent,
+              color: isSelected ? Theme.of(context).colorScheme.primary : Colors.transparent,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
@@ -548,7 +548,7 @@ class _LoginPageState extends State<LoginPage> {
           padding: const EdgeInsets.all(15.0),
           child: CircularProgressIndicator(
             strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(AppTheme.accentColor),
+            valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.primary),
           ),
         ),
       );

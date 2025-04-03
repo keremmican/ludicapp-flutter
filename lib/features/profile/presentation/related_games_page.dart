@@ -1079,8 +1079,6 @@ class _GameCardState extends State<GameCard> {
                         fit: BoxFit.cover,
                         width: double.infinity,
                         height: double.infinity,
-                        memCacheHeight: 300,
-                        memCacheWidth: 200,
                         fadeInDuration: const Duration(milliseconds: 0),
                         placeholder: (context, url) => Container(color: Colors.grey[800]),
                         errorWidget: (context, url, error) => Container(

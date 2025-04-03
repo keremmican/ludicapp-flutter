@@ -605,15 +605,15 @@ class _SearchPageState extends State<SearchPage> with SingleTickerProviderStateM
         ),
         title: Text(
           user.name,
-          style: const TextStyle(
-            color: AppTheme.textPrimary,
+          style: TextStyle(
+            color: Theme.of(context).textTheme.titleMedium?.color ?? Colors.white,
             fontSize: 16,
             fontWeight: FontWeight.w500,
           ),
         ),
-        trailing: const Icon(
+        trailing: Icon(
           Icons.arrow_forward_ios,
-          color: AppTheme.accentColor,
+          color: Theme.of(context).colorScheme.primary,
           size: 18,
         ),
         onTap: () {
@@ -633,9 +633,9 @@ class _SearchPageState extends State<SearchPage> with SingleTickerProviderStateM
 
   Widget _buildUserAvatar(SearchUser user) {
     if (user.imageUrl == null || user.imageUrl!.isEmpty) {
-      return const Icon(
+      return Icon(
         Icons.person,
-        color: AppTheme.textSecondary,
+        color: Theme.of(context).hintColor,
         size: 30,
       );
     }
@@ -647,9 +647,9 @@ class _SearchPageState extends State<SearchPage> with SingleTickerProviderStateM
         height: 50,
         fit: BoxFit.cover,
         placeholder: (context, url) => const CircleAvatar(backgroundColor: AppTheme.primaryDark),
-        errorWidget: (context, url, error) => const Icon(
+        errorWidget: (context, url, error) => Icon(
           Icons.person,
-          color: AppTheme.textSecondary,
+          color: Theme.of(context).hintColor,
           size: 30,
         ),
       ),
@@ -745,14 +745,16 @@ Widget build(BuildContext context) {
             ),
             child: TabBar(
               controller: _tabController,
+              indicatorSize: TabBarIndicatorSize.label,
+              labelColor: Theme.of(context).colorScheme.primary,
+              unselectedLabelColor: Theme.of(context).hintColor,
+              indicator: UnderlineTabIndicator(
+                borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2.0),
+              ),
               tabs: const [
                 Tab(text: 'Games'),
                 Tab(text: 'Users'),
               ],
-              labelColor: AppTheme.accentColor,
-              unselectedLabelColor: Colors.grey[400],
-              indicatorColor: AppTheme.accentColor,
-              indicatorWeight: 3,
             ),
           ),
         ),

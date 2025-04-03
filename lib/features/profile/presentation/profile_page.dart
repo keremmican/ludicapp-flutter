@@ -11,7 +11,12 @@ import 'package:ludicapp/models/profile_response.dart';
 import 'package:ludicapp/services/model/response/library_summary_response.dart';
 import 'dart:math';
 import 'settings_page.dart';
-import 'related_games_page.dart';
+import 'library_detail_page.dart';
+import 'user_ratings_page.dart';
+import 'all_libraries_page.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:ludicapp/core/enums/library_type.dart';
+import 'package:ludicapp/services/model/response/paged_response.dart';
 import 'package:ludicapp/services/repository/library_repository.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -38,6 +43,15 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _isCurrentUser = false;
   bool _isLoading = false;
   bool _isFollowing = false;
+  int? _currentUserId; // Kullanıcının kendi ID'si
+
+  // State for Followed Libraries
+  List<LibrarySummaryResponse> _followedLibraries = [];
+  bool _isLoadingFollowed = false;
+  bool _hasMoreFollowed = true;
+  int _currentPageFollowed = 0;
+  String? _errorFollowed;
+  ScrollController _followedScrollController = ScrollController(); // For potential pagination
 
   static const List<String> mockImages = [
     'lib/assets/images/mock_games/game1.jpg',
@@ -52,40 +66,49 @@ class _ProfilePageState extends State<ProfilePage> {
   void initState() {
     super.initState();
     _initializeProfile();
+    _followedScrollController.addListener(_onFollowedScroll); // Add listener if pagination needed
   }
 
-  void _initializeProfile() {
-    if (widget.isBottomNavigation) {
-      // Bottom navigation'dan geliyorsa direkt SplashScreen verilerini kullan
-      setState(() {
-        _profileData = SplashScreen.profileData;
-        _isCurrentUser = true;
-      });
-      // Arkaplanda güncelle
-      _refreshCurrentUserData();
-    } else {
-      _loadProfile();
-    }
+  @override
+  void dispose() {
+    _followedScrollController.dispose();
+    super.dispose();
   }
 
-  Future<void> _loadProfile() async {
+  // Listener for followed libraries pagination (optional)
+  void _onFollowedScroll() {
+    // Implement pagination logic if showing many followed libraries
+    // Similar to other pagination implementations
+  }
+
+  Future<void> _initializeProfile() async {
+    setState(() => _isLoading = true);
     try {
       final currentUserId = await _tokenService.getUserId();
       _isCurrentUser = widget.userId == null || widget.userId == currentUserId.toString();
+      _currentUserId = currentUserId; // Kullanıcı ID'sini kaydet
 
       if (_isCurrentUser) {
-        setState(() {
-          _profileData = SplashScreen.profileData;
-        });
-        // Arkaplanda güncelle
-        _refreshCurrentUserData();
+        // Use SplashScreen data for initial display
+        _profileData = SplashScreen.profileData;
+        // Refresh current user data in background
+        _refreshCurrentUserData(); 
       } else {
-        setState(() => _isLoading = true);
+        // Load other user's profile data
         await _loadOtherUserProfile();
       }
+      
+      // Always load followed libraries after determining the target user
+      await _loadFollowedLibraries(); 
+
     } catch (e) {
-      print('Error loading profile: $e');
-      if (!_isCurrentUser) {
+      print('Error initializing profile: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    } finally {
+      // Ensure initial loading indicator is turned off if not already done
+      if (mounted && _isLoading) {
         setState(() => _isLoading = false);
       }
     }
@@ -136,6 +159,68 @@ class _ProfilePageState extends State<ProfilePage> {
       print('Error loading other user profile: $e');
       if (mounted) {
         setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  // Method to load followed libraries
+  Future<void> _loadFollowedLibraries({bool loadMore = false}) async {
+    if (_isLoadingFollowed) return; 
+    
+    // Determine the target user ID
+    final int? targetUserId;
+    if (_isCurrentUser) {
+      targetUserId = await _tokenService.getUserId();
+    } else {
+      targetUserId = int.tryParse(widget.userId ?? '');
+    }
+
+    if (targetUserId == null) {
+      print('Could not determine target user ID for followed libraries.');
+      if (mounted) setState(() { _errorFollowed = 'Could not find user.'; });
+      return; // Cannot proceed without a user ID
+    }
+
+    setState(() {
+      _isLoadingFollowed = true;
+      if (!loadMore) {
+        _errorFollowed = null;
+        _currentPageFollowed = 0;
+        _followedLibraries = [];
+        _hasMoreFollowed = true;
+      }
+    });
+
+    try {
+      final response = await _libraryRepository.getFollowedLibrariesByUser(
+        targetUserId,
+        page: _currentPageFollowed,
+        size: 10, // Load fewer for profile preview
+      );
+
+      if (response != null && mounted) {
+        setState(() {
+          _followedLibraries.addAll(response.content);
+          _hasMoreFollowed = !response.last;
+          if (_hasMoreFollowed) {
+            _currentPageFollowed++;
+          }
+        });
+      } else if (response == null && mounted) {
+        _hasMoreFollowed = false;
+      }
+    } catch (e) {
+      print('Error loading followed libraries: $e');
+      if (mounted && !loadMore) {
+        setState(() {
+          _errorFollowed = 'Failed to load followed libraries.';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingFollowed = false;
+        });
       }
     }
   }
@@ -231,7 +316,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 right: 16,
               ),
               decoration: BoxDecoration(
-                color: AppTheme.primaryDark,
+                color: Theme.of(context).scaffoldBackgroundColor,
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.1),
@@ -241,7 +326,9 @@ class _ProfilePageState extends State<ProfilePage> {
                 ],
                 border: Border(
                   bottom: BorderSide(
-                    color: Colors.grey[900]!,
+                    color: Theme.of(context).brightness == Brightness.dark 
+                        ? Colors.grey[900]! 
+                        : Colors.grey[300]!,
                     width: 1,
                   ),
                 ),
@@ -250,20 +337,26 @@ class _ProfilePageState extends State<ProfilePage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+                    icon: Icon(
+                      Icons.arrow_back_ios, 
+                      color: Theme.of(context).iconTheme.color,
+                    ),
                     onPressed: () => Navigator.pop(context),
                   ),
                   Text(
                     _profileData?.username ?? '',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: Theme.of(context).textTheme.titleLarge?.color,
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   if (!_isCurrentUser)
                     IconButton(
-                      icon: const Icon(Icons.more_vert, color: Colors.white),
+                      icon: Icon(
+                        Icons.more_vert, 
+                        color: Theme.of(context).iconTheme.color,
+                      ),
                       onPressed: _showMoreOptions,
                     )
                   else
@@ -302,7 +395,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 80),
+                  const SizedBox(height: 50),
                   if (_isCurrentUser) ...[
                     Container(
                       width: double.infinity,
@@ -312,21 +405,21 @@ class _ProfilePageState extends State<ProfilePage> {
                           context,
                           MaterialPageRoute(builder: (context) => const SettingsPage()),
                         ),
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.settings,
-                          color: Colors.black,
+                          color: Theme.of(context).colorScheme.onPrimary,
                           size: 20,
                         ),
-                        label: const Text(
+                        label: Text(
                           'Settings',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: Colors.black,
+                            color: Theme.of(context).colorScheme.onPrimary,
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.accentColor,
+                          backgroundColor: Theme.of(context).colorScheme.primary,
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                           elevation: 2,
                           shadowColor: Colors.black.withOpacity(0.3),
@@ -345,7 +438,9 @@ class _ProfilePageState extends State<ProfilePage> {
                         onPressed: _toggleFollow,
                         icon: Icon(
                           _isFollowing ? Icons.check : Icons.add,
-                          color: _isFollowing ? Colors.grey[400] : Colors.black,
+                          color: _isFollowing 
+                              ? Colors.white 
+                              : Theme.of(context).colorScheme.onPrimary,
                           size: 20,
                         ),
                         label: Text(
@@ -353,11 +448,13 @@ class _ProfilePageState extends State<ProfilePage> {
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: _isFollowing ? Colors.grey[400] : Colors.black,
+                            color: _isFollowing 
+                                ? Colors.white 
+                                : Theme.of(context).colorScheme.onPrimary,
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: _isFollowing ? Colors.grey[800] : AppTheme.accentColor,
+                          backgroundColor: _isFollowing ? Colors.grey[800] : Theme.of(context).colorScheme.primary,
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                           elevation: 2,
                           shadowColor: Colors.black.withOpacity(0.3),
@@ -371,14 +468,30 @@ class _ProfilePageState extends State<ProfilePage> {
                   ],
                   _buildSectionHeader(
                     context,
-                    'My Library',
+                    _isCurrentUser ? 'My Library' : '${_profileData?.username ?? 'User'}\'s Library',
                     onSeeAll: () {
-                      print('See all library items');
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => AllLibrariesPage(
+                            username: _profileData?.username ?? 'User',
+                            userId: _isCurrentUser ? null : widget.userId,
+                          ),
+                        ),
+                      );
                     },
                   ),
                   const SizedBox(height: 16),
                   _buildGameLibrary(context),
                   const SizedBox(height: 24),
+
+                  // Followed Libraries Section should be right after user's library
+                  _buildFollowedLibrariesSection(context),
+                  
+                  // Recent Activity Section comes after Followed Libraries
+                  _buildRatedLibrarySection(context, _profileData?.librarySummaries ?? []),
+
+                  // Steam Profile Section (Remains last)
                   _buildSteamProfile(context),
                 ],
               ),
@@ -398,25 +511,49 @@ class _ProfilePageState extends State<ProfilePage> {
       padding: const EdgeInsets.symmetric(horizontal: 20.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(
+                color: Theme.of(context).textTheme.titleLarge?.color,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
             ),
           ),
+          const SizedBox(width: 16),
           if (onSeeAll != null)
             TextButton(
               onPressed: onSeeAll,
-              child: Text(
-                'See All',
-                style: TextStyle(
-                  color: AppTheme.accentColor,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.15),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
                 ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'See All',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 12,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ],
               ),
             ),
         ],
@@ -430,57 +567,257 @@ class _ProfilePageState extends State<ProfilePage> {
       : (_profileData?.librarySummaries ?? []);
     
     if (librarySummaries.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
           'No libraries found',
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color),
         ),
       );
     }
 
-    return GridView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 1.5,
-      ),
-      itemCount: librarySummaries.length,
-      itemBuilder: (context, index) {
-        final summary = librarySummaries[index];
-        return _buildCategoryCard(
-          context,
-          title: summary.displayName,
-          imagePath: summary.coverUrl ?? mockImages[Random().nextInt(mockImages.length)],
-          count: summary.gameCount.toString(),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) =>
-                    RelatedGamesPage(
-                      categoryTitle: summary.displayName,
-                      libraryId: summary.id,
-                    ),
-              ),
-            );
-          },
-        );
-      },
+    return Column(
+      children: [
+        // Horizontal scrollable library list (Spotify style)
+        SizedBox(
+          height: 220,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: librarySummaries.length,
+            itemBuilder: (context, index) {
+              final summary = librarySummaries[index];
+              
+              // Kullanıcı kendi profili dışında bir profil görüntülüyorsa ve kütüphane takip edilebilir bir türdeyse
+              // örneğin, CUSTOM tipindeki kütüphaneleri takip edebilir
+              final bool isFollowableLibrary = !_isCurrentUser && widget.fromSearch && summary.libraryType == LibraryType.CUSTOM;
+              
+              return _buildSpotifyStyleLibraryCard(
+                context,
+                librarySummary: summary,
+                imagePath: summary.coverUrl ?? mockImages[Random().nextInt(mockImages.length)],
+                isFollowable: isFollowableLibrary,
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildCategoryCard(
+  Widget _buildSpotifyStyleLibraryCard(
     BuildContext context, {
-    required String title,
+    required LibrarySummaryResponse librarySummary,
     required String imagePath,
-    required String count,
-    required VoidCallback onTap,
+    bool isFollowable = false,
   }) {
-    IconData getLibraryIcon() {
+    final String title = librarySummary.displayName;
+    final String count = librarySummary.gameCount.toString();
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => LibraryDetailPage(
+              librarySummary: librarySummary,
+              userId: widget.userId,
+              isFollowable: isFollowable,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        width: 160,
+        height: 212, // Fixed height to prevent overflow
+        margin: const EdgeInsets.only(right: 16, bottom: 8),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardTheme.color,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Cover image - fixed height
+            SizedBox(
+              height: 160,
+              child: ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  topRight: Radius.circular(12),
+                ),
+                child: imagePath.startsWith('http')
+                  ? CachedNetworkImage(
+                      imageUrl: imagePath,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      height: 160,
+                      placeholder: (context, url) => Container(color: Colors.grey[800]),
+                      errorWidget: (context, url, error) => Container(
+                        color: Colors.grey[800],
+                        child: Center(
+                          child: Icon(
+                            _getLibraryIcon(title),
+                            color: Colors.white.withOpacity(0.9),
+                            size: 40,
+                          ),
+                        ),
+                      ),
+                    )
+                  : Container(
+                      width: double.infinity,
+                      height: 160,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: _getLibraryGradient(title),
+                        ),
+                      ),
+                      child: Center(
+                        child: Icon(
+                          _getLibraryIcon(title),
+                          color: Colors.white.withOpacity(0.9),
+                          size: 40,
+                        ),
+                      ),
+                    ),
+              ),
+            ),
+            
+            // Title and count - limited space
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: Theme.of(context).textTheme.titleMedium?.color,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$count Games',
+                      style: TextStyle(
+                        color: Theme.of(context).textTheme.bodySmall?.color,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildRatedLibrarySection(BuildContext context, List<LibrarySummaryResponse> libraries) {
+    // Find the rated library if it exists
+    final ratedLibraryList = libraries.where((lib) => lib.libraryType == LibraryType.RATED).toList();
+    
+    // Return an empty state with a message instead of completely hiding the section
+    if (ratedLibraryList.isEmpty || (_isCurrentUser && ratedLibraryList.first.gameCount == 0)) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader(
+            context,
+            'Recent Activity',
+            onSeeAll: null, // No See All button for empty state
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 100,
+            child: Center(
+              child: Text(
+                _isCurrentUser 
+                  ? 'You don\'t have any recent activity yet.' 
+                  : '${_profileData?.username ?? "This user"} doesn\'t have any recent activity yet.',
+                style: TextStyle(color: Colors.grey[500]),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+      );
+    }
+    
+    final ratedLibrary = ratedLibraryList.first;
+    return _buildRatedGamesSection(context, ratedLibrary);
+  }
+
+  Widget _buildRatedGamesSection(BuildContext context, LibrarySummaryResponse ratedLibrary) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader(
+          context, 
+          'Recent Activity',
+          onSeeAll: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => UserRatingsPage(
+                  userId: _isCurrentUser ? null : widget.userId,
+                  username: _profileData?.username ?? 'User',
+                ),
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 16),
+        
+        // Content of rated games section
+        SizedBox(
+          height: 180,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: min(ratedLibrary.gameCount, 10), // Limit to 10 or available games
+            itemBuilder: (context, index) {
+              // Placeholder for actual game items
+              return Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Container(
+                  width: 120,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardTheme.color,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Game ${index + 1}',
+                      style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  IconData _getLibraryIcon(String title) {
       switch (title) {
         case 'Saved':
           return Icons.bookmark;
@@ -495,7 +832,7 @@ class _ProfilePageState extends State<ProfilePage> {
       }
     }
 
-    List<Color> getLibraryGradient() {
+  List<Color> _getLibraryGradient(String title) {
       switch (title) {
         case 'Saved':
           return [Color(0xFF6A3093), Color(0xFFA044FF)];
@@ -508,81 +845,6 @@ class _ProfilePageState extends State<ProfilePage> {
         default:
           return [Color(0xFF4B79A1), Color(0xFF283E51)];
       }
-    }
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          gradient: imagePath.startsWith('http')
-              ? null
-              : LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: getLibraryGradient(),
-                ),
-          image: imagePath.startsWith('http')
-              ? DecorationImage(
-                  image: NetworkImage(imagePath),
-                  fit: BoxFit.cover,
-                  colorFilter: ColorFilter.mode(
-                    Colors.black.withOpacity(0.2),
-                    BlendMode.darken,
-                  ),
-                )
-              : null,
-        ),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Colors.transparent,
-                Colors.black.withOpacity(0.8),
-              ],
-            ),
-          ),
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              if (!imagePath.startsWith('http')) ...[
-                Expanded(
-                  child: Center(
-                    child: Icon(
-                      getLibraryIcon(),
-                      color: Colors.white.withOpacity(0.9),
-                      size: 40,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-              ],
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '$count Games',
-                style: TextStyle(
-                  color: Colors.grey[300],
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   Widget _buildSteamProfile(BuildContext context) {
@@ -596,7 +858,7 @@ class _ProfilePageState extends State<ProfilePage> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: AppTheme.surfaceDark,
+              color: Theme.of(context).cardTheme.color,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: Colors.grey.withOpacity(0.1),
@@ -606,18 +868,21 @@ class _ProfilePageState extends State<ProfilePage> {
             child: Column(
               children: [
                 _buildSteamStat(
+                  context: context,
                   icon: Icons.sports_esports,
                   label: 'Games Played',
                   value: '120',
                 ),
                 const SizedBox(height: 16),
                 _buildSteamStat(
+                  context: context,
                   icon: Icons.emoji_events,
                   label: 'Achievements',
                   value: '350',
                 ),
                 const SizedBox(height: 16),
                 _buildSteamStat(
+                  context: context,
                   icon: Icons.timer,
                   label: 'Hours Played',
                   value: '540',
@@ -631,6 +896,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _buildSteamStat({
+    required BuildContext context,
     required IconData icon,
     required String label,
     required String value,
@@ -640,12 +906,12 @@ class _ProfilePageState extends State<ProfilePage> {
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: AppTheme.accentColor.withOpacity(0.1),
+            color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
             icon,
-            color: AppTheme.accentColor,
+            color: Theme.of(context).colorScheme.primary,
             size: 20,
           ),
         ),
@@ -657,15 +923,15 @@ class _ProfilePageState extends State<ProfilePage> {
               Text(
                 label,
                 style: TextStyle(
-                  color: Colors.grey[400],
+                  color: Theme.of(context).textTheme.bodySmall?.color,
                   fontSize: 14,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
                 value,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: Theme.of(context).textTheme.bodyLarge?.color,
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
@@ -674,6 +940,118 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ),
       ],
+    );
+  }
+
+  // --- Section for Followed Libraries ---
+  Widget _buildFollowedLibrariesSection(BuildContext context) {
+    final String sectionTitle = _isCurrentUser 
+        ? 'Libraries You Follow' 
+        : '${_profileData?.username ?? "User"}\'s Followed Libraries'; // Use username if available
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader(
+          context,
+          sectionTitle,
+          onSeeAll: () {
+            final String? targetUserIdString = _isCurrentUser ? null : widget.userId;
+            Navigator.push(
+              context, 
+              MaterialPageRoute(
+                builder: (_) => AllLibrariesPage(
+                  username: _profileData?.username ?? (_isCurrentUser ? 'Your' : 'User'),
+                  userId: targetUserIdString,
+                  fetchFollowedLibraries: true,
+                )
+              )
+            );
+            print('See All Followed Libraries tapped for user: $targetUserIdString');
+          },
+        ),
+        const SizedBox(height: 16),
+        _buildFollowedLibrariesContent(),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  // Helper widget to build the content of the followed libraries section
+  Widget _buildFollowedLibrariesContent() {
+    // Loading state (show loader only if the list is currently empty)
+    if (_isLoadingFollowed && _followedLibraries.isEmpty) {
+      return const SizedBox(
+        height: 220, // Maintain consistent height
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // Error state (show error only if the list is empty)
+    if (_errorFollowed != null && _followedLibraries.isEmpty) {
+      return SizedBox(
+        height: 220, // Maintain consistent height
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0),
+            child: Text(_errorFollowed!, style: const TextStyle(color: Colors.redAccent), textAlign: TextAlign.center),
+          )
+        ),
+      );
+    }
+
+    // Empty state (show a message if loading is finished and list is empty)
+    if (_followedLibraries.isEmpty && !_isLoadingFollowed) {
+      return SizedBox(
+        height: 220, // Maintain consistent height
+        child: Center(
+          child: Text(
+            _isCurrentUser ? 'You are not following any libraries yet.' : 'This user isn\'t following any libraries yet.',
+            style: TextStyle(color: Colors.grey[500]),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+
+    // If we have libraries, show the list
+    return SizedBox(
+      height: 220, // Same height as user's own library section
+      child: ListView.builder(
+        controller: _followedScrollController,
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        // Add 1 for loader if loading more
+        itemCount: _followedLibraries.length + (_isLoadingFollowed && _hasMoreFollowed ? 1 : 0),
+        itemBuilder: (context, index) {
+          // Loader at the end
+          if (index == _followedLibraries.length) {
+            return Container(
+              width: 160, // Match card width
+              height: 212,
+              child: const Center(child: CircularProgressIndicator()),
+            );
+          }
+          // Library card
+          final summary = _followedLibraries[index];
+          
+          // Takip edilen kütüphaneler için hepsini takip edilebilir olarak işaretleyelim
+          // Kullanıcının kendi kütüphanesi olmadığı sürece takip edilebilir olmalı
+          // ownerUserId varsa ve current user ID ile eşleşiyorsa kullanıcının kendi kütüphanesidir
+          final bool isOwnLibrary = summary.ownerUserId != null && 
+                                   _currentUserId != null && 
+                                   summary.ownerUserId == _currentUserId;
+          final bool isFollowableLibrary = !isOwnLibrary; // Kendi kütüphanesi değilse takip edilebilir
+          
+          return _buildSpotifyStyleLibraryCard(
+            context,
+            librarySummary: summary,
+            // Provide a fallback image path if needed
+            imagePath: summary.coverUrl ?? mockImages[Random().nextInt(mockImages.length)],
+            isFollowable: isFollowableLibrary, // Takip edilebilirlik parametresini ekleyelim
+          );
+        },
+      ),
     );
   }
 }

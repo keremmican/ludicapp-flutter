@@ -7,6 +7,13 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Tema renklerini al
+    final theme = Theme.of(context);
+    // İkon rengi: Koyu temada beyaz, açık temada koyu gri
+    final iconColor = theme.brightness == Brightness.dark 
+        ? Colors.white 
+        : Colors.grey[800];
+        
     return AppBar(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       elevation: 0,
@@ -19,7 +26,7 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
           // Notifications Icon
           IconButton(
             icon: const Icon(Icons.notifications),
-            color: Colors.white,
+            color: iconColor, // Tema uyumlu renk
             onPressed: () {
               Navigator.push(
                 context,
@@ -43,7 +50,7 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
           // Search Icon
           IconButton(
             icon: const Icon(Icons.search),
-            color: Colors.white,
+            color: iconColor, // Tema uyumlu renk
             onPressed: () {
               Navigator.push(
                 context,

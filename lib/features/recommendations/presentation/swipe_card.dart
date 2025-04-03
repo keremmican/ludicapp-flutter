@@ -101,12 +101,11 @@ class SwipeCard extends StatelessWidget {
                               Expanded(
                                 child: Text(
                                   game['name']!,
-                                  style: const TextStyle(
+                                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                                     color: Colors.white,
-                                    fontSize: 28,
                                     fontWeight: FontWeight.bold,
                                     letterSpacing: 0.5,
-                                    shadows: [
+                                    shadows: const [
                                       Shadow(
                                         blurRadius: 8.0,
                                         color: Colors.black,

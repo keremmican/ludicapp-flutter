@@ -1,3 +1,5 @@
+import 'package:ludicapp/services/model/response/game_detail_with_user_info.dart';
+
 class GameSummary {
   final int id;
   final String name;
@@ -134,6 +136,78 @@ class GameSummary {
       print('Stack trace: $stackTrace');
       rethrow;
     }
+  }
+
+  // New factory method to create from GameDetailWithUserInfo
+  factory GameSummary.fromGameDetailWithUserInfo(GameDetailWithUserInfo details) {
+    // Extract necessary fields from details.gameDetails
+    // Assuming details.gameDetails is the actual Game object or similar structure
+    // You might need to adjust field access based on the actual structure of GameDetailWithUserInfo
+    final gameDetails = details.gameDetails; // Assuming Game details are nested here
+
+    // Helper to convert nested lists, ensuring they are Map<String, dynamic>
+    List<Map<String, dynamic>> convertNestedList(dynamic list) {
+      if (list == null || list is! List) return [];
+      return list.map((e) {
+        if (e is Map<String, dynamic>) return e;
+        if (e is Map) return Map<String, dynamic>.from(e); // Handle Map<dynamic, dynamic>
+        return <String, dynamic>{}; // Fallback for unexpected types
+      }).toList();
+    }
+    
+    // Helper to convert list of maps with String values (like gameVideos, languageSupports)
+    List<Map<String, String>> convertStringMapList(dynamic list) {
+      if (list == null || list is! List) return [];
+      return list.map((e) {
+        if (e is Map<String, dynamic>) {
+          return e.map((key, value) => MapEntry(key, value?.toString() ?? ''));
+        } else if (e is Map) {
+           return Map<String, dynamic>.from(e).map((key, value) => MapEntry(key, value?.toString() ?? ''));
+        }
+        return <String, String>{}; // Fallback
+      }).toList();
+    }
+
+    // Helper to convert Map<String, int> (like gameTimeToBeats)
+     Map<String, int>? convertTimeMap(dynamic mapData) {
+        if (mapData == null || mapData is! Map) return null;
+        try {
+          return Map<String, dynamic>.from(mapData).map(
+            (key, value) => MapEntry(
+              key.toString(),
+              value is int ? value : (value as num?)?.toInt() ?? 0
+            ),
+          );
+        } catch (e) {
+          print('Error converting gameTimeToBeats from details: $e');
+          return null;
+        }
+      }
+
+    return GameSummary(
+      id: gameDetails.id ?? 0, // Use appropriate ID field (id or gameId)
+      name: gameDetails.name ?? 'Unknown Game',
+      slug: gameDetails.slug ?? gameDetails.name?.toLowerCase().replaceAll(' ', '-') ?? 'unknown-game',
+      coverUrl: gameDetails.coverUrl,
+      releaseDate: gameDetails.releaseDate,
+      totalRating: gameDetails.totalRating,
+      totalRatingCount: gameDetails.totalRatingCount,
+      summary: gameDetails.summary,
+      // Use helpers for nested lists
+      genres: convertNestedList(gameDetails.genres),
+      themes: convertNestedList(gameDetails.themes),
+      platforms: convertNestedList(gameDetails.platforms),
+      companies: convertNestedList(gameDetails.companies),
+      screenshots: List<String>.from(gameDetails.screenshots ?? []),
+      gameVideos: convertStringMapList(gameDetails.gameVideos),
+      websites: gameDetails.websites != null ? Map<String, String>.from(gameDetails.websites!) : null, 
+      gameTimeToBeats: convertTimeMap(gameDetails.gameTimeToBeats), 
+      pegiAgeRating: gameDetails.pegiAgeRating,
+      franchises: convertNestedList(gameDetails.franchises),
+      gameModes: convertNestedList(gameDetails.gameModes),
+      playerPerspectives: convertNestedList(gameDetails.playerPerspectives),
+      languageSupports: convertStringMapList(gameDetails.languageSupports),
+    );
   }
 
   Map<String, dynamic> toJson() {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ludicapp/features/authentication/presentation/landing_page.dart';
 import 'package:ludicapp/features/authentication/presentation/login_page.dart';
 import 'package:ludicapp/features/authentication/presentation/register_page.dart';
@@ -12,36 +13,51 @@ import 'package:ludicapp/services/token_service.dart';
 import 'package:ludicapp/routes.dart';
 import 'package:ludicapp/core/middleware/auth_middleware.dart';
 import 'dart:developer' as developer;
+import 'package:ludicapp/providers/theme_provider.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   // Enable debug logging
   developer.log('Starting app...', name: 'LudicApp');
-  runApp(const MyApp());
+  runApp(
+    const ProviderScope(
+      child: MyApp(),
+    ),
+  );
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
-  Future<bool> _checkIfLoggedIn() async {
-    final tokenService = TokenService();
-    final token = await tokenService.getAccessToken();
-    return token != null;
-  }
-
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ThemeMode currentThemeMode = ref.watch(themeProvider);
+
+    // Sistemin varsayılan metin ölçekleme faktörünü al
+    final systemTextScaleFactor = MediaQuery.textScaleFactorOf(context);
+    // Metin ölçekleme faktörünü sınırla (0.9 ile 1.2 arası)
+    final clampedTextScaleFactor = systemTextScaleFactor.clamp(0.9, 1.2);
+
     return MaterialApp(
       title: 'LudicApp',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: currentThemeMode,
       navigatorKey: ApiService.navigatorKey,
       builder: (context, child) {
-        return ScrollConfiguration(
-          behavior: ScrollBehavior().copyWith(
-            overscroll: false,
-            physics: const ClampingScrollPhysics(),
+        // Önce MediaQuery ile sarmala, sonra ScrollConfiguration
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaler: TextScaler.linear(clampedTextScaleFactor),
           ),
-          child: child ?? const SizedBox(),
+          child: ScrollConfiguration(
+            behavior: ScrollBehavior().copyWith(
+              overscroll: false,
+              physics: const ClampingScrollPhysics(),
+            ),
+            child: child ?? const SizedBox(),
+          ),
         );
       },
       initialRoute: '/splash',

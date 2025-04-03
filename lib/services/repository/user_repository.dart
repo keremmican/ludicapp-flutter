@@ -72,4 +72,28 @@ class UserRepository {
     // After updating user details, refresh the profile
     await refreshCurrentUserProfile();
   }
+
+  // --- Follow/Unfollow Methods ---
+
+  Future<bool> followUser(int userId) async {
+    try {
+      // Assume POST /v1/users/{userId}/follow
+      final response = await _apiService.post('/v1/users/$userId/follow', {});
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error following user $userId: $e');
+      return false;
+    }
+  }
+
+  Future<bool> unfollowUser(int userId) async {
+    try {
+      // Assume DELETE /v1/users/{userId}/follow
+      final response = await _apiService.delete('/v1/users/$userId/follow');
+      return response.statusCode == 200 || response.statusCode == 204;
+    } catch (e) {
+      print('Error unfollowing user $userId: $e');
+      return false;
+    }
+  }
 }

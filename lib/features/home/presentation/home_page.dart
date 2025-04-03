@@ -12,6 +12,9 @@ import 'package:ludicapp/core/models/game.dart';
 import 'package:ludicapp/features/home/presentation/widgets/skeleton_game_section.dart';
 import 'package:ludicapp/features/home/presentation/widgets/skeleton_large_game_section.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:ludicapp/services/repository/library_repository.dart';
+import 'package:ludicapp/features/home/presentation/widgets/add_game_to_library_modal.dart';
+import 'package:ludicapp/core/enums/library_type.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -47,6 +50,9 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
   
   // Scroll pozisyonunu ayarlamak için flag
   bool _isFirstBuild = true;
+  
+  // LibraryRepository instance ekleyelim (eğer yoksa)
+  final LibraryRepository _libraryRepository = LibraryRepository(); 
   
   @override
   bool get wantKeepAlive => true;
@@ -359,11 +365,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
               const SizedBox(height: 16),
 
               // Continue Playing Section
-              ContinuePlayingSection(
-                onAddGamesPressed: () {
-                  // TODO: Implement add games functionality
-                },
-              ),
+              _buildCurrentlyPlayingSection(),
 
               const SizedBox(height: 16),
 
@@ -624,6 +626,35 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildCurrentlyPlayingSection() {
+    return ContinuePlayingSection(
+      onAddGamesPressed: () {
+         // Call the renamed modal with correct parameters
+         AddGameToLibraryModal.show( 
+           context,
+           targetLibraryType: LibraryType.CURRENTLY_PLAYING, 
+           libraryName: "Currently Playing", // Pass the name for title
+           limit: 10, // Pass the limit
+           // targetLibraryId is not needed for CURRENTLY_PLAYING
+         );
+      },
+      onRemoveGamePressed: (gameId) async {
+        // Show loading/confirmation maybe?
+        bool success = await _libraryRepository.removeFromCurrentlyPlaying(gameId);
+        if (success && mounted) {
+          // Directly update HomeController state
+          _controller.removeGameFromCurrentlyPlaying(gameId);
+          // Show success message maybe?
+        } else if (mounted) {
+          // Show error message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to remove game.')),
+          );
+        }
+      },
     );
   }
 }

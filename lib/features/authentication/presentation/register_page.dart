@@ -288,7 +288,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     controller: _pageController,
                     count: 3,
                     effect: ExpandingDotsEffect(
-                      activeDotColor: AppTheme.accentColor,
+                      activeDotColor: Theme.of(context).colorScheme.primary,
                       dotColor: Colors.grey[800]!,
                       dotHeight: 8,
                       dotWidth: 8,
@@ -322,9 +322,10 @@ class _RegisterPageState extends State<RegisterPage> {
                 child: ElevatedButton(
                   onPressed: _currentPage == 0 && !_isUserValid ? null : _nextPage,
                   style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 50),
                     backgroundColor: _currentPage == 0 && !_isUserValid 
                         ? Colors.grey 
-                        : AppTheme.accentColor,
+                        : Theme.of(context).colorScheme.primary,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -582,7 +583,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     'Resend Code',
                     style: TextStyle(
                       color: _remainingSeconds == 0 && !_isLoading 
-                          ? AppTheme.accentColor 
+                          ? Theme.of(context).colorScheme.primary 
                           : Colors.grey,
                       fontWeight: FontWeight.bold,
                     ),
@@ -664,7 +665,7 @@ class _RegisterPageState extends State<RegisterPage> {
           Container(
             padding: const EdgeInsets.symmetric(vertical: 12),
             decoration: BoxDecoration(
-              color: isSelected ? AppTheme.accentColor : Colors.transparent,
+              color: isSelected ? Theme.of(context).colorScheme.primary : Colors.transparent,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
@@ -710,7 +711,7 @@ class _RegisterPageState extends State<RegisterPage> {
           padding: const EdgeInsets.all(15.0),
           child: CircularProgressIndicator(
             strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(AppTheme.accentColor),
+            valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.primary),
           ),
         ),
       );

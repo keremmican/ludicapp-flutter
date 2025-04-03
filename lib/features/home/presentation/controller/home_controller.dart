@@ -40,6 +40,9 @@ class HomeController extends ChangeNotifier {
   bool _isInitialized = false;
   int _currentBatchIndex = 0;
 
+  // Add list for currently playing games
+  List<GameSummary> currentlyPlayingGames = [];
+
   // Tüm popularity type ID'leri (1 hariç çünkü o showcase için kullanılıyor)
   static const List<List<int>> _popularityTypeBatches = [
     [1],
@@ -145,11 +148,13 @@ class HomeController extends ChangeNotifier {
     required List<GameSummary> newReleases,
     required List<GameSummary> topRatedGames,
     required List<GameSummary> comingSoonGames,
+    required List<GameSummary> currentlyPlayingGames,
     GameSummary? popularGameByVisits,
   }) {
     this.newReleases = newReleases;
     this.topRatedGames = topRatedGames;
     this.comingSoonGames = comingSoonGames;
+    this.currentlyPlayingGames = currentlyPlayingGames;
     this.popularGameByVisits = popularGameByVisits;
   }
 
@@ -337,5 +342,22 @@ class HomeController extends ChangeNotifier {
     }
     notifyListeners();
     print('HomeController - Updated comment for $gameId: $comment');
+  }
+
+  // Optional: Add methods to update the currentlyPlayingGames list 
+  // if the modal needs to directly notify the controller.
+  void addGameToCurrentlyPlaying(GameSummary game) {
+    if (!currentlyPlayingGames.any((g) => g.id == game.id)) {
+      currentlyPlayingGames.insert(0, game); // Add to beginning
+      notifyListeners();
+    }
+  }
+
+  void removeGameFromCurrentlyPlaying(int gameId) {
+    final index = currentlyPlayingGames.indexWhere((g) => g.id == gameId);
+    if (index != -1) {
+      currentlyPlayingGames.removeAt(index);
+      notifyListeners();
+    }
   }
 } 

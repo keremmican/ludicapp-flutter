@@ -178,8 +178,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       controller: _pageController,
                       count: 4,
                       effect: ExpandingDotsEffect(
-                        activeDotColor: AppTheme.accentColor,
-                        dotColor: Colors.grey[800]!,
+                        activeDotColor: Theme.of(context).colorScheme.primary,
+                        dotColor: Colors.black26,
                         dotHeight: 8,
                         dotWidth: 8,
                         spacing: 8,
@@ -212,7 +212,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   child: ElevatedButton(
                     onPressed: _nextPage,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.accentColor,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -417,7 +417,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
       selected: isSelected,
       onSelected: (_) => onTap(),
       backgroundColor: AppTheme.surfaceDark,
-      selectedColor: AppTheme.accentColor,
+      selectedColor: Theme.of(context).colorScheme.primary,
       checkmarkColor: Colors.black,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
