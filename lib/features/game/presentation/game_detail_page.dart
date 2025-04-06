@@ -119,11 +119,11 @@ class _GameDetailPageState extends State<GameDetailPage> {
       }
       
       // TODO: Check hidden status from HomeController if needed
-      // if (_homeController.hiddenGames.contains(gameId)) {
-      //    _isHidden = true;
-      //    print('initState - Using hidden state from HomeController: $_isHidden');
-      //    _game = _game.copyWith(userActions: (_game.userActions ?? UserGameActions()).copyWith(isHidden: true));
-      // }
+      if (_homeController.hiddenGames.contains(gameId)) { // <-- Check hidden state
+         _isHidden = true;
+         print('initState - Using hidden state from HomeController: $_isHidden');
+         _game = _game.copyWith(userActions: (_game.userActions ?? UserGameActions()).copyWith(isHidden: true));
+      }
       
       // Eğer HomeController'da comment varsa ve widget'tan gelen comment null ise, onu kullan
       final bool commentExistsInWidget = _game.userActions?.comment != null;
@@ -719,15 +719,14 @@ class _GameDetailPageState extends State<GameDetailPage> {
                           // Always show Share button
                           _buildActionButton(FontAwesomeIcons.shareFromSquare, 'Share'),
                           
-                          // Conditionally show other buttons
-                          if (_userRating != null)
-                             _buildActionButton(FontAwesomeIcons.circleCheck, 'Seen') // Only Seen if rated
-                          else if (_isHidden)
-                             _buildActionButton(FontAwesomeIcons.eye, 'Unhide') // Only Unhide if hidden (and not rated)
-                          else ...[
-                            // Show Hide, Seen, Save if not rated and not hidden
+                          // Conditionally show other buttons based on _isHidden and _userRating
+                          if (_isHidden) // If hidden, only show Unhide
+                             _buildActionButton(FontAwesomeIcons.eye, 'Unhide') 
+                          else if (_userRating != null && _userRating! > 0) // If rated (and not hidden), show Seen
+                            _buildActionButton(FontAwesomeIcons.circleCheck, 'Seen') 
+                          else ...[ // If not hidden AND not rated, show Hide, Seen (default), Save
                             _buildActionButton(FontAwesomeIcons.eyeSlash, 'Hide'),
-                            _buildActionButton(FontAwesomeIcons.circleCheck, 'Seen'), // Default icon before rating
+                            _buildActionButton(FontAwesomeIcons.circleCheck, 'Seen'), 
                             _buildActionButton(FontAwesomeIcons.bookmark, 'Save'),
                           ],
                           
@@ -805,7 +804,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
                                             coverUrl: _game.coverUrl ?? '',
                                             gameId: _game.gameId!,
                                             initialRating: _userRating,
-                                            onRatingSelected: (rating) {
+                                            onRatingSelected: (rating) async { // <-- Make callback async
                                               // Rating seçildikten sonra state'i güncelle
                                               setState(() {
                                                 _userRating = rating > 0 ? rating : null;
@@ -1864,7 +1863,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
       coverUrl: _game.coverUrl ?? '',
       gameId: _game.gameId,
       initialRating: _userRating != null && _userRating! > 0 ? _userRating : null,
-      onRatingSelected: (rating) {
+      onRatingSelected: (rating) async { // <-- Make callback async
         print('Rating selected: $rating'); 
         print('Previous userRating: $_userRating'); 
         print('Previous isHidden: $_isHidden'); // Log previous hidden state
@@ -1896,7 +1895,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
             updatedUserActions = currentActions.copyWith(
               isRated: true,
               userRating: rating,
-              isHidden: _isHidden,
+              isHidden: _isHidden, // Keep potentially updated hidden state
               comment: currentActions.comment
             );
           } else {
@@ -1904,7 +1903,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
             // Explicitly create new actions with null rating/comment
             updatedUserActions = UserGameActions(
               isSaved: currentActions.isSaved,
-              isHidden: _isHidden,
+              isHidden: _isHidden, // Keep potentially updated hidden state
               isRated: false,
               userRating: null,
               comment: null
@@ -1928,8 +1927,8 @@ class _GameDetailPageState extends State<GameDetailPage> {
         if (_game.gameId != null) {
           _homeController.updateGameRatingState(_game.gameId!, isNowRated ? rating : null);
           if (shouldUnhide) {
-            // TODO: Call HomeController to update hidden status
-            // _homeController.updateGameHiddenState(_game.gameId!, false); 
+            // Call HomeController to update hidden status
+            _homeController.updateGameHiddenState(_game.gameId!, false); 
             print('HomeController hidden state update needed for game ${_game.gameId}: false'); 
           }
           if (!isNowRated) {
@@ -1938,10 +1937,15 @@ class _GameDetailPageState extends State<GameDetailPage> {
           }
         }
 
-        // TODO: Add backend call to unhide game if shouldUnhide is true
+        // Call backend to unhide game if shouldUnhide is true
         if (shouldUnhide && _game.gameId != null) {
            print('Backend call needed: unhideGame(${_game.gameId})');
-           // try { await _libraryRepository.unhideGame(_game.gameId!); } catch (e) { ... }
+           try {
+             await _libraryRepository.unhideGame(_game.gameId!); // Now await is valid
+           } catch (e) {
+             print('Error unhiding game via rating: $e');
+             // Optionally show error to user
+           }
         }
       },
     );
@@ -2797,8 +2801,8 @@ class _GameDetailPageState extends State<GameDetailPage> {
         // Update in HomeController for other pages
         _homeController.updateGameSaveState(_game.gameId!, _isSaved);
         if (shouldUnhide) {
-           // TODO: Call HomeController to update hidden status
-           // _homeController.updateGameHiddenState(_game.gameId!, false);
+           // Call HomeController to update hidden status
+           _homeController.updateGameHiddenState(_game.gameId!, false);
            print('HomeController hidden state update needed for game ${_game.gameId}: false'); 
         }
 
@@ -2807,11 +2811,16 @@ class _GameDetailPageState extends State<GameDetailPage> {
           _showSavedNotification();
         }
 
-        // TODO: Add backend call to unhide game if shouldUnhide is true
+        // Call backend to unhide game if shouldUnhide is true
         // This might be redundant if saving implicitly unhides on the backend
         if (shouldUnhide) {
            print('Backend call needed: unhideGame(${_game.gameId})');
-           // try { await _libraryRepository.unhideGame(_game.gameId!); } catch (e) { ... }
+           try {
+             await _libraryRepository.unhideGame(_game.gameId!); // Await is already valid here
+           } catch (e) {
+             print('Error unhiding game via save: $e');
+             // Optionally show error to user
+           }
         }
       }
     } catch (e) {
@@ -2845,24 +2854,79 @@ class _GameDetailPageState extends State<GameDetailPage> {
       wasSaved = false; // To avoid unnecessary backend call check later
     }
 
-    // TODO: Add backend call placeholder for hide/unhide
+    // Call backend for hide/unhide
     print('Backend call needed: ${intendToHide ? 'hideGame' : 'unhideGame'}(${_game.gameId})');
-    // try {
-    //   final success = intendToHide 
-    //       ? await _libraryRepository.hideGame(_game.gameId!) 
-    //       : await _libraryRepository.unhideGame(_game.gameId!);
-    //   if (!success) throw Exception('Backend update failed');
-    // } catch (e) {
-    //    print('Error hiding/unhiding game: $e');
-    //    ScaffoldMessenger.of(context).showSnackBar(
-    //      SnackBar(content: Text('Error updating hidden status: ${e.toString()}')),
-    //    );
-    //    return; // Don't update UI if backend failed
-    // }
+    try {
+      bool success = false;
+      if (intendToHide) {
+        success = await _libraryRepository.hideGame(_game.gameId!); // Await is valid here
+      } else {
+        success = await _libraryRepository.unhideGame(_game.gameId!); // Await is valid here
+      }
+      
+      if (!success) throw Exception('Backend update failed');
 
+      // Update state only after successful backend call
+      if (mounted) { 
+        setState(() {
+          _isHidden = intendToHide;
 
-    // Update state after successful backend call (or placeholder)
-    setState(() {
+          // If hiding, clear related states
+          if (intendToHide) {
+            _userRating = null;
+            _isSaved = false;
+            // Update game object's actions
+            _game = _game.copyWith(
+              userActions: (_game.userActions ?? UserGameActions()).copyWith(
+                isHidden: true,
+                isRated: false,
+                userRating: null,
+                comment: null,
+                isSaved: false,
+              ),
+            );
+          } else {
+            // If unhiding, just update the hidden flag in the game object
+             _game = _game.copyWith(
+              userActions: (_game.userActions ?? UserGameActions()).copyWith(
+                isHidden: false,
+              ),
+            );
+          }
+           print('Updated isHidden: $_isHidden');
+           print('Updated userRating: $_userRating');
+           print('Updated isSaved: $_isSaved');
+           print('Updated userActions: ${_game.userActions}');
+        });
+
+        // Update HomeController
+        if (_game.gameId != null) {
+           // Call HomeController to update hidden status
+           _homeController.updateGameHiddenState(_game.gameId!, _isHidden);
+           print('HomeController hidden state update needed for game ${_game.gameId}: $_isHidden'); 
+
+          // If hiding, update other states in HomeController too
+          // These are now automatically handled by updateGameHiddenState in HomeController
+          /* if (intendToHide) {
+            _homeController.updateGameRatingState(_game.gameId!, null); 
+            _homeController.updateGameComment(_game.gameId!, null); 
+            _homeController.updateGameSaveState(_game.gameId!, false); 
+          } */
+        }
+      }
+
+    } catch (e) {
+       print('Error hiding/unhiding game: $e');
+       if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(
+           SnackBar(content: Text('Error updating hidden status: ${e.toString()}')),
+         );
+       }
+       return; // Don't update UI if backend failed
+    }
+
+    // Commented out old state update logic that was moved inside the try block
+    /* setState(() {
       _isHidden = intendToHide;
 
       // If hiding, clear related states
@@ -2895,8 +2959,8 @@ class _GameDetailPageState extends State<GameDetailPage> {
 
     // Update HomeController
     if (_game.gameId != null) {
-       // TODO: Call HomeController to update hidden status
-       // _homeController.updateGameHiddenState(_game.gameId!, _isHidden);
+       // Call HomeController to update hidden status
+       _homeController.updateGameHiddenState(_game.gameId!, _isHidden);
        print('HomeController hidden state update needed for game ${_game.gameId}: $_isHidden'); 
 
       // If hiding, update other states in HomeController too
@@ -2905,7 +2969,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
         _homeController.updateGameComment(_game.gameId!, null);
         _homeController.updateGameSaveState(_game.gameId!, false);
       }
-    }
+    } */
 
     // TODO: Optional: Add backend calls to remove rating/review/save status if hiding
     // These might be handled implicitly by the hideGame endpoint, or need separate calls.

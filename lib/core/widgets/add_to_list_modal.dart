@@ -238,7 +238,13 @@ class _AddToListModalState extends State<AddToListModal> {
       );
     }
 
-    libraries.sort((a, b) => a.libraryName.compareTo(b.libraryName));
+    // Sort libraries by updatedAt in descending order (most recent first)
+    libraries.sort((a, b) {
+      // If updatedAt is null, put it at the end
+      if (a.updatedAt == null) return 1;
+      if (b.updatedAt == null) return -1;
+      return b.updatedAt!.compareTo(a.updatedAt!);
+    });
 
     return ListView.separated(
       padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),

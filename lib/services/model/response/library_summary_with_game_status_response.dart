@@ -1,6 +1,7 @@
 import 'package:ludicapp/core/enums/library_type.dart';
 import 'package:ludicapp/services/model/response/library_summary_response.dart'; // Import the actual base class
 import 'package:flutter/foundation.dart';
+import 'package:ludicapp/core/enums/profile_photo_type.dart';
 
 @immutable
 class LibrarySummaryWithGameStatusResponse extends LibrarySummaryResponse {
@@ -16,7 +17,11 @@ class LibrarySummaryWithGameStatusResponse extends LibrarySummaryResponse {
     required bool isPrivate,
     int? followerCount,
     bool? isCurrentUserFollowing,
+    DateTime? updatedAt,
+    String? ownerUsername,
+    String? ownerProfilePhotoUrl,
     required this.isGamePresent,
+    ProfilePhotoType? ownerProfilePhotoType,
   }) : super(
           id: id,
           ownerUserId: ownerUserId,
@@ -27,6 +32,10 @@ class LibrarySummaryWithGameStatusResponse extends LibrarySummaryResponse {
           isPrivate: isPrivate,
           followerCount: followerCount,
           isCurrentUserFollowing: isCurrentUserFollowing,
+          updatedAt: updatedAt,
+          ownerUsername: ownerUsername,
+          ownerProfilePhotoUrl: ownerProfilePhotoUrl,
+          ownerProfilePhotoType: ownerProfilePhotoType ?? ProfilePhotoType.DEFAULT_1,
         );
 
   factory LibrarySummaryWithGameStatusResponse.fromJson(Map<String, dynamic> json) {
@@ -44,6 +53,10 @@ class LibrarySummaryWithGameStatusResponse extends LibrarySummaryResponse {
       isPrivate: baseSummary.isPrivate,
       followerCount: baseSummary.followerCount,
       isCurrentUserFollowing: baseSummary.isCurrentUserFollowing,
+      updatedAt: baseSummary.updatedAt,
+      ownerUsername: baseSummary.ownerUsername,
+      ownerProfilePhotoUrl: baseSummary.ownerProfilePhotoUrl,
+      ownerProfilePhotoType: baseSummary.ownerProfilePhotoType,
       isGamePresent: isGamePresent,
     );
   }
@@ -67,7 +80,11 @@ class LibrarySummaryWithGameStatusResponse extends LibrarySummaryResponse {
     bool? isPrivate,
     int? followerCount,
     bool? isCurrentUserFollowing,
+    DateTime? updatedAt,
     bool? isGamePresent,
+    String? ownerUsername,
+    String? ownerProfilePhotoUrl,
+    ProfilePhotoType? ownerProfilePhotoType,
   }) {
     return LibrarySummaryWithGameStatusResponse(
       id: id ?? this.id,
@@ -79,6 +96,9 @@ class LibrarySummaryWithGameStatusResponse extends LibrarySummaryResponse {
       isPrivate: isPrivate ?? this.isPrivate,
       followerCount: followerCount ?? this.followerCount,
       isCurrentUserFollowing: isCurrentUserFollowing ?? this.isCurrentUserFollowing,
+      updatedAt: updatedAt ?? this.updatedAt,
+      ownerUsername: ownerUsername ?? this.ownerUsername,
+      ownerProfilePhotoUrl: ownerProfilePhotoUrl ?? this.ownerProfilePhotoUrl,
       isGamePresent: isGamePresent ?? this.isGamePresent,
     );
   }

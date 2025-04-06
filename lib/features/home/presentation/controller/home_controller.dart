@@ -1,6 +1,7 @@
 import 'package:ludicapp/services/model/response/game_summary.dart';
 import 'package:ludicapp/services/model/response/name_id_response.dart';
 import 'package:ludicapp/services/repository/game_repository.dart';
+import 'package:ludicapp/services/repository/library_repository.dart';
 import 'package:ludicapp/features/splash/presentation/splash_screen.dart';
 import 'package:ludicapp/services/model/response/paged_game_with_user_response.dart';
 import 'package:ludicapp/services/model/response/game_detail_with_user_info.dart';
@@ -8,6 +9,7 @@ import 'package:ludicapp/core/models/game.dart';
 import 'package:ludicapp/services/model/response/user_game_info.dart';
 import 'package:ludicapp/services/model/response/user_game_actions.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 
 // ChangeNotifier'dan extend edelim
 class HomeController extends ChangeNotifier {
@@ -16,6 +18,7 @@ class HomeController extends ChangeNotifier {
   HomeController._internal();
 
   final GameRepository _gameRepository = GameRepository();
+  final LibraryRepository _libraryRepository = LibraryRepository();
 
   List<GameSummary> newReleases = [];
   List<GameSummary> topRatedGames = [];
@@ -359,5 +362,19 @@ class HomeController extends ChangeNotifier {
       currentlyPlayingGames.removeAt(index);
       notifyListeners();
     }
+  }
+
+  // <-- Add method to update hidden state -->
+  void updateGameHiddenState(int gameId, bool isHidden) {
+    if (isHidden) {
+      hiddenGames.add(gameId);
+      // Hiding a game removes rating, comment, and saved status
+      gameRatings.remove(gameId);
+      gameComments.remove(gameId);
+      savedGames.remove(gameId);
+    } else {
+      hiddenGames.remove(gameId);
+    }
+    notifyListeners();
   }
 } 

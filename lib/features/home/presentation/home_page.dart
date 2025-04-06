@@ -6,6 +6,7 @@ import 'package:ludicapp/features/home/presentation/controller/home_controller.d
 import 'package:ludicapp/features/home/presentation/widgets/main_page_game.dart';
 import 'package:ludicapp/features/game/presentation/game_detail_page.dart';
 import 'package:ludicapp/features/home/presentation/widgets/continue_playing_section.dart';
+import 'package:ludicapp/features/home/presentation/widgets/follow_us_section.dart';
 import 'package:ludicapp/services/model/response/game_summary.dart';
 import 'package:ludicapp/services/model/response/name_id_response.dart';
 import 'package:ludicapp/core/models/game.dart';
@@ -389,6 +390,11 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
                     );
                   },
                 ),
+
+              const SizedBox(height: 16),
+
+              // Follow Us Section (New)
+              const FollowUsSection(),
 
               const SizedBox(height: 16),
 

@@ -412,4 +412,32 @@ class LibraryRepository {
       return null;
     }
   }
+
+  Future<bool> hideGame(int gameId) async {
+    try {
+      final response = await _apiService.post(
+        '/api/library/hide-game?gameId=$gameId',
+        {}, // Provide an empty body for the POST request
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error hiding game $gameId: $e');
+      return false;
+    }
+  }
+
+  Future<bool> unhideGame(int gameId) async {
+    try {
+      // Construct the path with the query parameter
+      final path = '/api/library/unhide-game?gameId=$gameId';
+      final response = await _apiService.delete( 
+        path, 
+        // Remove the non-existent queryParameters argument
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error unhiding game $gameId: $e');
+      return false;
+    }
+  }
 } 

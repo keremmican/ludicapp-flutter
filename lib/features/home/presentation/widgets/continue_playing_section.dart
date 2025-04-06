@@ -75,14 +75,14 @@ class _ContinuePlayingSectionState extends State<ContinuePlayingSection> {
           Padding( // Apply padding to the main content
              padding: const EdgeInsets.only(top: 16.0, bottom: 16.0, left: 16.0),
              child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min, // Prevent column from taking full stack height
-              children: [
+      children: [
                 const Text(
-                  'Continue Playing',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
+            'Continue Playing',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
                     fontSize: 18,
                   ),
                 ),
@@ -109,9 +109,9 @@ class _ContinuePlayingSectionState extends State<ContinuePlayingSection> {
                   color: Colors.grey[300], 
                   fontSize: 11, 
                   fontWeight: FontWeight.w600
-                ),
-              ),
             ),
+          ),
+        ),
           ),
         ],
       ),
@@ -121,28 +121,28 @@ class _ContinuePlayingSectionState extends State<ContinuePlayingSection> {
   Widget _buildEmptyState(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(right: 16.0, bottom: 8.0), // İçeriği ortalamak için padding
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          const Text(
-            'Sign in to your accounts to sync the games you are currently playing.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Text(
+                'Sign in to your accounts to sync the games you are currently playing.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
               fontSize: 14, // Biraz daha küçük metin
-              color: Colors.grey,
+                  color: Colors.grey,
               height: 1.4, // Satır aralığı
-            ),
-          ),
-          const SizedBox(height: 20),
+                ),
+              ),
+              const SizedBox(height: 20),
           ElevatedButton.icon(
             icon: const Icon(Icons.play_arrow, size: 20),
             label: const Text('Continue Playing'),
-            style: ElevatedButton.styleFrom(
+                style: ElevatedButton.styleFrom(
               // Arka plan rengini temadan al (opaklık ayarlı)
               backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.9),
               foregroundColor: Theme.of(context).colorScheme.onPrimary, // Metin/ikon rengi
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              shape: RoundedRectangleBorder(
+                  shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8.0),
               ),
               textStyle: const TextStyle(

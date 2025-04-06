@@ -18,6 +18,9 @@ import 'package:ludicapp/core/enums/library_type.dart';
 import 'package:ludicapp/services/model/response/search_game.dart';
 import 'package:ludicapp/services/model/response/library_summary_response.dart';
 import 'package:ludicapp/features/profile/presentation/followers_page.dart';
+import 'package:ludicapp/core/enums/display_mode.dart';
+import 'package:ludicapp/features/profile/presentation/profile_page.dart';
+import 'package:ludicapp/core/enums/profile_photo_type.dart';
 
 class LibraryDetailPage extends StatefulWidget {
   final LibrarySummaryResponse librarySummary;
@@ -432,6 +435,9 @@ class _LibraryDetailPageState extends State<LibraryDetailPage> {
       builder: (context) {
           return StatefulBuilder(
              builder: (context, setDialogState) {
+                final theme = Theme.of(context);
+                final inputTheme = theme.inputDecorationTheme;
+
                 return AlertDialog(
                   backgroundColor: AppTheme.surfaceDark,
                   shape: RoundedRectangleBorder(
@@ -440,43 +446,39 @@ class _LibraryDetailPageState extends State<LibraryDetailPage> {
                   titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 24),
                   actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-                  title: const Text('Edit Library', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                  title: Text('Edit Library', style: theme.textTheme.headlineSmall),
                   content: Column(
                      mainAxisSize: MainAxisSize.min, 
                      children: [
                         TextField(
                            controller: _titleController,
-                           style: const TextStyle(color: Colors.white),
+                           style: theme.textTheme.bodyLarge,
                            decoration: InputDecoration(
                               hintText: 'Enter library name',
-                              hintStyle: TextStyle(color: Colors.grey[600]),
-                              filled: true,
-                              fillColor: Colors.black.withOpacity(0.1),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              enabledBorder: OutlineInputBorder(
-                                 borderRadius: BorderRadius.circular(12.0),
-                                 borderSide: BorderSide(color: Colors.grey[700]!),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                 borderRadius: BorderRadius.circular(12.0),
-                                 borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
-                              ),
+                              hintStyle: inputTheme.hintStyle,
+                              filled: inputTheme.filled,
+                              fillColor: inputTheme.fillColor,
+                              contentPadding: inputTheme.contentPadding,
+                              enabledBorder: inputTheme.enabledBorder,
+                              focusedBorder: inputTheme.focusedBorder,
                            ),
                            autofocus: true,
                            textCapitalization: TextCapitalization.sentences, 
                         ),
                         const SizedBox(height: 20),
                         SwitchListTile(
-                           title: const Text('Private Library', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
-                           subtitle: Text('Only you can see this library and its content.', style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+                           title: Text('Private Library', style: theme.textTheme.titleMedium),
+                           subtitle: Text('Only you can see this library and its content.', style: theme.textTheme.bodySmall),
                            value: tempIsPrivate,
                            onChanged: (bool newValue) { 
                               setDialogState(() { 
                                  tempIsPrivate = newValue;
                               });
                            },
-                           activeColor: Theme.of(context).colorScheme.primary,
-                           tileColor: Colors.white.withOpacity(0.05),
+                           activeColor: theme.colorScheme.primary,
+                           tileColor: theme.brightness == Brightness.dark 
+                              ? theme.colorScheme.surface.withOpacity(0.5) 
+                              : theme.colorScheme.surface,
                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                         ),
@@ -486,7 +488,7 @@ class _LibraryDetailPageState extends State<LibraryDetailPage> {
                     TextButton(
                       onPressed: () => Navigator.pop(context), 
                       style: TextButton.styleFrom(
-                         foregroundColor: Colors.grey[400],
+                         foregroundColor: theme.textTheme.labelLarge?.color?.withOpacity(0.7),
                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       ),
                       child: const Text('Cancel'),
@@ -498,13 +500,8 @@ class _LibraryDetailPageState extends State<LibraryDetailPage> {
                            Navigator.pop(context, {'title': enteredTitle, 'isPrivate': tempIsPrivate}); 
                         }
                       },
-                      style: ElevatedButton.styleFrom(
-                         backgroundColor: Theme.of(context).colorScheme.primary,
-                         foregroundColor: Colors.black,
-                         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8.0),
-                         ),
+                      style: theme.elevatedButtonTheme.style?.copyWith(
+                         foregroundColor: MaterialStateProperty.all(theme.colorScheme.onPrimary),
                       ),
                       child: const Text('Save'),
                     ),
@@ -531,7 +528,7 @@ class _LibraryDetailPageState extends State<LibraryDetailPage> {
          if (updatedDto != null && mounted) {
             setState(() {
                _currentTitle = updatedDto.title;
-               _isPrivate = updatedDto.isPrivate; 
+               _isPrivate = newIsPrivate;
             });
             ScaffoldMessenger.of(context).showSnackBar(
                const SnackBar(content: Text('Library updated successfully!')),
@@ -548,25 +545,31 @@ class _LibraryDetailPageState extends State<LibraryDetailPage> {
   Future<void> _showDeleteConfirmationDialog() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.surfaceDark,
-        title: const Text('Delete Library', style: TextStyle(color: Colors.white)),
-        content: Text(
-          'Are you sure you want to permanently delete the "$_currentTitle" library? This cannot be undone.',
-          style: const TextStyle(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      builder: (context) {
+         final theme = Theme.of(context);
+         return AlertDialog(
+            backgroundColor: theme.dialogBackgroundColor,
+            title: Text('Delete Library', style: theme.textTheme.headlineSmall),
+            content: Text(
+              'Are you sure you want to permanently delete the "$_currentTitle" library? This cannot be undone.',
+              style: theme.textTheme.bodyMedium,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                style: TextButton.styleFrom(
+                   foregroundColor: theme.textTheme.labelLarge?.color?.withOpacity(0.7),
+                ),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                style: TextButton.styleFrom(foregroundColor: theme.colorScheme.error),
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Delete'),
+              ),
+            ],
+         );
+      }
     );
 
     if (confirmed == true) {
@@ -743,18 +746,18 @@ class _LibraryDetailPageState extends State<LibraryDetailPage> {
                       value: 'edit',
                       child: ListTile(
                          minLeadingWidth: 0,
-                         contentPadding: EdgeInsets.symmetric(horizontal: 8),
-                         leading: Icon(Icons.edit_outlined, color: Colors.white70, size: 20),
-                         title: Text('Edit', style: TextStyle(color: Colors.white)),
+                         contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                         leading: const Icon(Icons.edit_outlined, color: Colors.white70, size: 20),
+                         title: const Text('Edit', style: TextStyle(color: Colors.white)),
                       ),
                    ),
                    PopupMenuItem<String>(
                       value: 'delete',
                       child: ListTile(
                          minLeadingWidth: 0,
-                         contentPadding: EdgeInsets.symmetric(horizontal: 8),
-                         leading: Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
-                         title: Text('Delete Library', style: TextStyle(color: Colors.redAccent)),
+                         contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                         leading: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                         title: const Text('Delete Library', style: TextStyle(color: Colors.redAccent)),
                       ),
                    ),
                 ],
@@ -867,6 +870,53 @@ class _LibraryDetailPageState extends State<LibraryDetailPage> {
           
           Row(
             children: [
+              if (widget.librarySummary.ownerUserId != null) ...[
+                GestureDetector(
+                  onTap: () {
+                    if (widget.librarySummary.ownerUserId != null) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ProfilePage(
+                            userId: widget.librarySummary.ownerUserId.toString(),
+                            fromSearch: true,
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 16,
+                        backgroundColor: Colors.grey[700],
+                        backgroundImage: widget.librarySummary.ownerProfilePhotoType == ProfilePhotoType.CUSTOM && 
+                                         widget.librarySummary.ownerProfilePhotoUrl != null &&
+                                         widget.librarySummary.ownerProfilePhotoUrl!.isNotEmpty
+                            ? CachedNetworkImageProvider(widget.librarySummary.ownerProfilePhotoUrl!)
+                            : null,
+                        child: _buildOwnerProfileImage(),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        widget.librarySummary.ownerUsername ?? 'User',
+                        style: TextStyle(
+                          color: Colors.grey[300],
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Container(
+                  height: 16,
+                  width: 1,
+                  color: Colors.grey[600],
+                ),
+                const SizedBox(width: 16),
+              ],
+              
               Text(
                 '${widget.librarySummary.gameCount} Games',
                 style: TextStyle(
@@ -886,15 +936,24 @@ class _LibraryDetailPageState extends State<LibraryDetailPage> {
                  GestureDetector(
                     onTap: () {
                        print('Follower count tapped for library $_libraryId');
-                       Navigator.push(
-                         context,
-                         MaterialPageRoute(
-                           builder: (context) => FollowersPage(
-                             libraryId: _libraryId,
-                             libraryName: _currentTitle ?? widget.librarySummary.displayName,
+                       final ownerId = widget.librarySummary.ownerUserId;
+                       if (ownerId != null) {
+                         Navigator.push(
+                           context,
+                           MaterialPageRoute(
+                             builder: (context) => FollowersPage(
+                               userId: ownerId,
+                               username: "Owner's",
+                               initialMode: DisplayMode.followers,
+                             ),
                            ),
-                         ),
-                       );
+                         );
+                       } else {
+                         print('Cannot navigate to followers page: Library owner ID is null.');
+                         ScaffoldMessenger.of(context).showSnackBar(
+                           const SnackBar(content: Text('Cannot view followers for this library.')),
+                         );
+                       }
                     },
                     child: Text(
                        '${_followerCount ?? 0} Followers',
@@ -1039,7 +1098,7 @@ class _LibraryDetailPageState extends State<LibraryDetailPage> {
             },
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.grey[900],
+                color: Theme.of(context).cardTheme.color?.withOpacity(0.8) ?? Colors.grey[850],
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
@@ -1059,10 +1118,10 @@ class _LibraryDetailPageState extends State<LibraryDetailPage> {
                       fit: BoxFit.cover,
                       width: double.infinity,
                       height: double.infinity,
-                      placeholder: (context, url) => Container(color: Colors.grey[800]),
+                      placeholder: (context, url) => Container(color: Theme.of(context).cardTheme.color?.withOpacity(0.5) ?? Colors.grey[800]),
                       errorWidget: (context, url, error) => Container(
-                        color: Colors.grey[800],
-                        child: const Icon(Icons.error, color: Colors.white),
+                        color: Theme.of(context).cardTheme.color?.withOpacity(0.5) ?? Colors.grey[800],
+                        child: Icon(Icons.error, color: Theme.of(context).iconTheme.color?.withOpacity(0.7)),
                       ),
                     ),
                   ),
@@ -1081,9 +1140,9 @@ class _LibraryDetailPageState extends State<LibraryDetailPage> {
                               color: Colors.black.withOpacity(0.5),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.favorite,
-                              color: Colors.red,
+                              color: Theme.of(context).colorScheme.error,
                               size: 16,
                             ),
                           ),
@@ -1099,7 +1158,7 @@ class _LibraryDetailPageState extends State<LibraryDetailPage> {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(
+                                Icon(
                                   Icons.star,
                                   color: Colors.amber,
                                   size: 14,
@@ -1107,8 +1166,8 @@ class _LibraryDetailPageState extends State<LibraryDetailPage> {
                                 const SizedBox(width: 3),
                                 Text(
                                   '${userRatings[game.id]}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.onSurface,
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -1129,11 +1188,7 @@ class _LibraryDetailPageState extends State<LibraryDetailPage> {
           padding: const EdgeInsets.only(top: 8, bottom: 4),
           child: Text(
             game.name,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
+            style: Theme.of(context).textTheme.titleSmall,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -1176,5 +1231,29 @@ class _LibraryDetailPageState extends State<LibraryDetailPage> {
       default:
         return Icons.games;
     }
+  }
+
+  Widget _buildOwnerProfileImage() {
+    if (widget.librarySummary.ownerProfilePhotoType == ProfilePhotoType.CUSTOM && 
+        widget.librarySummary.ownerProfilePhotoUrl != null && 
+        widget.librarySummary.ownerProfilePhotoUrl!.isNotEmpty) {
+      return Container();
+    } else if (widget.librarySummary.ownerProfilePhotoType != ProfilePhotoType.CUSTOM) {
+      final String? assetPath = widget.librarySummary.ownerProfilePhotoType.assetPath;
+      if (assetPath != null) {
+        return Image.asset(
+          assetPath,
+          width: 32,
+          height: 32,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            print('Error loading profile default image: $error in path: $assetPath');
+            return const Icon(Icons.person, color: Colors.white, size: 18);
+          },
+        );
+      }
+    }
+    
+    return const Icon(Icons.person, color: Colors.white, size: 18);
   }
 } 

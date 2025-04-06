@@ -5,7 +5,9 @@ import 'package:ludicapp/theme/app_theme.dart';
 import 'package:ludicapp/services/api_service.dart';
 import 'package:ludicapp/services/token_service.dart';
 import 'package:ludicapp/services/repository/auth_repository.dart';
+import 'package:ludicapp/services/repository/user_repository.dart';
 import 'package:ludicapp/providers/theme_provider.dart';
+import 'edit_profile_page.dart'; // Add import for the new page
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({Key? key}) : super(key: key);
@@ -18,6 +20,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   final _apiService = ApiService();
   final _tokenService = TokenService();
   final _authRepository = AuthRepository();
+  final _userRepository = UserRepository();
+  bool _profileUpdated = false;
+
+  @override
+  void dispose() {
+    if (_profileUpdated) {
+      // Eğer profil güncellendiyse, çıkış yaparken bu bilgiyi ilet
+      Navigator.pop(context, 'updated');
+    }
+    super.dispose();
+  }
 
   Future<void> _handleLogout(BuildContext context) async {
     try {
@@ -96,9 +109,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           const SizedBox(height: 20),
 
           _buildSectionHeader('ACCOUNT'),
-          _buildListTile('Profile', Icons.person, onTap: () {
-            print('Profile clicked');
-          }),
+          _buildListTile(
+            'Profile',
+            Icons.edit,
+            onTap: () async {
+              final result = await Navigator.push(
+                context, 
+                MaterialPageRoute(builder: (context) => const EditProfilePage())
+              );
+              
+              if (result == 'updated') {
+                await _userRepository.refreshCurrentUserProfile();
+                _profileUpdated = true;
+              }
+            },
+          ),
           _buildListTile('Dashboard Setup', Icons.dashboard, onTap: () {
             print('Dashboard Setup clicked');
           }),

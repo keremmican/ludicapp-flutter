@@ -9,15 +9,18 @@ import 'package:ludicapp/services/repository/user_repository.dart';
 import 'package:ludicapp/services/token_service.dart';
 import 'package:ludicapp/models/profile_response.dart';
 import 'package:ludicapp/services/model/response/library_summary_response.dart';
+import 'package:ludicapp/core/enums/display_mode.dart';
 import 'dart:math';
 import 'settings_page.dart';
 import 'library_detail_page.dart';
 import 'user_ratings_page.dart';
 import 'all_libraries_page.dart';
+import 'edit_profile_page.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:ludicapp/core/enums/library_type.dart';
 import 'package:ludicapp/services/model/response/paged_response.dart';
 import 'package:ludicapp/services/repository/library_repository.dart';
+import 'package:ludicapp/core/enums/profile_photo_type.dart';
 
 class ProfilePage extends StatefulWidget {
   final String? userId;
@@ -35,7 +38,7 @@ class ProfilePage extends StatefulWidget {
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
-class _ProfilePageState extends State<ProfilePage> {
+class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
   final UserRepository _userRepository = UserRepository();
   final TokenService _tokenService = TokenService();
   final LibraryRepository _libraryRepository = LibraryRepository();
@@ -67,12 +70,44 @@ class _ProfilePageState extends State<ProfilePage> {
     super.initState();
     _initializeProfile();
     _followedScrollController.addListener(_onFollowedScroll); // Add listener if pagination needed
+    // Register the observer
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
+    // Remove the observer
+    WidgetsBinding.instance.removeObserver(this);
     _followedScrollController.dispose();
     super.dispose();
+  }
+
+  // Listen to app lifecycle changes
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // Refresh data when the app resumes (page becomes visible)
+    if (state == AppLifecycleState.resumed) {
+      print("ProfilePage resumed. Refreshing data...");
+      _refreshProfileDataInBackground();
+      _loadFollowedLibraries(loadMore: false);
+    }
+  }
+
+  // Add this method to refresh data when navigating back to this screen
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    // Only refresh if we're not in the initial loading state
+    if (!_isLoading && mounted) {
+      print("ProfilePage dependencies changed. Refreshing data...");
+      
+      // Important: Force a refresh whenever dependencies change
+      // This ensures data is refreshed when navigating back to this screen
+      _refreshProfileDataInBackground();
+      _loadFollowedLibraries(loadMore: false);
+    }
   }
 
   // Listener for followed libraries pagination (optional)
@@ -127,9 +162,18 @@ class _ProfilePageState extends State<ProfilePage> {
 
       if (mounted) {
         setState(() {
+          // Ensure librarySummaries is assigned to updatedProfile
+          if (updatedProfile != null) {
+            updatedProfile.librarySummaries = updatedLibrarySummaries ?? [];
+          }
+          
           _profileData = updatedProfile;
+          // Also update SplashScreen data for completeness, but not rely on it for UI
           SplashScreen.profileData = updatedProfile;
           SplashScreen.librarySummaries = updatedLibrarySummaries;
+          
+          // Log to confirm update happened
+          print("ProfilePage: Refreshed user data - libraries count: ${updatedLibrarySummaries?.length ?? 0}");
         });
       }
     } catch (e) {
@@ -260,49 +304,161 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _toggleFollow() async {
+    if (widget.userId == null) {
+      print('Cannot follow/unfollow: User ID is missing.');
+      return;
+    }
+    final int? targetUserId = int.tryParse(widget.userId!);
+    if (targetUserId == null) {
+      print('Cannot follow/unfollow: Invalid User ID format.');
+      return;
+    }
+
+    final bool intendToFollow = !_isFollowing;
+    // Optimistically update UI
+    setState(() => _isFollowing = intendToFollow);
+
     try {
-      setState(() => _isFollowing = !_isFollowing);
-      // TODO: Implement follow/unfollow API call
-      await _userRepository.refreshCurrentUserProfile(); // Refresh current user's following count
+      bool success;
+      if (intendToFollow) {
+        success = await _userRepository.followUser(targetUserId);
+      } else {
+        success = await _userRepository.unfollowUser(targetUserId);
+      }
+
+      if (!success) {
+        // Revert UI on failure
+        if (mounted) {
+          setState(() => _isFollowing = !intendToFollow);
+        }
+        print('API call to ${intendToFollow ? 'follow' : 'unfollow'} failed.');
+        // Optionally show a snackbar or message to the user
+      } else {
+        // Refresh current user's profile to update counts
+        // We only need to refresh if the action was successful and *we* are the current user
+        // But refreshing the *other* user's profile might be needed if their follower count is displayed dynamically (which it is)
+        // For simplicity, let's try refreshing the current user's data as it might update their following count
+        // And potentially refresh the viewed profile's data if needed (though fetchUserProfile doesn't directly update follower count on the response object itself)
+        
+        // Refresh current user's data in the background (updates follower/following counts in cache)
+        _userRepository.refreshCurrentUserProfile();
+        
+        // Also, re-fetch the viewed user's profile data to potentially get updated follower counts
+        // This assumes the backend updates the followerCount immediately in the profile response.
+        if (widget.userId != null && !_isCurrentUser) {
+          final refreshedProfile = await _userRepository.fetchUserProfile(userId: widget.userId);
+          if (mounted && refreshedProfile != null) {
+            setState(() {
+               _profileData = _profileData?.copyWith(
+                 followerCount: refreshedProfile.followerCount,
+                 profilePhotoUrl: refreshedProfile.profilePhotoUrl,
+                 profilePhotoType: refreshedProfile.profilePhotoType,
+               );
+            });
+          }
+        }
+        print('Successfully ${intendToFollow ? 'followed' : 'unfollowed'} user $targetUserId');
+      }
     } catch (e) {
-      setState(() => _isFollowing = !_isFollowing); // Revert on error
-      print('Error toggling follow: $e');
+      // Revert UI on error
+      if (mounted) {
+        setState(() => _isFollowing = !intendToFollow);
+      }
+      print('Error toggling follow for user $targetUserId: $e');
+      // Optionally show a snackbar or message to the user
+    }
+  }
+
+  Future<void> _openEditProfile() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const EditProfilePage())
+    );
+    
+    if (result == 'updated') {
+      print("ProfilePage: Received update signal from EditProfilePage");
+      // Yeni profil verilerini yükle ve UI'ı güncelle
+      await _refreshProfileDataInBackground();
+      setState(() {
+        // UI'ı yenilemeye zorla
+        print("ProfilePage: Forcing UI update after profile edit");
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Bottom navigation'dan geliyorsa direkt SplashScreen verilerini kullan
-    if (widget.isBottomNavigation) {
-      _profileData = SplashScreen.profileData;
-      return _buildProfileContent();
-    }
-
-    // Kendi profilimiz için SplashScreen verilerini kullan
-    if (_isCurrentUser) {
-      _profileData = SplashScreen.profileData;
-      return _buildProfileContent();
-    }
-
-    // Diğer durumlar için loading ve error kontrolü
+    // Use the state (_profileData) consistently instead of SplashScreen data
+    
+    // Initial loading check
     if (_isLoading) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
     }
 
-    // Başka kullanıcının profili için data kontrolü
-    if (!widget.isBottomNavigation && _profileData == null) {
+    // For bottom navigation (home), ensure we still have valid data
+    if (widget.isBottomNavigation && _profileData == null) {
+      // If we don't have profile data in state yet, initialize from SplashScreen
+      // but only as a fallback
+      _profileData = SplashScreen.profileData;
+      
+      // Then still trigger a refresh for next time
+      Future.microtask(() {
+        _refreshProfileDataInBackground();
+        _loadFollowedLibraries(loadMore: false);
+      });
+    }
+    
+    // For current user, ensure we have valid data
+    if (_isCurrentUser && _profileData == null) {
+      // If we don't have profile data in state yet, initialize from SplashScreen
+      // but only as a fallback
+      _profileData = SplashScreen.profileData;
+      
+      // If SplashScreen data is also null, show loading or error
+      if (_profileData == null) {
+        print("ProfilePage: Current user profile data is null in both state and SplashScreen.");
+        // Optionally return a loading indicator or error message here
+        // For now, trigger refresh and let the build method handle null check later
+        Future.microtask(() {
+            _refreshProfileDataInBackground();
+            _loadFollowedLibraries(loadMore: false);
+        });
+      } else {
+          // Trigger refresh for next time even if using SplashScreen data
+          Future.microtask(() {
+              _refreshProfileDataInBackground();
+              _loadFollowedLibraries(loadMore: false);
+          });
+      }
+    }
+
+    // Error state for other users
+    if (!widget.isBottomNavigation && !_isCurrentUser && _profileData == null) {
       print(widget.isBottomNavigation);
       return const Scaffold(
         body: Center(child: Text('Error loading profile')),
       );
     }
 
+    // Null check before building content
+    if (_profileData == null) {
+      // This handles cases where data is truly unavailable after checks
+      print("ProfilePage: _profileData is null, showing loading/error.");
+      return const Scaffold(
+        body: Center(child: Text('Error loading profile data.')),
+      );
+    }
+
+    // Always build with state data
     return _buildProfileContent();
   }
 
   Widget _buildProfileContent() {
+    // Ensure profileData is not null here (already checked in build method)
+    final profileData = _profileData!;
+
     return Scaffold(
       body: Column(
         children: [
@@ -344,7 +500,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     onPressed: () => Navigator.pop(context),
                   ),
                   Text(
-                    _profileData?.username ?? '',
+                    profileData.username,
                     style: TextStyle(
                       color: Theme.of(context).textTheme.titleLarge?.color,
                       fontSize: 18,
@@ -374,62 +530,67 @@ class _ProfilePageState extends State<ProfilePage> {
                     clipBehavior: Clip.none,
                     children: [
                       ProfileHeader(
-                        username: _profileData?.username ?? 'Guest User',
-                        level: _profileData?.level.toInt() ?? 0,
-                        progress: (_profileData?.level ?? 0) % 1,
-                        followingCount: _profileData?.followingCount ?? 0,
-                        followersCount: _profileData?.followerCount ?? 0,
-                        onSettingsPressed: null,
+                        username: profileData.username,
+                        level: profileData.level.toInt(),
+                        progress: profileData.level % 1,
+                        followingCount: profileData.followingCount,
+                        followersCount: profileData.followerCount,
+                        profilePhotoUrl: profileData.profilePhotoUrl,
+                        profilePhotoType: profileData.profilePhotoType,
+                        onSettingsPressed: _isCurrentUser ? () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const SettingsPage()),
+                        ).then((result) {
+                          // Settings sayfasından dönüldüğünde, profil güncellenmişse yenile
+                          if (result == 'updated') {
+                            _refreshProfileDataInBackground();
+                          }
+                        }) : null,
+                        onEditProfilePressed: _isCurrentUser ? _openEditProfile : null,
                         onFollowingPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const FollowingPage()),
-                          );
+                          final int? targetUserId = _isCurrentUser 
+                              ? _currentUserId 
+                              : (widget.userId != null ? int.tryParse(widget.userId!) : null);
+                          if (targetUserId != null) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => FollowersPage(
+                                  userId: targetUserId,
+                                  username: profileData.username, 
+                                  initialMode: DisplayMode.following,
+                                ),
+                              ),
+                            );
+                          } else {
+                            print('Could not determine user ID for following page.');
+                          }
                         },
                         onFollowersPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const FollowersPage()),
-                          );
+                          final int? targetUserId = _isCurrentUser 
+                              ? _currentUserId 
+                              : (widget.userId != null ? int.tryParse(widget.userId!) : null);
+                          if (targetUserId != null) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => FollowersPage(
+                                  userId: targetUserId,
+                                  username: profileData.username, 
+                                  initialMode: DisplayMode.followers,
+                                ),
+                              ),
+                            );
+                          } else {
+                            print('Could not determine user ID for followers page.');
+                          }
                         },
                       ),
                     ],
                   ),
-                  const SizedBox(height: 50),
+                  const SizedBox(height: 70), // Adjusted spacing due to header changes
                   if (_isCurrentUser) ...[
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: ElevatedButton.icon(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const SettingsPage()),
-                        ),
-                        icon: Icon(
-                          Icons.settings,
-                          color: Theme.of(context).colorScheme.onPrimary,
-                          size: 20,
-                        ),
-                        label: Text(
-                          'Settings',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Theme.of(context).colorScheme.onPrimary,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.primary,
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                          elevation: 2,
-                          shadowColor: Colors.black.withOpacity(0.3),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 0), // Remove extra space if button was here
                   ] else if (widget.fromSearch) ...[
                     Container(
                       width: double.infinity,
@@ -466,19 +627,27 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                     const SizedBox(height: 24),
                   ],
+                  // If neither current user nor fromSearch, add some space
+                  if (!_isCurrentUser && !widget.fromSearch) const SizedBox(height: 24),
+
                   _buildSectionHeader(
                     context,
-                    _isCurrentUser ? 'My Library' : '${_profileData?.username ?? 'User'}\'s Library',
-                    onSeeAll: () {
-                      Navigator.push(
+                    _isCurrentUser ? 'My Library' : "${profileData.username}'s Library",
+                    onSeeAll: () async {
+                      final result = await Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (context) => AllLibrariesPage(
-                            username: _profileData?.username ?? 'User',
+                            username: profileData.username,
                             userId: _isCurrentUser ? null : widget.userId,
                           ),
                         ),
                       );
+                      if (result == 'updated' && mounted) {
+                         print('ProfilePage: Received update signal from AllLibrariesPage.');
+                         _refreshProfileDataInBackground();
+                         _loadFollowedLibraries(loadMore: false);
+                      }
                     },
                   ),
                   const SizedBox(height: 16),
@@ -489,7 +658,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   _buildFollowedLibrariesSection(context),
                   
                   // Recent Activity Section comes after Followed Libraries
-                  _buildRatedLibrarySection(context, _profileData?.librarySummaries ?? []),
+                  _buildRatedLibrarySection(context, profileData.librarySummaries),
 
                   // Steam Profile Section (Remains last)
                   _buildSteamProfile(context),
@@ -562,9 +731,8 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _buildGameLibrary(BuildContext context) {
-    final librarySummaries = _isCurrentUser 
-      ? (SplashScreen.librarySummaries ?? [])
-      : (_profileData?.librarySummaries ?? []);
+    // Use state variable _profileData here
+    final librarySummaries = _profileData?.librarySummaries ?? [];
     
     if (librarySummaries.isEmpty) {
       return Center(
@@ -575,23 +743,40 @@ class _ProfilePageState extends State<ProfilePage> {
       );
     }
 
+    // Create a mutable copy for sorting
+    List<LibrarySummaryResponse> sortedSummaries = List.from(librarySummaries);
+
+    // Safely parse and sort libraries by updatedAt in descending order (most recent first)
+    sortedSummaries.sort((a, b) {
+      DateTime? dateA = a.updatedAt != null ? DateTime.tryParse(a.updatedAt.toString()) : null;
+      DateTime? dateB = b.updatedAt != null ? DateTime.tryParse(b.updatedAt.toString()) : null;
+
+      // Handle null dates (put them at the end)
+      if (dateA == null && dateB == null) return 0;
+      if (dateA == null) return 1; // a comes after b
+      if (dateB == null) return -1; // a comes before b
+
+      // Compare valid dates (descending)
+      return dateB.compareTo(dateA);
+    });
+
     return Column(
       children: [
-        // Horizontal scrollable library list (Spotify style)
+        // Horizontal scrollable library list
         SizedBox(
-          height: 220,
+          height: 120, // Adjust height for new card design
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: librarySummaries.length,
+            itemCount: sortedSummaries.length,
             itemBuilder: (context, index) {
-              final summary = librarySummaries[index];
+              final summary = sortedSummaries[index];
               
               // Kullanıcı kendi profili dışında bir profil görüntülüyorsa ve kütüphane takip edilebilir bir türdeyse
               // örneğin, CUSTOM tipindeki kütüphaneleri takip edebilir
               final bool isFollowableLibrary = !_isCurrentUser && widget.fromSearch && summary.libraryType == LibraryType.CUSTOM;
               
-              return _buildSpotifyStyleLibraryCard(
+              return _buildLibraryCard(
                 context,
                 librarySummary: summary,
                 imagePath: summary.coverUrl ?? mockImages[Random().nextInt(mockImages.length)],
@@ -604,7 +789,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildSpotifyStyleLibraryCard(
+  Widget _buildLibraryCard(
     BuildContext context, {
     required LibrarySummaryResponse librarySummary,
     required String imagePath,
@@ -614,8 +799,8 @@ class _ProfilePageState extends State<ProfilePage> {
     final String count = librarySummary.gameCount.toString();
 
     return GestureDetector(
-      onTap: () {
-        Navigator.push(
+      onTap: () async {
+        final result = await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => LibraryDetailPage(
@@ -625,113 +810,113 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ),
         );
+
+        if (result == 'updated') {
+          print('ProfilePage: Received update signal from LibraryDetailPage.');
+          _refreshProfileDataInBackground();
+          _loadFollowedLibraries(loadMore: false);
+        } else if (result == 'deleted' && _isCurrentUser) {
+          print('ProfilePage: Received delete signal for library ${librarySummary.id}');
+          _refreshProfileDataInBackground();
+        }
       },
       child: Container(
-        width: 160,
-        height: 212, // Fixed height to prevent overflow
-        margin: const EdgeInsets.only(right: 16, bottom: 8),
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardTheme.color,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.2),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Cover image - fixed height
-            SizedBox(
-              height: 160,
-              child: ClipRRect(
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(12),
-                  topRight: Radius.circular(12),
-                ),
-                child: imagePath.startsWith('http')
-                  ? CachedNetworkImage(
-                      imageUrl: imagePath,
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      height: 160,
-                      placeholder: (context, url) => Container(color: Colors.grey[800]),
-                      errorWidget: (context, url, error) => Container(
-                        color: Colors.grey[800],
+        width: 260, // Increased width for horizontal layout
+        margin: const EdgeInsets.only(right: 12, bottom: 8, top: 8), // Add vertical margin
+        child: Card(
+          elevation: 3,
+          clipBehavior: Clip.antiAlias, // Clip the image corners
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              // Image Section
+              SizedBox(
+                width: 90, // Fixed width for image
+                height: double.infinity, // Take full height of the card
+                child: ClipRRect(
+                  // No need for separate borderRadius here if using Card's clipBehavior
+                  child: imagePath.startsWith('http')
+                    ? CachedNetworkImage(
+                        imageUrl: imagePath,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                        placeholder: (context, url) => Container(color: Colors.grey[800]),
+                        errorWidget: (context, url, error) => Container(
+                          color: Colors.grey[700],
+                          child: Center(
+                            child: Icon(
+                              _getLibraryIcon(title),
+                              color: Colors.white.withOpacity(0.7),
+                              size: 30,
+                            ),
+                          ),
+                        ),
+                      )
+                    : Container(
+                        width: double.infinity,
+                        height: double.infinity,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: _getLibraryGradient(title),
+                          ),
+                        ),
                         child: Center(
                           child: Icon(
                             _getLibraryIcon(title),
                             color: Colors.white.withOpacity(0.9),
-                            size: 40,
+                            size: 30,
                           ),
                         ),
                       ),
-                    )
-                  : Container(
-                      width: double.infinity,
-                      height: 160,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: _getLibraryGradient(title),
-                        ),
-                      ),
-                      child: Center(
-                        child: Icon(
-                          _getLibraryIcon(title),
-                          color: Colors.white.withOpacity(0.9),
-                          size: 40,
-                        ),
-                      ),
-                    ),
-              ),
-            ),
-            
-            // Title and count - limited space
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        color: Theme.of(context).textTheme.titleMedium?.color,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '$count Games',
-                      style: TextStyle(
-                        color: Theme.of(context).textTheme.bodySmall?.color,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
                 ),
               ),
-            ),
-          ],
+
+              // Text Section
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center, // Center text vertically
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: Theme.of(context).textTheme.titleMedium?.color,
+                          fontSize: 15, // Slightly larger font
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 2, // Allow two lines for title
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '$count Games',
+                        style: TextStyle(
+                          color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.8),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
   
   Widget _buildRatedLibrarySection(BuildContext context, List<LibrarySummaryResponse> libraries) {
-    // Find the rated library if it exists
+    // This method already receives libraries, no need to access _profileData directly here for this purpose
     final ratedLibraryList = libraries.where((lib) => lib.libraryType == LibraryType.RATED).toList();
     
-    // Return an empty state with a message instead of completely hiding the section
     if (ratedLibraryList.isEmpty || (_isCurrentUser && ratedLibraryList.first.gameCount == 0)) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -746,6 +931,7 @@ class _ProfilePageState extends State<ProfilePage> {
             height: 100,
             child: Center(
               child: Text(
+                // Use state variable _profileData here for username
                 _isCurrentUser 
                   ? 'You don\'t have any recent activity yet.' 
                   : '${_profileData?.username ?? "This user"} doesn\'t have any recent activity yet.',
@@ -760,6 +946,7 @@ class _ProfilePageState extends State<ProfilePage> {
     }
     
     final ratedLibrary = ratedLibraryList.first;
+    // Pass state variable _profileData for username to _buildRatedGamesSection if needed
     return _buildRatedGamesSection(context, ratedLibrary);
   }
 
@@ -776,6 +963,7 @@ class _ProfilePageState extends State<ProfilePage> {
               MaterialPageRoute(
                 builder: (context) => UserRatingsPage(
                   userId: _isCurrentUser ? null : widget.userId,
+                  // Use state variable _profileData here for username
                   username: _profileData?.username ?? 'User',
                 ),
               ),
@@ -945,9 +1133,10 @@ class _ProfilePageState extends State<ProfilePage> {
 
   // --- Section for Followed Libraries ---
   Widget _buildFollowedLibrariesSection(BuildContext context) {
+    // Use state variable _profileData here for username
     final String sectionTitle = _isCurrentUser 
         ? 'Libraries You Follow' 
-        : '${_profileData?.username ?? "User"}\'s Followed Libraries'; // Use username if available
+        : '${_profileData?.username ?? "User"}\'s Followed Libraries'; 
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -955,12 +1144,13 @@ class _ProfilePageState extends State<ProfilePage> {
         _buildSectionHeader(
           context,
           sectionTitle,
-          onSeeAll: () {
+          onSeeAll: () async {
             final String? targetUserIdString = _isCurrentUser ? null : widget.userId;
-            Navigator.push(
+            final result = await Navigator.push(
               context, 
               MaterialPageRoute(
                 builder: (_) => AllLibrariesPage(
+                  // Use state variable _profileData here for username
                   username: _profileData?.username ?? (_isCurrentUser ? 'Your' : 'User'),
                   userId: targetUserIdString,
                   fetchFollowedLibraries: true,
@@ -968,6 +1158,10 @@ class _ProfilePageState extends State<ProfilePage> {
               )
             );
             print('See All Followed Libraries tapped for user: $targetUserIdString');
+            if (result == 'updated' && mounted) {
+                print('ProfilePage: Received update signal from AllLibrariesPage (Followed).');
+                _loadFollowedLibraries(loadMore: false);
+            }
           },
         ),
         const SizedBox(height: 16),
@@ -982,7 +1176,7 @@ class _ProfilePageState extends State<ProfilePage> {
     // Loading state (show loader only if the list is currently empty)
     if (_isLoadingFollowed && _followedLibraries.isEmpty) {
       return const SizedBox(
-        height: 220, // Maintain consistent height
+        height: 120, // Maintain consistent height with the new card design
         child: Center(child: CircularProgressIndicator()),
       );
     }
@@ -990,7 +1184,7 @@ class _ProfilePageState extends State<ProfilePage> {
     // Error state (show error only if the list is empty)
     if (_errorFollowed != null && _followedLibraries.isEmpty) {
       return SizedBox(
-        height: 220, // Maintain consistent height
+        height: 120, // Maintain consistent height
         child: Center(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20.0),
@@ -1003,7 +1197,7 @@ class _ProfilePageState extends State<ProfilePage> {
     // Empty state (show a message if loading is finished and list is empty)
     if (_followedLibraries.isEmpty && !_isLoadingFollowed) {
       return SizedBox(
-        height: 220, // Maintain consistent height
+        height: 120, // Maintain consistent height
         child: Center(
           child: Text(
             _isCurrentUser ? 'You are not following any libraries yet.' : 'This user isn\'t following any libraries yet.',
@@ -1014,9 +1208,25 @@ class _ProfilePageState extends State<ProfilePage> {
       );
     }
 
+    List<LibrarySummaryResponse> sortedFollowedLibraries = List.from(_followedLibraries);
+
+    // Safely parse and sort followed libraries by updatedAt in descending order (most recent first)
+    sortedFollowedLibraries.sort((a, b) {
+      DateTime? dateA = a.updatedAt != null ? DateTime.tryParse(a.updatedAt.toString()) : null;
+      DateTime? dateB = b.updatedAt != null ? DateTime.tryParse(b.updatedAt.toString()) : null;
+
+      // Handle null or invalid dates (put them at the end)
+      if (dateA == null && dateB == null) return 0;
+      if (dateA == null) return 1; // a comes after b (put nulls last)
+      if (dateB == null) return -1; // a comes before b (put nulls last)
+
+      // Compare valid dates (descending)
+      return dateB.compareTo(dateA);
+    });
+
     // If we have libraries, show the list
     return SizedBox(
-      height: 220, // Same height as user's own library section
+      height: 120, // Adjust height for new card design
       child: ListView.builder(
         controller: _followedScrollController,
         scrollDirection: Axis.horizontal,
@@ -1026,9 +1236,10 @@ class _ProfilePageState extends State<ProfilePage> {
         itemBuilder: (context, index) {
           // Loader at the end
           if (index == _followedLibraries.length) {
-            return Container(
-              width: 160, // Match card width
-              height: 212,
+            return Container( // Placeholder loader matches card dimensions
+              width: 260,
+              height: 100,
+              margin: const EdgeInsets.only(right: 12, bottom: 8, top: 8),
               child: const Center(child: CircularProgressIndicator()),
             );
           }
@@ -1043,7 +1254,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                    summary.ownerUserId == _currentUserId;
           final bool isFollowableLibrary = !isOwnLibrary; // Kendi kütüphanesi değilse takip edilebilir
           
-          return _buildSpotifyStyleLibraryCard(
+          return _buildLibraryCard(
             context,
             librarySummary: summary,
             // Provide a fallback image path if needed
@@ -1053,5 +1264,37 @@ class _ProfilePageState extends State<ProfilePage> {
         },
       ),
     );
+  }
+
+  // Helper function to refresh profile data without showing a loading indicator
+  Future<void> _refreshProfileDataInBackground() async {
+    print("Refreshing profile data in background...");
+    try {
+      if (_isCurrentUser) {
+        await _refreshCurrentUserData();
+      } else if (widget.userId != null) {
+        final refreshedProfile = await _userRepository.fetchUserProfile(userId: widget.userId);
+        final refreshedLibrarySummaries = await _libraryRepository.getAllLibrarySummaries(
+          userId: widget.userId,
+        );
+        
+        if (refreshedProfile != null) {
+          refreshedProfile.librarySummaries = refreshedLibrarySummaries ?? [];
+        }
+
+        if (mounted && refreshedProfile != null) {
+          setState(() {
+            _profileData = refreshedProfile;
+            _isFollowing = refreshedProfile.isFollowing ?? _isFollowing;
+            
+            print("ProfilePage: Background refresh completed - libraries count: ${refreshedLibrarySummaries?.length ?? 0}");
+          });
+        } else if (mounted) {
+            print("ProfilePage: Background refresh failed or component unmounted.");
+        }
+      }
+    } catch (e) {
+      print('Error refreshing profile data in background: $e');
+    }
   }
 }

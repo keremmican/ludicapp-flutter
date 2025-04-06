@@ -1,21 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:ludicapp/services/model/response/user_follower_response.dart';
 import 'package:ludicapp/services/model/response/paged_response.dart';
-import 'package:ludicapp/services/repository/library_repository.dart';
-import 'package:ludicapp/services/repository/user_repository.dart'; // For follow/unfollow actions
+import 'package:ludicapp/services/repository/user_repository.dart';
 import 'package:ludicapp/theme/app_theme.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:ludicapp/features/profile/presentation/profile_page.dart'; // To navigate to user profiles
-import 'package:ludicapp/services/token_service.dart'; // Import TokenService
+import 'package:ludicapp/features/profile/presentation/profile_page.dart';
+import 'package:ludicapp/services/token_service.dart';
+import 'package:ludicapp/core/enums/display_mode.dart'; // Import DisplayMode
+
+// REMOVE ENUM DEFINITION FROM HERE IF IT EXISTS
+// enum DisplayMode {
+//   followers,
+//   following,
+// }
 
 class FollowersPage extends StatefulWidget {
-  final int libraryId;
-  final String libraryName;
+  final int userId;
+  final String username; // Username of the profile being viewed
+  final DisplayMode initialMode;
 
   const FollowersPage({
     Key? key,
-    required this.libraryId,
-    required this.libraryName,
+    required this.userId,
+    required this.username,
+    this.initialMode = DisplayMode.followers, // Default to followers
   }) : super(key: key);
 
   @override
@@ -23,12 +31,11 @@ class FollowersPage extends StatefulWidget {
 }
 
 class _FollowersPageState extends State<FollowersPage> {
-  final LibraryRepository _libraryRepository = LibraryRepository();
-  final UserRepository _userRepository = UserRepository(); // For follow/unfollow
-  final TokenService _tokenService = TokenService(); // Add TokenService instance
+  final UserRepository _userRepository = UserRepository();
+  final TokenService _tokenService = TokenService();
   final ScrollController _scrollController = ScrollController();
 
-  List<UserFollowerResponse> _followers = [];
+  List<UserFollowerResponse> _users = [];
   bool _isLoading = false;
   bool _isInitialLoading = true;
   bool _isLoadingMore = false;
@@ -36,14 +43,15 @@ class _FollowersPageState extends State<FollowersPage> {
   int _currentPage = 0;
   static const int _pageSize = 20;
   String? _error;
-  int? _currentUserId; // Add state for current user ID
+  int? _currentUserId; // Logged-in user's ID
+  late DisplayMode _currentMode;
 
   @override
   void initState() {
     super.initState();
+    _currentMode = widget.initialMode;
     _scrollController.addListener(_onScroll);
-    // Load current user ID first, then load followers
-    _loadCurrentUserIdAndFollowers();
+    _loadCurrentUserIdAndUsers();
   }
 
   @override
@@ -59,15 +67,14 @@ class _FollowersPageState extends State<FollowersPage> {
     final threshold = maxScroll * 0.9;
 
     if (currentScroll >= threshold && !_isLoadingMore && _hasMore && !_isInitialLoading) {
-      _loadFollowers(loadMore: true);
+      _loadUsers(loadMore: true);
     }
   }
 
-  Future<void> _loadCurrentUserIdAndFollowers() async {
+  Future<void> _loadCurrentUserIdAndUsers() async {
     await _loadCurrentUserId();
-    // Only load followers if current user ID is successfully fetched
     if (mounted && _currentUserId != null) {
-      _loadFollowers();
+      _loadUsers();
     }
   }
 
@@ -79,14 +86,14 @@ class _FollowersPageState extends State<FollowersPage> {
       if (mounted) {
         setState(() {
           _error = "Could not verify user.";
-          _isInitialLoading = false; // Stop initial loading indicator
+          _isInitialLoading = false;
         });
       }
     }
   }
 
-  Future<void> _loadFollowers({bool loadMore = false}) async {
-    if (_isLoading) return; // Prevent simultaneous loads
+  Future<void> _loadUsers({bool loadMore = false}) async {
+    if (_isLoading) return;
 
     setState(() {
       _isLoading = true;
@@ -95,42 +102,48 @@ class _FollowersPageState extends State<FollowersPage> {
       } else {
         _isInitialLoading = true;
         _error = null;
-        _currentPage = 0; // Reset page for initial load
-        _followers = []; // Clear previous results for initial load
-        _hasMore = true; // Assume there's more initially
+        _currentPage = 0;
+        _users = [];
+        _hasMore = true;
       }
     });
 
     try {
-      final response = await _libraryRepository.getLibraryFollowers(
-        widget.libraryId,
-        page: _currentPage,
-        size: _pageSize,
-      );
+      final Future<PagedResponse<UserFollowerResponse>> fetchFuture =
+          _currentMode == DisplayMode.followers
+              ? _userRepository.getFollowers(
+                  widget.userId,
+                  page: _currentPage,
+                  size: _pageSize,
+                )
+              : _userRepository.getFollowing(
+                  widget.userId,
+                  page: _currentPage,
+                  size: _pageSize,
+                );
 
-      if (response != null && mounted) {
+      final response = await fetchFuture;
+
+      if (mounted) {
         setState(() {
-          _followers.addAll(response.content);
+          _users.addAll(response.content);
           _hasMore = !response.last;
           if (_hasMore) {
             _currentPage++;
           }
         });
-      } else if (response == null && mounted) {
-        // Handle null response as potentially no more data or error
-        _hasMore = false;
-        if (!loadMore) {
-           _error = 'Could not load followers.';
-        }
       }
     } catch (e) {
-      print('Error loading followers: $e');
+      final errorMsg = _currentMode == DisplayMode.followers
+          ? 'Failed to load followers.'
+          : 'Failed to load following.';
+      print('Error loading ${_currentMode.name}: $e');
       if (mounted) {
         setState(() {
           if (!loadMore) {
-            _error = 'Failed to load followers. Please try again.';
+            _error = errorMsg;
           }
-          _hasMore = false; // Stop pagination on error
+          _hasMore = false;
         });
       }
     } finally {
@@ -144,15 +157,13 @@ class _FollowersPageState extends State<FollowersPage> {
     }
   }
 
-  // --- Follow/Unfollow Logic ---
   Future<void> _toggleFollow(UserFollowerResponse user) async {
-     // Prevent action if already processing or userId is null
      if (user.isProcessing || user.userId == null) return;
 
      final bool intendToFollow = !user.isFollowing;
 
      setState(() {
-        user.isProcessing = true; // Set processing flag
+        user.isProcessing = true;
      });
 
      try {
@@ -167,28 +178,16 @@ class _FollowersPageState extends State<FollowersPage> {
            setState(() {
               user.isFollowing = intendToFollow;
            });
-           // Optional: Show success SnackBar
-           // ScaffoldMessenger.of(context).showSnackBar(
-           //   SnackBar(content: Text(intendToFollow ? 'User followed' : 'User unfollowed')),
-           // );
+           _userRepository.refreshCurrentUserProfile();
         } else if (mounted) {
-            // Optional: Show error SnackBar
-            // ScaffoldMessenger.of(context).showSnackBar(
-            //   SnackBar(content: Text('Failed to ${intendToFollow ? 'follow' : 'unfollow'} user.')),
-            // );
+          print('Follow/unfollow API call failed');
         }
      } catch (e) {
        print('Error toggling follow: $e');
-       if (mounted) {
-         // Optional: Show error SnackBar
-         // ScaffoldMessenger.of(context).showSnackBar(
-         //   SnackBar(content: Text('Error: ${e.toString()}')),
-         // );
-       }
      } finally {
         if (mounted) {
            setState(() {
-              user.isProcessing = false; // Reset processing flag
+              user.isProcessing = false;
            });
         }
      }
@@ -196,10 +195,14 @@ class _FollowersPageState extends State<FollowersPage> {
 
   @override
   Widget build(BuildContext context) {
+    final String title = _currentMode == DisplayMode.followers
+        ? '${widget.username}\'s Followers'
+        : '${widget.username}\'s Following';
+
     return Scaffold(
       backgroundColor: AppTheme.primaryDark,
       appBar: AppBar(
-        title: Text('Followers of ${widget.libraryName}'),
+        title: Text(title),
         backgroundColor: AppTheme.primaryDark,
         elevation: 0,
       ),
@@ -226,7 +229,7 @@ class _FollowersPageState extends State<FollowersPage> {
               ),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: () => _loadFollowers(),
+                onPressed: () => _loadUsers(),
                 child: const Text('Retry'),
               ),
             ],
@@ -235,49 +238,54 @@ class _FollowersPageState extends State<FollowersPage> {
       );
     }
 
-    if (_followers.isEmpty) {
+    if (_users.isEmpty) {
+      final String emptyMessage = _currentMode == DisplayMode.followers
+          ? '${widget.username} has no followers yet.'
+          : '${widget.username} isn\'t following anyone yet.';
+      final IconData emptyIcon = _currentMode == DisplayMode.followers
+          ? Icons.people_outline
+          : Icons.person_add_disabled_outlined;
+
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.people_outline,
+              emptyIcon,
               size: 64,
               color: Colors.grey[600],
             ),
             const SizedBox(height: 16),
             Text(
-              'No followers yet',
+              emptyMessage,
               style: TextStyle(
                 color: Colors.grey[400],
                 fontSize: 18,
                 fontWeight: FontWeight.w500,
               ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
       );
     }
 
-    // Build the list view
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.symmetric(vertical: 16.0),
-      itemCount: _followers.length + (_isLoadingMore ? 1 : 0), // Add space for loader
+      itemCount: _users.length + (_isLoadingMore ? 1 : 0),
       itemBuilder: (context, index) {
-        if (index == _followers.length) {
-          // If it's the loader item
+        if (index == _users.length) {
           return _buildLoadingIndicator();
         }
 
-        final user = _followers[index];
-        return _buildFollowerListItem(user);
+        final user = _users[index];
+        return _buildUserListItem(user);
       },
     );
   }
 
-  Widget _buildFollowerListItem(UserFollowerResponse user) {
-    // Check if the displayed user is the current user
+  Widget _buildUserListItem(UserFollowerResponse user) {
     final bool isCurrentUser = user.userId == _currentUserId;
 
     return ListTile(
@@ -320,13 +328,12 @@ class _FollowersPageState extends State<FollowersPage> {
          ),
       ),
       trailing: isCurrentUser || user.userId == null
-        ? const SizedBox.shrink() // Hide button if it's the current user or ID is null
+        ? const SizedBox.shrink()
         : _buildFollowButton(user),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
     );
   }
 
-  // Helper to build the follow/unfollow button
   Widget _buildFollowButton(UserFollowerResponse user) {
      final bool isFollowing = user.isFollowing;
      final bool isProcessing = user.isProcessing;

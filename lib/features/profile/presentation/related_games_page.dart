@@ -927,10 +927,30 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
     );
 
     if (confirmed == true && mounted) {
-      // TODO: Implement hide functionality with backend
-      setState(() {
-        games.remove(gameToHide);  // Changed from indexWhere/removeAt to direct remove
-      });
+      // Call backend to hide the game
+      try {
+        final success = await _libraryRepository.hideGame(gameToHide.id);
+        if (success) {
+          setState(() {
+            games.removeWhere((game) => game.id == gameToHide.id);
+            gameDetailsMap.remove(gameToHide.id); // Also remove from details map
+          });
+          // Update HomeController
+          _homeController.updateGameHiddenState(gameToHide.id, true);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('"${gameToHide.name}" hidden.')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to hide game. Please try again.')),
+          );
+        }
+      } catch (e) {
+        print('Error hiding game: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error hiding game: ${e.toString()}')),
+        );
+      }
     }
   }
 

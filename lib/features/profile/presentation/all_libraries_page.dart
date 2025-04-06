@@ -116,6 +116,10 @@ class _AllLibrariesPageState extends State<AllLibrariesPage> {
         title: Text(pageTitle),
         backgroundColor: AppTheme.primaryDark,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          onPressed: () => Navigator.pop(context, 'updated'),
+        ),
         actions: [
           if (showCreateButton)
             IconButton(
@@ -125,11 +129,11 @@ class _AllLibrariesPageState extends State<AllLibrariesPage> {
             ),
         ],
       ),
-      body: _buildBody(),
+      body: _buildContent(),
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildContent() {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -169,11 +173,28 @@ class _AllLibrariesPageState extends State<AllLibrariesPage> {
       );
     }
 
+    // Create a mutable copy for sorting
+    List<LibrarySummaryResponse> sortedLibraries = List.from(_libraries!);
+
+    // Safely parse and sort libraries by updatedAt in descending order (most recent first)
+    sortedLibraries.sort((a, b) {
+      DateTime? dateA = a.updatedAt != null ? DateTime.tryParse(a.updatedAt.toString()) : null;
+      DateTime? dateB = b.updatedAt != null ? DateTime.tryParse(b.updatedAt.toString()) : null;
+
+      // Handle null or invalid dates (put them at the end)
+      if (dateA == null && dateB == null) return 0;
+      if (dateA == null) return 1; // a comes after b
+      if (dateB == null) return -1; // a comes before b
+
+      // Compare valid dates (descending)
+      return dateB.compareTo(dateA);
+    });
+
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: _libraries!.length,
+      itemCount: sortedLibraries.length, // Use sorted list length
       itemBuilder: (context, index) {
-        final library = _libraries![index];
+        final library = sortedLibraries[index]; // Use sorted list item
         return _buildLibraryListItem(library);
       },
     );

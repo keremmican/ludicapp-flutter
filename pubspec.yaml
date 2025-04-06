@@ -50,6 +50,8 @@ dependencies:
   riverpod_annotation: ^2.3.4
   provider: ^6.1.2
   shared_preferences: ^2.5.3
+  flutter_staggered_animations: ^1.1.1
+  flutter_animate: ^4.5.2
 
 dev_dependencies:
   flutter_test:
@@ -91,6 +93,7 @@ flutter:
           weight: 700
   assets:
     - lib/assets/images/
+    - lib/assets/images/profile/
     - lib/assets/icons/
 
   # The following line ensures that the Material Icons font is
