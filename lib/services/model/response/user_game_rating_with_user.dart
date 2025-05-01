@@ -1,21 +1,27 @@
-class UserGameRating {
+class UserGameRatingWithUser {
   final int id;
   final int userId;
+  final String username;
+  final String? profilePhotoUrl;
+  final String? profilePhotoType;
   final int gameId;
   final int rating;
   final String? comment;
   final DateTime ratingDate;
 
-  UserGameRating({
+  UserGameRatingWithUser({
     required this.id,
     required this.userId,
+    required this.username,
+    this.profilePhotoUrl,
+    this.profilePhotoType,
     required this.gameId,
     required this.rating,
     this.comment,
     required this.ratingDate,
   });
 
-  factory UserGameRating.fromJson(Map<String, dynamic> json) {
+  factory UserGameRatingWithUser.fromJson(Map<String, dynamic> json) {
     // ratingDate bir liste veya String olarak gelebilir
     DateTime parsedDate;
     
@@ -47,9 +53,12 @@ class UserGameRating {
       parsedDate = DateTime.now();
     }
     
-    return UserGameRating(
+    return UserGameRatingWithUser(
       id: json['id'] as int,
       userId: json['userId'] as int,
+      username: json['username'] as String,
+      profilePhotoUrl: json['profilePhotoUrl'] as String?,
+      profilePhotoType: json['profilePhotoType'] as String?,
       gameId: json['gameId'] as int,
       rating: json['rating'] as int,
       comment: json['comment'] as String?,
@@ -61,6 +70,9 @@ class UserGameRating {
     return {
       'id': id,
       'userId': userId,
+      'username': username,
+      'profilePhotoUrl': profilePhotoUrl,
+      'profilePhotoType': profilePhotoType,
       'gameId': gameId,
       'rating': rating,
       'comment': comment,

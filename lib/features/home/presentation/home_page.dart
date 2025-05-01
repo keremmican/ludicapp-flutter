@@ -576,12 +576,13 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
             key: ValueKey('large_section_${popularityType.id}'),
             title: _controller.getPopularityTypeTitle(popularityType.id),
             games: games.map((game) => _controller.getGameWithUserActions(game)).toList(),
-            onGameTap: (game) {
+            onGameTap: (game, coverProvider) {
               Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => GameDetailPage(
                     game: game,
+                    initialCoverProvider: coverProvider,
                   ),
                 ),
               );

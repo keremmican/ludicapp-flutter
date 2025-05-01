@@ -699,74 +699,61 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
                                 onSave: _handleSaveGame,
                                 onRate: _showRatingDialog,
                                 onHide: _handleHideGame,
-                                onGameUpdated: (gameId, updatedGame) {
-                                  print('RelatedGamesPage - Received updated game: gameId=$gameId, isSaved=${updatedGame.userActions?.isSaved}, isRated=${updatedGame.userActions?.isRated}, userRating=${updatedGame.userActions?.userRating}');
-                                  
-                                  if (gameDetailsMap.containsKey(gameId)) {
-                                    final existingGameDetail = gameDetailsMap[gameId]!;
-                                    final updatedUserActions = UserGameActions(
-                                      isSaved: updatedGame.userActions?.isSaved ?? false,
-                                      isRated: updatedGame.userActions?.isRated ?? false,
-                                      userRating: updatedGame.userActions?.userRating,
-                                    );
+                                onGameUpdated: (gameId, returnedGame) async {
+                                  print('RelatedGamesPage - Returned from GameDetailPage for gameId=$gameId. Fetching fresh details...');
+                                  // NOTE: We ignore returnedGame.userActions regarding isInCustomList
+                                  // because AddToListModal doesn't return its final state.
 
-                                    print('RelatedGamesPage - Creating updated game detail with actions: isSaved=${updatedUserActions.isSaved}, isRated=${updatedUserActions.isRated}, userRating=${updatedUserActions.userRating}');
+                                  if (!mounted) return; // Check if the widget is still in the tree
 
-                                    // savedGames ve ratedGames Set'lerini güncelle
-                                    if (updatedUserActions.isSaved == true) {
-                                      print('RelatedGamesPage - Adding game $gameId to savedGames');
-                                      savedGames.add(gameId);
-                                    } else {
-                                      print('RelatedGamesPage - Removing game $gameId from savedGames');
-                                      savedGames.remove(gameId);
+                                  try {
+                                    // Fetch the *latest* details from the backend
+                                    final GameDetailWithUserInfo freshDetails = await _gameRepository.fetchGameDetailsWithUserInfo(gameId);
+
+                                    if (mounted) {
+                                      print('RelatedGamesPage - Fresh details received for gameId=$gameId: userActions=${freshDetails.userActions}');
+
+                                      // Update the central map with the fresh data
+                                      gameDetailsMap[gameId] = freshDetails;
+
+                                      // Reprocess user info (for saved/rated sets - might be slightly redundant if only list changed, but safe)
+                                      _processUserGameInfo(freshDetails);
+
+                                      // Trigger UI update using the fresh details
+                                      setState(() {
+                                         // Force rebuild of the GameCard by updating the GameSummary reference
+                                         // This ensures the GridView item rebuilds.
+                                         final gameIndex = games.indexWhere((game) => game.id == gameId);
+                                         if (gameIndex != -1) {
+                                           // Recreate the GameSummary object from the fresh details using the correct constructor
+                                           games[gameIndex] = GameSummary.fromGameDetailWithUserInfo(freshDetails);
+                                         }
+                                         print('RelatedGamesPage - State updated with fresh details for gameId=$gameId');
+                                      });
                                     }
-
-                                    if (updatedUserActions.isRated == true) {
-                                      print('RelatedGamesPage - Adding game $gameId to ratedGames');
-                                      ratedGames.add(gameId);
-                                      if (updatedUserActions.userRating != null) {
-                                        print('RelatedGamesPage - Setting rating ${updatedUserActions.userRating} for game $gameId');
-                                        userRatings[gameId] = updatedUserActions.userRating!;
-                                      }
-                                    } else {
-                                      print('RelatedGamesPage - Removing game $gameId from ratedGames');
-                                      ratedGames.remove(gameId);
-                                      userRatings.remove(gameId);
+                                  } catch (e) {
+                                    if (mounted) {
+                                      print('RelatedGamesPage - Error fetching fresh details for gameId=$gameId: $e');
+                                      // Optionally show an error message to the user
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                         SnackBar(content: Text('Could not refresh game status for ${games.firstWhere((g) => g.id == gameId, orElse: () => GameSummary(
+                                           id: gameId, 
+                                           name: 'Game', 
+                                           slug: 'unknown-game',
+                                           genres: [],
+                                           themes: [],
+                                           platforms: [],
+                                           companies: [],
+                                           screenshots: [],
+                                           gameVideos: [],
+                                           franchises: [],
+                                           gameModes: [],
+                                           playerPerspectives: [],
+                                           languageSupports: [],
+                                         )).name}.')),
+                                      );
+                                      // The UI will remain in its previous (potentially incorrect optimistic) state
                                     }
-
-                                    // Yeni bir GameDetailWithUserInfo nesnesi oluştur
-                                    final updatedGameDetail = GameDetailWithUserInfo(
-                                      gameDetails: existingGameDetail.gameDetails,
-                                      userActions: updatedUserActions,
-                                    );
-
-                                    setState(() {
-                                      // gameDetailsMap'i güncelle
-                                      gameDetailsMap[gameId] = updatedGameDetail;
-
-                                      // GameCard'ı zorla yeniden oluştur
-                                      final gameIndex = games.indexWhere((game) => game.id == gameId);
-                                      if (gameIndex != -1) {
-                                        // Yeni bir GameSummary nesnesi oluştur
-                                        games[gameIndex] = GameSummary(
-                                          id: games[gameIndex].id,
-                                          name: games[gameIndex].name,
-                                          coverUrl: games[gameIndex].coverUrl,
-                                          totalRating: games[gameIndex].totalRating,
-                                          screenshots: games[gameIndex].screenshots,
-                                          slug: games[gameIndex].slug,
-                                          genres: games[gameIndex].genres,
-                                          themes: games[gameIndex].themes,
-                                          platforms: games[gameIndex].platforms,
-                                          companies: games[gameIndex].companies,
-                                          gameVideos: games[gameIndex].gameVideos,
-                                          franchises: games[gameIndex].franchises,
-                                          gameModes: games[gameIndex].gameModes,
-                                          playerPerspectives: games[gameIndex].playerPerspectives,
-                                          languageSupports: games[gameIndex].languageSupports,
-                                        );
-                                      }
-                                    });
                                   }
                                 },
                               );
@@ -800,10 +787,12 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
               final updatedActions = existingGameDetail.userActions?.copyWith(
                 isRated: true,
                 userRating: rating,
+                isInCustomList: existingGameDetail.userActions?.isInCustomList,
               ) ?? UserGameActions(
                 isRated: true,
                 userRating: rating,
                 isSaved: existingGameDetail.userActions?.isSaved ?? false,
+                isInCustomList: existingGameDetail.userActions?.isInCustomList,
               );
               
               gameDetailsMap[game.id] = GameDetailWithUserInfo(
@@ -822,10 +811,12 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
               final updatedActions = existingGameDetail.userActions?.copyWith(
                 isRated: false,
                 userRating: null,
+                isInCustomList: existingGameDetail.userActions?.isInCustomList,
               ) ?? UserGameActions(
                 isRated: false,
                 userRating: null,
                 isSaved: existingGameDetail.userActions?.isSaved ?? false,
+                isInCustomList: existingGameDetail.userActions?.isInCustomList,
               );
               
               gameDetailsMap[game.id] = GameDetailWithUserInfo(
@@ -874,8 +865,8 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
         setState(() {
           // Update the game's userActions in gameDetailsMap
           if (gameDetail != null) {
-            final updatedActions = gameDetail.userActions?.copyWith(isSaved: !isSaved) ?? 
-                UserGameActions(isSaved: !isSaved);
+            final updatedActions = gameDetail.userActions?.copyWith(isSaved: !isSaved, isInCustomList: gameDetail.userActions?.isInCustomList) ??
+                UserGameActions(isSaved: !isSaved, isInCustomList: gameDetail.userActions?.isInCustomList);
             gameDetailsMap[game.id] = GameDetailWithUserInfo(
               gameDetails: gameDetail.gameDetails,
               userActions: updatedActions,
@@ -1020,6 +1011,7 @@ class GameCard extends StatefulWidget {
 class _GameCardState extends State<GameCard> {
   bool get isSaved => widget.gameDetail?.userActions?.isSaved ?? false;
   bool get isRated => widget.gameDetail?.userActions?.isRated ?? false;
+  bool get isInCustomList => widget.gameDetail?.userActions?.isInCustomList ?? false;
 
   @override
   Widget build(BuildContext context) {
@@ -1120,6 +1112,23 @@ class _GameCardState extends State<GameCard> {
                         ),
                         child: const Icon(
                           Icons.favorite,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  if (isInCustomList)
+                    Positioned(
+                      bottom: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.5),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.inventory_2,
                           color: Colors.white,
                           size: 20,
                         ),

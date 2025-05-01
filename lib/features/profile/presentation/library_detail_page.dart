@@ -210,6 +210,8 @@ class _LibraryDetailPageState extends State<LibraryDetailPage> {
       if (userActions.isSaved == true) {
         savedGames.add(gameId);
       }
+      
+      // isInCustomList is handled directly from userActions object
     }
   }
 
@@ -276,8 +278,8 @@ class _LibraryDetailPageState extends State<LibraryDetailPage> {
       if (success && mounted) {
         setState(() {
           if (gameDetail != null) {
-            final updatedActions = gameDetail.userActions?.copyWith(isSaved: !isSaved) ?? 
-                UserGameActions(isSaved: !isSaved);
+            final updatedActions = gameDetail.userActions?.copyWith(isSaved: !isSaved, isInCustomList: gameDetail.userActions?.isInCustomList) ?? 
+                UserGameActions(isSaved: !isSaved, isInCustomList: gameDetail.userActions?.isInCustomList);
             gameDetailsMap[game.id] = GameDetailWithUserInfo(
               gameDetails: gameDetail.gameDetails,
               userActions: updatedActions,
@@ -314,10 +316,12 @@ class _LibraryDetailPageState extends State<LibraryDetailPage> {
               final updatedActions = existingGameDetail.userActions?.copyWith(
                 isRated: true,
                 userRating: rating,
+                isInCustomList: existingGameDetail.userActions?.isInCustomList,
               ) ?? UserGameActions(
                 isRated: true,
                 userRating: rating,
                 isSaved: existingGameDetail.userActions?.isSaved ?? false,
+                isInCustomList: existingGameDetail.userActions?.isInCustomList,
               );
               
               gameDetailsMap[game.id] = GameDetailWithUserInfo(
@@ -334,10 +338,12 @@ class _LibraryDetailPageState extends State<LibraryDetailPage> {
               final updatedActions = existingGameDetail.userActions?.copyWith(
                 isRated: false,
                 userRating: null,
+                isInCustomList: existingGameDetail.userActions?.isInCustomList,
               ) ?? UserGameActions(
                 isRated: false,
                 userRating: null,
                 isSaved: existingGameDetail.userActions?.isSaved ?? false,
+                isInCustomList: existingGameDetail.userActions?.isInCustomList,
               );
               
               gameDetailsMap[game.id] = GameDetailWithUserInfo(
@@ -453,6 +459,8 @@ class _LibraryDetailPageState extends State<LibraryDetailPage> {
                         TextField(
                            controller: _titleController,
                            style: theme.textTheme.bodyLarge,
+                           maxLength: 50,
+                           buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                            decoration: InputDecoration(
                               hintText: 'Enter library name',
                               hintStyle: inputTheme.hintStyle,
@@ -497,6 +505,12 @@ class _LibraryDetailPageState extends State<LibraryDetailPage> {
                       onPressed: () {
                         final enteredTitle = _titleController.text.trim();
                         if (enteredTitle.isNotEmpty) {
+                           if (enteredTitle.length > 50) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                 const SnackBar(content: Text('Library name is too long. Please enter a shorter name.')),
+                              );
+                              return;
+                           }
                            Navigator.pop(context, {'title': enteredTitle, 'isPrivate': tempIsPrivate}); 
                         }
                       },
@@ -1071,6 +1085,7 @@ class _LibraryDetailPageState extends State<LibraryDetailPage> {
                         isSaved: result.userActions?.isSaved ?? false,
                         isRated: result.userActions?.isRated ?? false,
                         userRating: result.userActions?.userRating,
+                        isInCustomList: result.userActions?.isInCustomList,
                       );
                       
                       gameDetailsMap[game.id] = GameDetailWithUserInfo(
@@ -1178,6 +1193,24 @@ class _LibraryDetailPageState extends State<LibraryDetailPage> {
                       ],
                     ),
                   ),
+                  
+                  if (gameDetailsMap[game.id]?.userActions?.isInCustomList == true)
+                    Positioned(
+                      bottom: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.5),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.inventory_2,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),

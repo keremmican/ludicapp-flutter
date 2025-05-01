@@ -1,5 +1,7 @@
 import 'package:ludicapp/services/api_service.dart';
 import 'package:ludicapp/services/model/response/user_game_rating.dart';
+import 'package:ludicapp/services/model/request/rating_filter_request.dart';
+import 'package:ludicapp/services/model/response/user_game_rating_with_user.dart';
 
 class RatingRepository {
   final ApiService _apiService = ApiService();
@@ -15,25 +17,7 @@ class RatingRepository {
       );
       
       if (response.data is Map<String, dynamic>) {
-        final data = Map<String, dynamic>.from(response.data);
-        // Parse ratingDate from the response
-        if (data['ratingDate'] != null) {
-          if (data['ratingDate'] is List) {
-            // Handle List format: [2024, 3, 3, 23, 25, 10, 251483000]
-            final List<dynamic> dateList = data['ratingDate'] as List;
-            final year = dateList[0] as int;
-            final month = dateList[1] as int;
-            final day = dateList[2] as int;
-            final hour = dateList[3] as int;
-            final minute = dateList[4] as int;
-            final second = dateList[5] as int;
-            final microsecond = (dateList[6] as int) ~/ 1000; // Convert nanoseconds to microseconds
-            
-            final dateTime = DateTime(year, month, day, hour, minute, second, microsecond);
-            data['ratingDate'] = dateTime.toIso8601String();
-          }
-        }
-        return UserGameRating.fromJson(data);
+        return UserGameRating.fromJson(response.data);
       }
       
       throw Exception('Invalid response format');
@@ -53,45 +37,9 @@ class RatingRepository {
         },
       );
       
-      // Yanıt formatını kontrol et ve ratingDate'i dönüştür (rateGame'deki gibi)
       if (response.data is Map<String, dynamic>) {
-        final data = Map<String, dynamic>.from(response.data);
-        // Parse ratingDate from the response
-        if (data['ratingDate'] != null) {
-          if (data['ratingDate'] is List) {
-            // Handle List format: [2024, 3, 3, 23, 25, 10, 251483000]
-            try {
-              final List<dynamic> dateList = data['ratingDate'] as List;
-              final year = dateList[0] as int;
-              final month = dateList[1] as int;
-              final day = dateList[2] as int;
-              final hour = dateList[3] as int;
-              final minute = dateList[4] as int;
-              final second = dateList[5] as int;
-              // Nanoseconds'ı microseconds'a çevirirken null veya hatalı tip kontrolü
-              final nanoseconds = dateList.length > 6 ? dateList[6] : 0;
-              final microsecond = (nanoseconds is int) ? nanoseconds ~/ 1000 : 0;
-              
-              final dateTime = DateTime.utc(year, month, day, hour, minute, second, microsecond);
-              data['ratingDate'] = dateTime.toIso8601String();
-            } catch (e) {
-              print('Error parsing ratingDate list in commentGame: $e');
-              // Hata durumunda tarihi null veya varsayılan bir değere ayarlayabiliriz
-              // Veya hatayı yukarı fırlatabiliriz. Şimdilik loglayıp devam edelim.
-              // Belki de tarihi olmayan bir UserGameRating döndürmek daha iyi?
-              // Şimdilik fromJson'a gitmesine izin verelim, orada hata verebilir.
-            }
-          } else if (data['ratingDate'] is String) {
-            // Eğer zaten string ise bir şey yapma
-          } else {
-            // Beklenmeyen format
-            print('Unexpected format for ratingDate in commentGame: ${data['ratingDate'].runtimeType}');
-            // Hata yönetimi eklenebilir
-          }
-        }
-        return UserGameRating.fromJson(data);
+        return UserGameRating.fromJson(response.data);
       } else {
-        // Yanıt Map değilse
         print('Unexpected response data type in commentGame: ${response.data.runtimeType}');
         throw Exception('Invalid response format from comment endpoint');
       }
@@ -121,6 +69,103 @@ class RatingRepository {
           .toList();
     } catch (e) {
       print('Error getting all ratings: $e');
+      return [];
+    }
+  }
+
+  Future<List<UserGameRating>> filterRatings({
+    required RatingFilterRequest filter, 
+    int page = 0, 
+    int size = 20,
+    String sort = 'ratingDate',
+    String direction = 'DESC',
+  }) async {
+    try {
+      final Map<String, dynamic> queryParams = {
+        'page': page.toString(),
+        'size': size.toString(),
+        'sort': sort,
+        'direction': direction,
+        ...filter.toQueryParameters(),
+      };
+      
+      print('Sending filter request with params: $queryParams');
+      
+      final response = await _apiService.get(
+        '/api/rating/filter',
+        queryParameters: queryParams,
+      );
+      
+      print('Filter response data type: ${response.data.runtimeType}');
+      print('Filter response data: ${response.data}');
+      
+      // API yanıtının yapısını kontrol et
+      if (response.data is Map<String, dynamic> && response.data.containsKey('content')) {
+        // Normal sayfalanmış yanıt formatı
+        final content = response.data['content'];
+        if (content is List) {
+          return content.map((json) => UserGameRating.fromJson(json)).toList();
+        } else {
+          print('Content is not a list: $content');
+          return [];
+        }
+      } else if (response.data is List) {
+        // Doğrudan liste formatında yanıt
+        return (response.data as List).map((json) => UserGameRating.fromJson(json)).toList();
+      } else {
+        print('Unexpected response format: ${response.data}');
+        return [];
+      }
+    } catch (e) {
+      print('Error filtering ratings: $e');
+      return [];
+    }
+  }
+  
+  Future<List<UserGameRatingWithUser>> filterRatingsWithUser({
+    required RatingFilterRequest filter, 
+    int page = 0, 
+    int size = 20,
+    String sort = 'ratingDate',
+    String direction = 'DESC',
+  }) async {
+    try {
+      final Map<String, dynamic> queryParams = {
+        'page': page.toString(),
+        'size': size.toString(),
+        'sort': sort,
+        'direction': direction,
+        ...filter.toQueryParameters(),
+      };
+      
+      print('Sending filter-with-user request with params: $queryParams');
+      
+      final response = await _apiService.get(
+        '/api/rating/filter-with-user',
+        queryParameters: queryParams,
+      );
+      
+      print('Filter with user response data type: ${response.data.runtimeType}');
+      
+      // API yanıtının yapısını kontrol et
+      if (response.data is Map<String, dynamic> && response.data.containsKey('content')) {
+        // Normal sayfalanmış yanıt formatı
+        final content = response.data['content'];
+        if (content is List) {
+          return content.map((json) => UserGameRatingWithUser.fromJson(json)).toList();
+        } else {
+          print('Content is not a list: $content');
+          return [];
+        }
+      } else if (response.data is List) {
+        // Doğrudan liste formatında yanıt
+        return (response.data as List).map((json) => UserGameRatingWithUser.fromJson(json)).toList();
+      } else {
+        print('Unexpected response format: ${response.data}');
+        return [];
+      }
+    } catch (e) {
+      print('Error filtering ratings with user: $e');
       return [];
     }
   }

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ludicapp/core/models/game.dart';
+import 'package:ludicapp/core/providers/blurred_background_provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
-class LargeGameCard extends StatelessWidget {
+class LargeGameCard extends ConsumerWidget {
   final Game game;
   final VoidCallback onTap;
   final double scale;
@@ -14,7 +17,35 @@ class LargeGameCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Arka planı ön belleğe al
+    if (game.screenshots != null && game.screenshots!.isNotEmpty) {
+      // BlurredBackgroundProvider doğrudan sınıf olarak kullan
+      final backgroundProvider = BlurredBackgroundProvider();
+      backgroundProvider.cacheBackground(
+        game.gameId.toString(),
+        game.screenshots![0],
+      );
+      
+      // Önceden ön belleğe al (çıktıyı bekleme)
+      try {
+        precacheImage(CachedNetworkImageProvider(game.screenshots![0]), context)
+          .catchError((e) => print('Error pre-caching screenshot: $e'));
+      } catch (e) {
+        print('Error initiating screenshot pre-cache: $e');
+      }
+    }
+    
+    // Kapak görselini de önceden ön belleğe al
+    if (game.coverUrl != null && game.coverUrl!.isNotEmpty) {
+      try {
+        precacheImage(CachedNetworkImageProvider(game.coverUrl!), context)
+          .catchError((e) => print('Error pre-caching cover: $e'));
+      } catch (e) {
+        print('Error initiating cover pre-cache: $e');
+      }
+    }
+    
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10),
       child: SizedBox(
@@ -27,7 +58,8 @@ class LargeGameCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
               image: game.coverUrl != null
                   ? DecorationImage(
-                      image: NetworkImage(game.coverUrl!),
+                      // NetworkImage yerine CachedNetworkImageProvider kullan
+                      image: CachedNetworkImageProvider(game.coverUrl!),
                       fit: BoxFit.cover,
                       colorFilter: ColorFilter.mode(
                         Colors.black.withOpacity(0.2),

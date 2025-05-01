@@ -93,6 +93,7 @@ class Game {
 
   bool get isSaved => _userActions?.isSaved ?? false;
   bool get isRated => _userActions?.isRated ?? false;
+  bool get isInCustomList => _userActions?.isInCustomList ?? false;
   int? get userRating => _userActions?.userRating;
 
   Game({

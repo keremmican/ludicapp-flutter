@@ -365,6 +365,8 @@ class _AllLibrariesPageState extends State<AllLibrariesPage> {
         content: TextField(
           controller: titleController,
           style: const TextStyle(color: Colors.white),
+          maxLength: 50,
+          buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
           decoration: InputDecoration(
             hintText: 'Enter library title',
             hintStyle: TextStyle(color: Colors.grey[600]),
@@ -386,6 +388,12 @@ class _AllLibrariesPageState extends State<AllLibrariesPage> {
             onPressed: () {
               final enteredTitle = titleController.text.trim();
               if (enteredTitle.isNotEmpty) {
+                if (enteredTitle.length > 50) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Library name is too long. Please enter a shorter name.')),
+                  );
+                  return;
+                }
                 Navigator.pop(context, enteredTitle); // Return new title
               }
             },

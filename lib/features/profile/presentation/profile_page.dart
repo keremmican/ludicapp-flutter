@@ -21,6 +21,8 @@ import 'package:ludicapp/core/enums/library_type.dart';
 import 'package:ludicapp/services/model/response/paged_response.dart';
 import 'package:ludicapp/services/repository/library_repository.dart';
 import 'package:ludicapp/core/enums/profile_photo_type.dart';
+import 'package:ludicapp/features/profile/presentation/widgets/user_activities_section.dart';
+import 'package:ludicapp/models/user_activity.dart';
 
 class ProfilePage extends StatefulWidget {
   final String? userId;
@@ -658,8 +660,13 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
                   _buildFollowedLibrariesSection(context),
                   
                   // Recent Activity Section comes after Followed Libraries
-                  _buildRatedLibrarySection(context, profileData.librarySummaries),
-
+                  UserActivitiesSection(
+                    username: profileData.username,
+                    userId: _isCurrentUser ? null : widget.userId,
+                    isCurrentUser: _isCurrentUser,
+                    activities: UserActivity.generateMockActivities(),
+                  ),
+                  
                   // Steam Profile Section (Remains last)
                   _buildSteamProfile(context),
                 ],
@@ -913,225 +920,6 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
     );
   }
   
-  Widget _buildRatedLibrarySection(BuildContext context, List<LibrarySummaryResponse> libraries) {
-    // This method already receives libraries, no need to access _profileData directly here for this purpose
-    final ratedLibraryList = libraries.where((lib) => lib.libraryType == LibraryType.RATED).toList();
-    
-    if (ratedLibraryList.isEmpty || (_isCurrentUser && ratedLibraryList.first.gameCount == 0)) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildSectionHeader(
-            context,
-            'Recent Activity',
-            onSeeAll: null, // No See All button for empty state
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 100,
-            child: Center(
-              child: Text(
-                // Use state variable _profileData here for username
-                _isCurrentUser 
-                  ? 'You don\'t have any recent activity yet.' 
-                  : '${_profileData?.username ?? "This user"} doesn\'t have any recent activity yet.',
-                style: TextStyle(color: Colors.grey[500]),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-        ],
-      );
-    }
-    
-    final ratedLibrary = ratedLibraryList.first;
-    // Pass state variable _profileData for username to _buildRatedGamesSection if needed
-    return _buildRatedGamesSection(context, ratedLibrary);
-  }
-
-  Widget _buildRatedGamesSection(BuildContext context, LibrarySummaryResponse ratedLibrary) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionHeader(
-          context, 
-          'Recent Activity',
-          onSeeAll: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => UserRatingsPage(
-                  userId: _isCurrentUser ? null : widget.userId,
-                  // Use state variable _profileData here for username
-                  username: _profileData?.username ?? 'User',
-                ),
-              ),
-            );
-          },
-        ),
-        const SizedBox(height: 16),
-        
-        // Content of rated games section
-        SizedBox(
-          height: 180,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: min(ratedLibrary.gameCount, 10), // Limit to 10 or available games
-            itemBuilder: (context, index) {
-              // Placeholder for actual game items
-              return Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: Container(
-                  width: 120,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).cardTheme.color,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Center(
-                    child: Text(
-                      'Game ${index + 1}',
-                      style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 24),
-      ],
-    );
-  }
-
-  IconData _getLibraryIcon(String title) {
-      switch (title) {
-        case 'Saved':
-          return Icons.bookmark;
-        case 'Hidden':
-          return Icons.visibility_off;
-        case 'Rated':
-          return Icons.star;
-        case 'Currently Playing':
-          return Icons.sports_esports;
-        default:
-          return Icons.games;
-      }
-    }
-
-  List<Color> _getLibraryGradient(String title) {
-      switch (title) {
-        case 'Saved':
-          return [Color(0xFF6A3093), Color(0xFFA044FF)];
-        case 'Hidden':
-          return [Color(0xFF434343), Color(0xFF000000)];
-        case 'Rated':
-          return [Color(0xFFFF512F), Color(0xFFDD2476)];
-        case 'Currently Playing':
-          return [Color(0xFF1A2980), Color(0xFF26D0CE)];
-        default:
-          return [Color(0xFF4B79A1), Color(0xFF283E51)];
-      }
-  }
-
-  Widget _buildSteamProfile(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildSectionHeader(context, 'Steam Profile'),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Theme.of(context).cardTheme.color,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: Colors.grey.withOpacity(0.1),
-                width: 1,
-              ),
-            ),
-            child: Column(
-              children: [
-                _buildSteamStat(
-                  context: context,
-                  icon: Icons.sports_esports,
-                  label: 'Games Played',
-                  value: '120',
-                ),
-                const SizedBox(height: 16),
-                _buildSteamStat(
-                  context: context,
-                  icon: Icons.emoji_events,
-                  label: 'Achievements',
-                  value: '350',
-                ),
-                const SizedBox(height: 16),
-                _buildSteamStat(
-                  context: context,
-                  icon: Icons.timer,
-                  label: 'Hours Played',
-                  value: '540',
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSteamStat({
-    required BuildContext context,
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            icon,
-            color: Theme.of(context).colorScheme.primary,
-            size: 20,
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  color: Theme.of(context).textTheme.bodySmall?.color,
-                  fontSize: 14,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                value,
-                style: TextStyle(
-                  color: Theme.of(context).textTheme.bodyLarge?.color,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  // --- Section for Followed Libraries ---
   Widget _buildFollowedLibrariesSection(BuildContext context) {
     // Use state variable _profileData here for username
     final String sectionTitle = _isCurrentUser 
@@ -1296,5 +1084,131 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
     } catch (e) {
       print('Error refreshing profile data in background: $e');
     }
+  }
+
+  IconData _getLibraryIcon(String title) {
+      switch (title) {
+        case 'Saved':
+          return Icons.bookmark;
+        case 'Hidden':
+          return Icons.visibility_off;
+        case 'Rated':
+          return Icons.star;
+        case 'Currently Playing':
+          return Icons.sports_esports;
+        default:
+          return Icons.games;
+      }
+    }
+
+  List<Color> _getLibraryGradient(String title) {
+      switch (title) {
+        case 'Saved':
+          return [Color(0xFF6A3093), Color(0xFFA044FF)];
+        case 'Hidden':
+          return [Color(0xFF434343), Color(0xFF000000)];
+        case 'Rated':
+          return [Color(0xFFFF512F), Color(0xFFDD2476)];
+        case 'Currently Playing':
+          return [Color(0xFF1A2980), Color(0xFF26D0CE)];
+        default:
+          return [Color(0xFF4B79A1), Color(0xFF283E51)];
+      }
+  }
+
+  Widget _buildSteamProfile(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(20.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader(context, 'Steam Profile'),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardTheme.color,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Colors.grey.withOpacity(0.1),
+                width: 1,
+              ),
+            ),
+            child: Column(
+              children: [
+                _buildSteamStat(
+                  context: context,
+                  icon: Icons.sports_esports,
+                  label: 'Games Played',
+                  value: '120',
+                ),
+                const SizedBox(height: 16),
+                _buildSteamStat(
+                  context: context,
+                  icon: Icons.emoji_events,
+                  label: 'Achievements',
+                  value: '350',
+                ),
+                const SizedBox(height: 16),
+                _buildSteamStat(
+                  context: context,
+                  icon: Icons.timer,
+                  label: 'Hours Played',
+                  value: '540',
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSteamStat({
+    required BuildContext context,
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            color: Theme.of(context).colorScheme.primary,
+            size: 20,
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: Theme.of(context).textTheme.bodySmall?.color,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: TextStyle(
+                  color: Theme.of(context).textTheme.bodyLarge?.color,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }
