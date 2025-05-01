@@ -12,12 +12,14 @@ class GameRepository {
   Future<PageableResponse<GameSummary>> fetchNewReleases({
     int page = 0,
     int size = 20,
+    bool availableToPlay = true,
   }) async {
     final response = await _apiService.get(
       "/games/new-releases",
       queryParameters: {
         'page': page.toString(),
         'size': size.toString(),
+        'availableToPlay': availableToPlay.toString(),
       },
     );
 
@@ -34,12 +36,14 @@ class GameRepository {
   Future<PageableResponse<GameSummary>> fetchTopRatedGames({
     int page = 0,
     int size = 20,
+    bool availableToPlay = true,
   }) async {
     final response = await _apiService.get(
       "/games/top-games",
       queryParameters: {
         'page': page.toString(),
         'size': size.toString(),
+        'availableToPlay': availableToPlay.toString(),
       },
     );
 
@@ -69,6 +73,7 @@ class GameRepository {
     required String sortDirection,
     int page = 0,
     int pageSize = 20,
+    bool availableToPlay = true,
   }) async {
     final response = await _apiService.get(
       "/games/games-by-genre",
@@ -78,6 +83,7 @@ class GameRepository {
         'sortDirection': sortDirection,
         'page': page.toString(),
         'pageSize': pageSize.toString(),
+        'availableToPlay': availableToPlay.toString(),
       },
     );
 
@@ -97,6 +103,7 @@ class GameRepository {
     required String sortDirection,
     int page = 0,
     int pageSize = 20,
+    bool availableToPlay = true,
   }) async {
     final response = await _apiService.get(
       "/games/games-by-theme",
@@ -106,6 +113,7 @@ class GameRepository {
         'sortDirection': sortDirection,
         'page': page.toString(),
         'pageSize': pageSize.toString(),
+        'availableToPlay': availableToPlay.toString(),
       },
     );
 
@@ -161,11 +169,15 @@ class GameRepository {
     return jsonData.map((json) => GameCategory.fromJson(json as Map<String, dynamic>)).toList();
   }
 
-  Future<List<GameSummary>> fetchRandomGames({int count = 10}) async {
+  Future<List<GameSummary>> fetchRandomGames({
+    int count = 10,
+    bool availableToPlay = true,
+  }) async {
     final response = await _apiService.get(
       "/games/random",
       queryParameters: {
         'count': count.toString(),
+        'availableToPlay': availableToPlay.toString(),
       },
     );
 
@@ -186,11 +198,15 @@ class GameRepository {
     return jsonData.map((json) => NameIdResponse.fromJson(json as Map<String, dynamic>)).toList();
   }
 
-  Future<GameSummary> getSingleGameByPopularityType(int popularityType) async {
+  Future<GameSummary> getSingleGameByPopularityType(
+    int popularityType, {
+    bool availableToPlay = true,
+  }) async {
     final response = await _apiService.get(
       "/games/get-single-game-by-popularity-type",
       queryParameters: {
         'popularityType': popularityType.toString(),
+        'availableToPlay': availableToPlay.toString(),
       },
     );
     
@@ -207,6 +223,7 @@ class GameRepository {
     String sortDirection = 'DESC',
     int page = 0,
     int pageSize = 20,
+    bool availableToPlay = true,
   }) async {
     final response = await _apiService.get(
       "/games/with-user/get-games-by-popularity-type",
@@ -216,6 +233,7 @@ class GameRepository {
         'sortDirection': sortDirection,
         'page': page.toString(),
         'pageSize': pageSize.toString(),
+        'availableToPlay': availableToPlay.toString(),
       },
     );
 
@@ -236,6 +254,7 @@ class GameRepository {
     required String sortDirection,
     required int page,
     required int pageSize,
+    bool availableToPlay = true,
   }) async {
     final response = await _apiService.get(
       '/games/games-by-platform',
@@ -245,6 +264,7 @@ class GameRepository {
         'sortDirection': sortDirection,
         'page': page.toString(),
         'pageSize': pageSize.toString(),
+        'availableToPlay': availableToPlay.toString(),
       },
     );
 
@@ -258,8 +278,17 @@ class GameRepository {
     );
   }
 
-  Future<List<GameSummary>> fetchRandomGamesWithUserInfo() async {
-    final response = await _apiService.get("/games/with-user/random");
+  Future<List<GameSummary>> fetchRandomGamesWithUserInfo({
+    bool availableToPlay = true,
+    bool hideRated = false,
+  }) async {
+    final response = await _apiService.get(
+      "/games/with-user/random",
+      queryParameters: {
+        'availableToPlay': availableToPlay.toString(),
+        'hideRated': hideRated.toString(),
+      },
+    );
     
     final List<dynamic> jsonData = response.data is String 
         ? json.decode(response.data as String)
@@ -271,12 +300,16 @@ class GameRepository {
   Future<PagedGameWithUserResponse> fetchTopRatedGamesWithUserInfo({
     int page = 0,
     int pageSize = 20,
+    bool availableToPlay = true,
+    bool hideRated = false,
   }) async {
     final response = await _apiService.get(
       "/games/with-user/top-games",
       queryParameters: {
         'page': page.toString(),
         'pageSize': pageSize.toString(),
+        'availableToPlay': availableToPlay.toString(),
+        'hideRated': hideRated.toString(),
       },
     );
 
@@ -290,12 +323,16 @@ class GameRepository {
   Future<PagedGameWithUserResponse> fetchNewReleasesWithUserInfo({
     int page = 0,
     int pageSize = 20,
+    bool availableToPlay = true,
+    bool hideRated = false,
   }) async {
     final response = await _apiService.get(
       "/games/with-user/new-releases",
       queryParameters: {
         'page': page.toString(),
         'pageSize': pageSize.toString(),
+        'availableToPlay': availableToPlay.toString(),
+        'hideRated': hideRated.toString(),
       },
     );
 
@@ -309,12 +346,14 @@ class GameRepository {
   Future<PagedGameWithUserResponse> fetchComingSoonWithUserInfo({
     int page = 0,
     int pageSize = 20,
+    bool hideRated = false,
   }) async {
     final response = await _apiService.get(
       "/games/with-user/coming-soon",
       queryParameters: {
         'page': page.toString(),
         'pageSize': pageSize.toString(),
+        'hideRated': hideRated.toString(),
       },
     );
 
@@ -376,6 +415,8 @@ class GameRepository {
     String sortDirection = 'DESC',
     int page = 0,
     int pageSize = 20,
+    bool availableToPlay = true,
+    bool hideRated = false,
   }) async {
     final response = await _apiService.get(
       "/games/with-user/get-games-by-popularity-type",
@@ -385,6 +426,8 @@ class GameRepository {
         'sortDirection': sortDirection,
         'page': page.toString(),
         'pageSize': pageSize.toString(),
+        'availableToPlay': availableToPlay.toString(),
+        'hideRated': hideRated.toString(),
       },
     );
 
@@ -395,12 +438,16 @@ class GameRepository {
     return PagedGameWithUserResponse.fromJson(jsonData);
   }
 
-  Future<GameDetailWithUserInfo> getSingleGameByPopularityTypeWithUserInfo(int popularityType) async {
+  Future<GameDetailWithUserInfo> getSingleGameByPopularityTypeWithUserInfo(
+    int popularityType, {
+    bool hideRated = false,
+  }) async {
     try {
       final response = await _apiService.get(
         '/games/with-user/get-single-game-by-popularity-type',
         queryParameters: {
           'popularityType': popularityType.toString(),
+          'hideRated': hideRated.toString(),
         },
       );
       
@@ -421,6 +468,8 @@ class GameRepository {
     required String sortDirection,
     required int page,
     required int pageSize,
+    bool availableToPlay = true,
+    bool hideRated = false,
   }) async {
     final response = await _apiService.get(
       '/games/with-user/games-by-platform',
@@ -430,6 +479,8 @@ class GameRepository {
         'sortDirection': sortDirection,
         'page': page.toString(),
         'pageSize': pageSize.toString(),
+        'availableToPlay': availableToPlay.toString(),
+        'hideRated': hideRated.toString(),
       },
     );
 
@@ -446,6 +497,8 @@ class GameRepository {
     required String sortDirection,
     int page = 0,
     int pageSize = 20,
+    bool availableToPlay = true,
+    bool hideRated = false,
   }) async {
     final response = await _apiService.get(
       '/games/with-user/games-by-genre',
@@ -455,6 +508,8 @@ class GameRepository {
         'sortDirection': sortDirection,
         'page': page.toString(),
         'pageSize': pageSize.toString(),
+        'availableToPlay': availableToPlay.toString(),
+        'hideRated': hideRated.toString(),
       },
     );
 
@@ -471,6 +526,8 @@ class GameRepository {
     required String sortDirection,
     int page = 0,
     int pageSize = 20,
+    bool availableToPlay = true,
+    bool hideRated = false,
   }) async {
     final response = await _apiService.get(
       '/games/with-user/games-by-theme',
@@ -480,6 +537,8 @@ class GameRepository {
         'sortDirection': sortDirection,
         'page': page.toString(),
         'pageSize': pageSize.toString(),
+        'availableToPlay': availableToPlay.toString(),
+        'hideRated': hideRated.toString(),
       },
     );
 

@@ -61,6 +61,8 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
   static const int _pageSize = 20;
   final ScrollController _scrollController = ScrollController();
   SortOption _currentSort = SortOption.topRatedDesc;
+  bool _availableToPlay = false;
+  bool _hideRated = false;
 
   @override
   void initState() {
@@ -136,7 +138,7 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
         handleResponseWithUserInfo(response);
       }
       else if (widget.platformId != null) {
-        print('Fetching games for platform: ${widget.platformId} - Page: $_currentPage');
+        print('Fetching games for platform: ${widget.platformId} - Page: $_currentPage, availableToPlay: $_availableToPlay, hideRated: $_hideRated');
         final (sortBy, sortDirection) = _getSortParams(_currentSort);
         final response = await _gameRepository.fetchGamesByPlatformWithUserInfo(
           platformId: widget.platformId!,
@@ -144,13 +146,15 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
           sortDirection: sortDirection,
           page: _currentPage,
           pageSize: _pageSize,
+          availableToPlay: _availableToPlay,
+          hideRated: _hideRated,
         );
 
         if (!mounted) return;
         handleResponseWithUserInfo(response);
       }
       else if (widget.genreId != null) {
-        print('Fetching games for genre: ${widget.genreId} - Page: $_currentPage');
+        print('Fetching games for genre: ${widget.genreId} - Page: $_currentPage, availableToPlay: $_availableToPlay, hideRated: $_hideRated');
         final (sortBy, sortDirection) = _getSortParams(_currentSort);
         final response = await _gameRepository.fetchGamesByGenreWithUserInfo(
           genreId: widget.genreId!,
@@ -158,13 +162,15 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
           sortDirection: sortDirection,
           page: _currentPage,
           pageSize: _pageSize,
+          availableToPlay: _availableToPlay,
+          hideRated: _hideRated,
         );
 
         if (!mounted) return;
         handleResponseWithUserInfo(response);
       }
       else if (widget.themeId != null) {
-        print('Fetching games for theme: ${widget.themeId} - Page: $_currentPage');
+        print('Fetching games for theme: ${widget.themeId} - Page: $_currentPage, availableToPlay: $_availableToPlay, hideRated: $_hideRated');
         final (sortBy, sortDirection) = _getSortParams(_currentSort);
         final response = await _gameRepository.fetchGamesByThemeWithUserInfo(
           themeId: widget.themeId!,
@@ -172,57 +178,63 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
           sortDirection: sortDirection,
           page: _currentPage,
           pageSize: _pageSize,
+          availableToPlay: _availableToPlay,
+          hideRated: _hideRated,
         );
 
         if (!mounted) return;
         handleResponseWithUserInfo(response);
       }
       else if (widget.popularityTypeId != null) {
-        print('Fetching games for popularity type: ${widget.popularityTypeId} - Page: $_currentPage');
-        final (sortBy, sortDirection) = _getSortParams(_currentSort);
-        final response = await _gameRepository.fetchGamesByPopularityType(
+        print('Fetching games for popularity type: ${widget.popularityTypeId} - Page: $_currentPage, availableToPlay: $_availableToPlay, hideRated: $_hideRated');
+        final response = await _gameRepository.fetchGamesByPopularityTypeWithUserInfo(
           popularityType: widget.popularityTypeId!,
-          sortBy: sortBy,
-          sortDirection: sortDirection,
           page: _currentPage,
           pageSize: _pageSize,
+          availableToPlay: _availableToPlay,
+          hideRated: _hideRated,
         );
 
         if (!mounted) return;
         handleResponseWithUserInfo(response);
       }
       else if (widget.categoryTitle == 'New Releases') {
-        print('Fetching new releases - Page: $_currentPage');
+        print('Fetching new releases - Page: $_currentPage, availableToPlay: $_availableToPlay, hideRated: $_hideRated');
         final response = await _gameRepository.fetchNewReleasesWithUserInfo(
           page: _currentPage,
           pageSize: _pageSize,
+          availableToPlay: _availableToPlay,
+          hideRated: _hideRated,
         );
         
         if (!mounted) return;
         handleResponseWithUserInfo(response);
       } 
       else if (widget.categoryTitle == 'Top Rated') {
-        print('Fetching top rated games - Page: $_currentPage');
+        print('Fetching top rated games - Page: $_currentPage, availableToPlay: $_availableToPlay, hideRated: $_hideRated');
         final response = await _gameRepository.fetchTopRatedGamesWithUserInfo(
           page: _currentPage,
           pageSize: _pageSize,
+          availableToPlay: _availableToPlay,
+          hideRated: _hideRated,
         );
 
         if (!mounted) return;
         handleResponseWithUserInfo(response);
       }
       else if (widget.categoryTitle == 'Coming Soon') {
-        print('Fetching coming soon games - Page: $_currentPage');
+        print('Fetching coming soon games - Page: $_currentPage, hideRated: $_hideRated');
         final response = await _gameRepository.fetchComingSoonWithUserInfo(
           page: _currentPage,
           pageSize: _pageSize,
+          hideRated: _hideRated,
         );
 
         if (!mounted) return;
         handleResponseWithUserInfo(response);
       }
       else if (genres.contains(widget.categoryTitle)) {
-        print('Fetching games for genre: ${widget.categoryTitle} - Page: $_currentPage');
+        print('Fetching games for genre: ${widget.categoryTitle} - Page: $_currentPage, availableToPlay: $_availableToPlay, hideRated: $_hideRated');
         final (sortBy, sortDirection) = _getSortParams(_currentSort);
         final response = await _gameRepository.fetchGamesByGenreWithUserInfo(
           genreId: _getGenreId(widget.categoryTitle),
@@ -230,13 +242,15 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
           sortDirection: sortDirection,
           page: _currentPage,
           pageSize: _pageSize,
+          availableToPlay: _availableToPlay,
+          hideRated: _hideRated,
         );
 
         if (!mounted) return;
         handleResponseWithUserInfo(response);
       }
       else if (themes.contains(widget.categoryTitle)) {
-        print('Fetching games for theme: ${widget.categoryTitle} - Page: $_currentPage');
+        print('Fetching games for theme: ${widget.categoryTitle} - Page: $_currentPage, availableToPlay: $_availableToPlay, hideRated: $_hideRated');
         final (sortBy, sortDirection) = _getSortParams(_currentSort);
         final response = await _gameRepository.fetchGamesByThemeWithUserInfo(
           themeId: _getThemeId(widget.categoryTitle),
@@ -244,6 +258,8 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
           sortDirection: sortDirection,
           page: _currentPage,
           pageSize: _pageSize,
+          availableToPlay: _availableToPlay,
+          hideRated: _hideRated,
         );
 
         if (!mounted) return;
@@ -425,7 +441,7 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
 
   Widget _buildFilterRow() {
     return Container(
-      height: 48,
+      height: 40,
       margin: const EdgeInsets.only(top: 8),
       child: ListView(
         scrollDirection: Axis.horizontal,
@@ -516,7 +532,7 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
                     ),
                 ],
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: AppTheme.surfaceDark,
                     borderRadius: BorderRadius.circular(6),
@@ -549,8 +565,32 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
               ),
             ),
           // Other Filter Buttons - Show for all categories
-          _buildFilterButton('Available to Play'),
-          _buildFilterButton('Hide Rated'),
+          _buildFilterButton(
+            'Available to Play',
+            isActive: _availableToPlay,
+            onTap: widget.categoryTitle != 'Coming Soon' ? () {
+              setState(() {
+                _availableToPlay = !_availableToPlay;
+                _currentPage = 0;
+                games = [];
+                _hasMore = true;
+                _loadGames();
+              });
+            } : null,
+          ),
+          _buildFilterButton(
+            'Hide Rated',
+            isActive: _hideRated,
+            onTap: () {
+              setState(() {
+                _hideRated = !_hideRated;
+                _currentPage = 0;
+                games = [];
+                _hasMore = true;
+                _loadGames();
+              });
+            },
+          ),
         ],
       ),
     );
@@ -593,26 +633,26 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
     }
   }
 
-  Widget _buildFilterButton(String title, {bool isSelected = false}) {
+  Widget _buildFilterButton(String title, {bool isActive = false, VoidCallback? onTap}) {
     return Container(
       margin: const EdgeInsets.only(right: 8),
       child: InkWell(
-        onTap: () {
-          print('$title filter selected');
-        },
+        onTap: onTap,
         child: Container(
-          height: 32,
+          height: 30,
+          constraints: const BoxConstraints(minWidth: 120),
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            color: AppTheme.surfaceDark,
+            color: isActive ? Colors.white.withOpacity(0.2) : AppTheme.surfaceDark,
             borderRadius: BorderRadius.circular(6),
           ),
           child: Center(
             child: Text(
               title,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: isActive ? Colors.white : Colors.white70,
                 fontSize: 14,
+                fontWeight: isActive ? FontWeight.w500 : FontWeight.normal,
               ),
             ),
           ),

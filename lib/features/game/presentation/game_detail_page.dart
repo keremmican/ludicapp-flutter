@@ -832,13 +832,15 @@ class _GameDetailPageState extends State<GameDetailPage> {
                             // Yatay review listesi (kullanıcı reviewi ilk eleman olacak)
                             SizedBox(
                               height: 160,
-                              child: _isLoadingReviews
-                                ? Center(
-                                    child: CircularProgressIndicator(
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.grey[400]!),
-                                    ),
-                                  )
-                                : ListView.builder(
+                              // REMOVE: Conditional loading indicator
+                              // child: _isLoadingReviews
+                              //   ? Center(
+                              //       child: CircularProgressIndicator(
+                              //         valueColor: AlwaysStoppedAnimation<Color>(Colors.grey[400]!),
+                              //       ),
+                              //     )
+                              //   : ListView.builder( // Always build the ListView now
+                              child: ListView.builder( // Always build the ListView now
                                     scrollDirection: Axis.horizontal,
                                     itemCount: 1 + _gameReviews.length, // 1 kullanıcı yorumu + gerçek yorumlar
                                     padding: EdgeInsets.zero,
