@@ -12,7 +12,7 @@ class GameRepository {
   Future<PageableResponse<GameSummary>> fetchNewReleases({
     int page = 0,
     int size = 20,
-    bool availableToPlay = true,
+    bool availableToPlay = false,
   }) async {
     final response = await _apiService.get(
       "/games/new-releases",
@@ -36,7 +36,7 @@ class GameRepository {
   Future<PageableResponse<GameSummary>> fetchTopRatedGames({
     int page = 0,
     int size = 20,
-    bool availableToPlay = true,
+    bool availableToPlay = false,
   }) async {
     final response = await _apiService.get(
       "/games/top-games",
@@ -73,7 +73,7 @@ class GameRepository {
     required String sortDirection,
     int page = 0,
     int pageSize = 20,
-    bool availableToPlay = true,
+    bool availableToPlay = false,
   }) async {
     final response = await _apiService.get(
       "/games/games-by-genre",
@@ -103,7 +103,7 @@ class GameRepository {
     required String sortDirection,
     int page = 0,
     int pageSize = 20,
-    bool availableToPlay = true,
+    bool availableToPlay = false,
   }) async {
     final response = await _apiService.get(
       "/games/games-by-theme",
@@ -171,7 +171,7 @@ class GameRepository {
 
   Future<List<GameSummary>> fetchRandomGames({
     int count = 10,
-    bool availableToPlay = true,
+    bool availableToPlay = false,
   }) async {
     final response = await _apiService.get(
       "/games/random",
@@ -200,7 +200,7 @@ class GameRepository {
 
   Future<GameSummary> getSingleGameByPopularityType(
     int popularityType, {
-    bool availableToPlay = true,
+    bool availableToPlay = false,
   }) async {
     final response = await _apiService.get(
       "/games/get-single-game-by-popularity-type",
@@ -223,7 +223,7 @@ class GameRepository {
     String sortDirection = 'DESC',
     int page = 0,
     int pageSize = 20,
-    bool availableToPlay = true,
+    bool availableToPlay = false,
   }) async {
     final response = await _apiService.get(
       "/games/with-user/get-games-by-popularity-type",
@@ -254,7 +254,7 @@ class GameRepository {
     required String sortDirection,
     required int page,
     required int pageSize,
-    bool availableToPlay = true,
+    bool availableToPlay = false,
   }) async {
     final response = await _apiService.get(
       '/games/games-by-platform',
@@ -279,7 +279,7 @@ class GameRepository {
   }
 
   Future<List<GameSummary>> fetchRandomGamesWithUserInfo({
-    bool availableToPlay = true,
+    bool availableToPlay = false,
     bool hideRated = false,
   }) async {
     final response = await _apiService.get(
@@ -300,7 +300,7 @@ class GameRepository {
   Future<PagedGameWithUserResponse> fetchTopRatedGamesWithUserInfo({
     int page = 0,
     int pageSize = 20,
-    bool availableToPlay = true,
+    bool availableToPlay = false,
     bool hideRated = false,
   }) async {
     final response = await _apiService.get(
@@ -323,7 +323,7 @@ class GameRepository {
   Future<PagedGameWithUserResponse> fetchNewReleasesWithUserInfo({
     int page = 0,
     int pageSize = 20,
-    bool availableToPlay = true,
+    bool availableToPlay = false,
     bool hideRated = false,
   }) async {
     final response = await _apiService.get(
@@ -415,7 +415,7 @@ class GameRepository {
     String sortDirection = 'DESC',
     int page = 0,
     int pageSize = 20,
-    bool availableToPlay = true,
+    bool availableToPlay = false,
     bool hideRated = false,
   }) async {
     final response = await _apiService.get(
@@ -468,7 +468,7 @@ class GameRepository {
     required String sortDirection,
     required int page,
     required int pageSize,
-    bool availableToPlay = true,
+    bool availableToPlay = false,
     bool hideRated = false,
   }) async {
     final response = await _apiService.get(
@@ -497,7 +497,7 @@ class GameRepository {
     required String sortDirection,
     int page = 0,
     int pageSize = 20,
-    bool availableToPlay = true,
+    bool availableToPlay = false,
     bool hideRated = false,
   }) async {
     final response = await _apiService.get(
@@ -526,7 +526,7 @@ class GameRepository {
     required String sortDirection,
     int page = 0,
     int pageSize = 20,
-    bool availableToPlay = true,
+    bool availableToPlay = false,
     bool hideRated = false,
   }) async {
     final response = await _apiService.get(

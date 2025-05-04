@@ -2,40 +2,39 @@
 
 class PagedResponse<T> {
   final List<T> content;
+  final int pageNumber;
+  final int pageSize;
   final int totalPages;
   final int totalElements;
-  final int number; // Current page number (0-indexed)
-  final int size;
-  final bool first;
   final bool last;
+  final bool first;
   final bool empty;
 
   PagedResponse({
     required this.content,
+    required this.pageNumber,
+    required this.pageSize,
     required this.totalPages,
     required this.totalElements,
-    required this.number,
-    required this.size,
-    required this.first,
     required this.last,
+    required this.first,
     required this.empty,
   });
 
   factory PagedResponse.fromJson(
     Map<String, dynamic> json,
-    T Function(Map<String, dynamic>) fromJsonT,
+    T Function(dynamic json) fromJsonT,
   ) {
+    final contentList = json['content'] as List? ?? [];
     return PagedResponse<T>(
-      content: (json['content'] as List?)
-          ?.map((e) => fromJsonT(e as Map<String, dynamic>))
-          .toList() ?? [],
-      totalPages: json['totalPages'] as int? ?? 0,
-      totalElements: json['totalElements'] as int? ?? 0,
-      number: json['number'] as int? ?? 0,
-      size: json['size'] as int? ?? 0,
-      first: json['first'] as bool? ?? true,
-      last: json['last'] as bool? ?? true,
-      empty: json['empty'] as bool? ?? true,
+      content: contentList.map(fromJsonT).toList(),
+      pageNumber: json['pageable']?['pageNumber'] ?? json['number'] ?? 0,
+      pageSize: json['pageable']?['pageSize'] ?? json['size'] ?? 0,
+      totalPages: json['totalPages'] ?? 0,
+      totalElements: json['totalElements'] ?? 0,
+      last: json['last'] ?? false,
+      first: json['first'] ?? false,
+      empty: json['empty'] ?? false,
     );
   }
 

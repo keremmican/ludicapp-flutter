@@ -7,6 +7,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:ludicapp/core/enums/profile_photo_type.dart';
 import 'package:ludicapp/services/token_service.dart';
 import 'package:ludicapp/core/widgets/review_modal.dart';
+import 'package:ludicapp/core/enums/play_status.dart';
+import 'package:ludicapp/core/enums/completion_status.dart';
 
 class AllReviewsPage extends StatefulWidget {
   final int gameId;
@@ -97,21 +99,21 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
         size: _pageSize,
       );
       
-      print('Received ${ratings.length} ratings from API');
+      print('Received ${ratings.content.length} ratings from API');
       
       // Backend API'den gelen yanıtı debug et
-      for (int i = 0; i < ratings.length; i++) {
-        print('Rating $i: userId=${ratings[i].userId}, username=${ratings[i].username}, rating=${ratings[i].rating}, comment=${ratings[i].comment}');
+      for (int i = 0; i < ratings.content.length; i++) {
+        print('Rating $i: userId=${ratings.content[i].userId}, username=${ratings.content[i].username}, rating=${ratings.content[i].rating}, comment=${ratings.content[i].comment}');
       }
 
       if (mounted) {
         setState(() {
-          _ratings = ratings;
+          _ratings = ratings.content;
           print('Total ratings after update: ${_ratings.length}');
           
           _isLoading = false;
           _currentPage = 1;
-          _hasMoreData = ratings.length == _pageSize;
+          _hasMoreData = ratings.content.length == _pageSize;
         });
       }
     } catch (e) {
@@ -146,16 +148,16 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
         size: _pageSize,
       );
       
-      print('Received ${moreRatings.length} more ratings from API');
+      print('Received ${moreRatings.content.length} more ratings from API');
 
       if (mounted) {
         setState(() {
-          _ratings.addAll(moreRatings);
+          _ratings.addAll(moreRatings.content);
           print('Total ratings after adding more: ${_ratings.length}');
           
           _isLoading = false;
           _currentPage++;
-          _hasMoreData = moreRatings.length == _pageSize;
+          _hasMoreData = moreRatings.content.length == _pageSize;
         });
       }
     } catch (e) {
@@ -248,70 +250,87 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
                       isCurrentUser ? 'Your Review' : rating.username,
                       style: TextStyle(
                         color: isCurrentUser ? Colors.blue[300] : Colors.white,
+                        fontWeight: FontWeight.bold,
                         fontSize: 16,
-                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                    if (isCurrentUser)
-                      IconButton(
-                        icon: Icon(Icons.edit, size: 18, color: Colors.grey[400]),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        tooltip: 'Edit your review',
-                        onPressed: () => _editReview(rating),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    _buildUserAvatar(rating),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.star,
-                                color: Colors.amber[400],
-                                size: 16,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                "${rating.rating}",
-                                style: TextStyle(
-                                  color: Colors.grey[400],
-                                  fontSize: 14,
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Text(
-                                _formatDate(rating.ratingDate),
-                                style: TextStyle(
-                                  color: Colors.grey[500],
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                    Text(
+                      rating.lastUpdatedDate != null ? _formatDate(rating.lastUpdatedDate!) : 'Unknown date',
+                      style: TextStyle(
+                        color: Colors.grey[500],
+                        fontSize: 12,
                       ),
                     ),
                   ],
                 ),
-                if (rating.comment != null) ...[
-                  const SizedBox(height: 16),
-                  Text(
-                    rating.comment!,
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 15,
-                      height: 1.5,
+                const SizedBox(height: 8),
+                if (rating.rating != null)
+                  Row(
+                    children: List.generate(5, (starIndex) {
+                      // Display 1-10 rating as 1-5 stars (simple mapping)
+                      double starValue = (rating.rating! / 2.0);
+                      IconData iconData = starIndex < starValue
+                          ? (starIndex + 0.5 == starValue ? Icons.star_half : Icons.star)
+                          : Icons.star_border;
+                      return Icon(
+                        iconData,
+                        color: Colors.amber[400],
+                        size: 18,
+                      );
+                    }),
+                  ),
+                if (rating.rating == null)
+                   Text(
+                      'Not Rated',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 14,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                if (rating.comment != null && rating.comment!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text(
+                      rating.comment!,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                        height: 1.4,
+                      ),
                     ),
                   ),
-                ],
+                // Add playtime, play status and completion status info
+                if (rating.playStatus != null && rating.playStatus != PlayStatus.notSet ||
+                    rating.completionStatus != null && rating.completionStatus != CompletionStatus.notSelected ||
+                    rating.playtimeInMinutes != null && rating.playtimeInMinutes! > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Wrap(
+                      spacing: 8, // Space between items
+                      runSpacing: 4, // Space between lines
+                      children: [
+                        if (rating.playStatus != null && rating.playStatus != PlayStatus.notSet)
+                          _buildInfoChip(
+                            _getPlayStatusIcon(rating.playStatus!),
+                            _getPlayStatusText(rating.playStatus!),
+                            Colors.blue[300]!,
+                          ),
+                        if (rating.completionStatus != null && rating.completionStatus != CompletionStatus.notSelected)
+                          _buildInfoChip(
+                            _getCompletionStatusIcon(rating.completionStatus!),
+                            _getCompletionStatusText(rating.completionStatus!),
+                            Colors.green[300]!,
+                          ),
+                        if (rating.playtimeInMinutes != null && rating.playtimeInMinutes! > 0)
+                          _buildInfoChip(
+                            Icons.timer_outlined,
+                            _formatPlaytime(rating.playtimeInMinutes!),
+                            Colors.orange[300]!,
+                          ),
+                      ],
+                    ),
+                  ),
               ],
             ),
           ),
@@ -359,12 +378,10 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
   }
 
   Widget _buildLoadingIndicator() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(Colors.grey[400]!),
-        ),
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 32.0),
+      child: Center(
+        child: CircularProgressIndicator(color: Colors.white70),
       ),
     );
   }
@@ -387,7 +404,7 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
             await _ratingRepository.commentGame(widget.gameId, newComment);
             print('AllReviewsPage: Comment updated successfully');
           } else {
-            if (reviewToEdit.rating > 0) {
+            if (reviewToEdit.rating != null && reviewToEdit.rating! > 0) {
               await _ratingRepository.deleteComment(widget.gameId);
               print('AllReviewsPage: Comment deleted successfully');
             } else {
@@ -408,7 +425,7 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
                    gameId: _ratings[index].gameId,
                    rating: _ratings[index].rating,
                    comment: newComment,
-                   ratingDate: _ratings[index].ratingDate
+                   lastUpdatedDate: _ratings[index].lastUpdatedDate
                 );
               }
             });
@@ -422,6 +439,260 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
           }
         }
       },
+    );
+  }
+
+  // Builds the card for the current user's rating/review if provided
+  Widget _buildUserRatingCard() {
+    if (widget.userRating == null) return const SizedBox.shrink();
+    
+    // Create a UserGameRatingWithUser object for consistent rendering
+    final UserGameRatingWithUser userRatingData = UserGameRatingWithUser(
+      id: 0,
+      userId: _currentUserId ?? 0,
+      username: 'You', // Placeholder
+      gameId: widget.gameId,
+      rating: widget.userRating?.rating,
+      comment: widget.userRating?.comment,
+      // Use lastUpdatedDate from userRating if available
+      lastUpdatedDate: widget.userRating?.lastUpdatedDate, 
+      // Set other fields as needed or null
+      playStatus: widget.userRating?.playStatus,
+      completionStatus: widget.userRating?.completionStatus,
+      playtimeInMinutes: widget.userRating?.playtimeInMinutes,
+      profilePhotoType: null, // Set appropriately if you have user profile data
+      profilePhotoUrl: null, // Set appropriately
+    );
+
+    return Card(
+      color: Colors.blueGrey[800], // Highlight user's card
+      margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Your Review',
+                  style: TextStyle(
+                    color: Colors.blue,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                // Use lastUpdatedDate and handle null
+                Text(
+                  userRatingData.lastUpdatedDate != null ? _formatDate(userRatingData.lastUpdatedDate!) : 'Not saved yet',
+                  style: TextStyle(
+                    color: Colors.grey[500],
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+             if (userRatingData.rating != null)
+              Row(
+                children: List.generate(5, (starIndex) {
+                  // Display 1-10 rating as 1-5 stars (simple mapping)
+                  double starValue = (userRatingData.rating! / 2.0);
+                  IconData iconData = starIndex < starValue
+                      ? (starIndex + 0.5 == starValue ? Icons.star_half : Icons.star)
+                      : Icons.star_border;
+                  return Icon(
+                    iconData,
+                    color: Colors.amber[400],
+                    size: 18,
+                  );
+                }),
+              ),
+            if (userRatingData.rating == null)
+              Text(
+                'Not Rated',
+                 style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 14,
+                    fontStyle: FontStyle.italic,
+                 ),
+              ),
+            if (userRatingData.comment != null && userRatingData.comment!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Text(
+                  userRatingData.comment!,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+             if (userRatingData.comment == null || userRatingData.comment!.isEmpty)
+               Padding(
+                 padding: const EdgeInsets.only(top: 12),
+                 child: Text(
+                   'No review written yet.',
+                   style: TextStyle(
+                     color: Colors.grey[600],
+                     fontSize: 14,
+                     fontStyle: FontStyle.italic,
+                   ),
+                 ),
+               ),
+            // Add playtime, play status and completion status info
+            if (userRatingData.playStatus != null && userRatingData.playStatus != PlayStatus.notSet ||
+                userRatingData.completionStatus != null && userRatingData.completionStatus != CompletionStatus.notSelected ||
+                userRatingData.playtimeInMinutes != null && userRatingData.playtimeInMinutes! > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Wrap(
+                  spacing: 8, // Space between items
+                  runSpacing: 4, // Space between lines
+                  children: [
+                    if (userRatingData.playStatus != null && userRatingData.playStatus != PlayStatus.notSet)
+                      _buildInfoChip(
+                        _getPlayStatusIcon(userRatingData.playStatus!),
+                        _getPlayStatusText(userRatingData.playStatus!),
+                        Colors.blue[300]!,
+                      ),
+                    if (userRatingData.completionStatus != null && userRatingData.completionStatus != CompletionStatus.notSelected)
+                      _buildInfoChip(
+                        _getCompletionStatusIcon(userRatingData.completionStatus!),
+                        _getCompletionStatusText(userRatingData.completionStatus!),
+                        Colors.green[300]!,
+                      ),
+                    if (userRatingData.playtimeInMinutes != null && userRatingData.playtimeInMinutes! > 0)
+                      _buildInfoChip(
+                        Icons.timer_outlined,
+                        _formatPlaytime(userRatingData.playtimeInMinutes!),
+                        Colors.orange[300]!,
+                      ),
+                  ],
+                ),
+              ),
+
+            // Edit button for user's review
+            Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
+                icon: const Icon(Icons.edit_note, color: Colors.white70),
+                onPressed: () {
+                  // Add null check for rating before comparison
+                  if (userRatingData.rating != null && userRatingData.rating! > 0) {
+                    ReviewModal.show(
+                      context,
+                      gameName: widget.gameName,
+                      coverUrl: widget.coverUrl ?? '',
+                      initialReview: userRatingData.comment,
+                      onReviewSubmitted: (newComment) {
+                         // TODO: Implement comment update logic
+                        print('User review update requested: $newComment');
+                        // Potentially call repository.updateRatingEntry here
+                        // Then refresh the list: _loadInitialRatings()
+                      },
+                    );
+                  } else {
+                     ScaffoldMessenger.of(context).showSnackBar(
+                       const SnackBar(content: Text('You need to rate the game before adding a review.'))
+                    );
+                  }
+                },
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _getPlayStatusIcon(PlayStatus status) {
+    switch (status) {
+      case PlayStatus.notSet: return Icons.help_outline;
+      case PlayStatus.playing: return Icons.gamepad;
+      case PlayStatus.completed: return Icons.check_circle_outline;
+      case PlayStatus.dropped: return Icons.cancel_outlined;
+      case PlayStatus.onHold: return Icons.pause_circle_outline;
+      case PlayStatus.backlog: return Icons.pending_outlined;
+      case PlayStatus.skipped: return Icons.skip_next;
+    }
+  }
+
+  String _getPlayStatusText(PlayStatus status) {
+    switch (status) {
+      case PlayStatus.notSet: return "Not Started";
+      case PlayStatus.playing: return "Currently Playing";
+      case PlayStatus.completed: return "Completed";
+      case PlayStatus.dropped: return "Dropped";
+      case PlayStatus.onHold: return "On Hold";
+      case PlayStatus.backlog: return "In Backlog";
+      case PlayStatus.skipped: return "Skipped";
+    }
+  }
+
+  IconData _getCompletionStatusIcon(CompletionStatus status) {
+    switch (status) {
+      case CompletionStatus.notSelected: return Icons.help_outline;
+      case CompletionStatus.mainStory: return Icons.book_outlined;
+      case CompletionStatus.mainStoryPlusExtras: return Icons.extension_outlined;
+      case CompletionStatus.hundredPercent: return Icons.workspace_premium_outlined;
+    }
+  }
+
+  String _getCompletionStatusText(CompletionStatus status) {
+    switch (status) {
+      case CompletionStatus.notSelected: return "Not Selected";
+      case CompletionStatus.mainStory: return "Main Story";
+      case CompletionStatus.mainStoryPlusExtras: return "Main Story + Extras";
+      case CompletionStatus.hundredPercent: return "100% Completion";
+    }
+  }
+
+  String _formatPlaytime(int minutes) {
+    final hours = minutes ~/ 60;
+    final mins = minutes % 60;
+    
+    if (hours > 0) {
+      if (mins > 0) {
+        return "$hours hr $mins min";
+      } else {
+        return "$hours hr";
+      }
+    } else {
+      return "$mins min";
+    }
+  }
+
+  Widget _buildInfoChip(IconData icon, String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: color,
+            size: 12,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ),
     );
   }
 } 

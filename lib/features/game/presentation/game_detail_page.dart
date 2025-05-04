@@ -28,6 +28,8 @@ import 'package:ludicapp/features/game/presentation/all_reviews_page.dart';
 import 'package:ludicapp/services/model/response/user_game_rating_with_user.dart';
 import 'package:ludicapp/core/enums/profile_photo_type.dart';
 import 'package:ludicapp/services/token_service.dart'; // Import TokenService
+import 'package:ludicapp/core/enums/completion_status.dart'; // Added import
+import 'package:ludicapp/core/enums/play_status.dart'; // Added import
 
 class GameDetailPage extends StatefulWidget {
   final Game game;
@@ -82,13 +84,20 @@ class _GameDetailPageState extends State<GameDetailPage> {
       _isHidden = widget.game.userActions!.isHidden ?? false; // <-- Initialize hidden status
       final initialComment = widget.game.userActions!.comment; 
       
-      // _game'in userActions'ını comment ile başlat/güncelle
+      // Widget'tan oyun durumu alanlarını logla (debug)
+      print('initState - Checking widget.game.userActions: playStatus=${widget.game.userActions!.playStatus}, completionStatus=${widget.game.userActions!.completionStatus}, playtime=${widget.game.userActions!.playtimeInMinutes}');
+      
+      // _game'in userActions'ını comment ile başlat/güncelle - diğer değerleri de ekle
       _game = _game.copyWith(
         userActions: (_game.userActions ?? UserGameActions()).copyWith(
           userRating: _userRating,
           isSaved: _isSaved,
           isHidden: _isHidden, // <-- Set hidden status in game object
-          comment: initialComment, 
+          comment: initialComment,
+          // ÖNEMLİ: Oyun durumu alanlarını da kopyala
+          playStatus: widget.game.userActions!.playStatus, 
+          completionStatus: widget.game.userActions!.completionStatus,
+          playtimeInMinutes: widget.game.userActions!.playtimeInMinutes,
         )
       );
 
@@ -97,6 +106,8 @@ class _GameDetailPageState extends State<GameDetailPage> {
       print('initState - isHidden from widget: $_isHidden'); // <-- Log hidden status
       print('initState - comment from widget: $initialComment'); 
       print('initState - userActions from widget: ${_game.userActions}'); 
+      print('initState - playStatus from widget: ${_game.userActions?.playStatus}');
+      print('initState - completionStatus from widget: ${_game.userActions?.completionStatus}');
     }
     
     // Game ID varsa, HomeController'dan rating, save ve comment durumunu da kontrol edelim
@@ -862,47 +873,67 @@ class _GameDetailPageState extends State<GameDetailPage> {
                                                 gameName: _game.name,
                                                 coverUrl: _game.coverUrl ?? '',
                                                 gameId: _game.gameId!,
-                                                initialRating: _userRating,
-                                                onRatingSelected: (rating) async { // <-- Make callback async
-                                                  // Rating seçildikten sonra state'i güncelle
+                                                // Correct parameter name
+                                                initialUserGameRating: UserGameRating(
+                                                  id: _currentUserReviewData?.id ?? 0,
+                                                  userId: _currentUserId ?? 0,
+                                                  gameId: _game.gameId!, 
+                                                  rating: _userRating,
+                                                  comment: _game.userActions?.comment,
+                                                  // Fetch these if available from _currentUserReviewData or local state
+                                                  playStatus: _currentUserReviewData?.playStatus,
+                                                  completionStatus: _currentUserReviewData?.completionStatus,
+                                                  playtimeInMinutes: _currentUserReviewData?.playtimeInMinutes,
+                                                ),
+                                                // Correct callback name
+                                                onUpdateComplete: (updatedRating) async {
+                                                  // Update state based on the full returned object
                                                   setState(() {
-                                                    _userRating = rating > 0 ? rating : null;
-                                                    
-                                                    // Update game user actions
-                                                    final currentActions = _game.userActions ?? UserGameActions();
-                                                    final updatedRating = rating > 0 ? rating : null;
-                                                    final updatedComment = (rating > 0) ? currentActions.comment : null; // Rating kaldırılırsa yorumu da kaldır
+                                                    _userRating = updatedRating.rating;
                                                     
                                                     _game = _game.copyWith(
-                                                      userActions: currentActions.copyWith(
-                                                        isRated: rating > 0,
-                                                        userRating: updatedRating,
-                                                        comment: updatedComment, // Yorumu güncelle
+                                                      userActions: (_game.userActions ?? UserGameActions()).copyWith(
+                                                        isRated: updatedRating.rating != null && updatedRating.rating! > 0,
+                                                        userRating: updatedRating.rating,
+                                                        comment: updatedRating.comment, 
+                                                        // TODO: Update other actions if stored locally
                                                       ),
                                                     );
-                                                    
-                                                    print('RatingModal (via comment card) - Updated userRating: $_userRating');
-                                                    print('RatingModal (via comment card) - Updated comment: ${_game.userActions?.comment}');
+                                                    // Update _currentUserReviewData if necessary
+                                                    _currentUserReviewData = UserGameRatingWithUser(
+                                                       id: updatedRating.id, 
+                                                       userId: updatedRating.userId, 
+                                                       gameId: updatedRating.gameId, 
+                                                       rating: updatedRating.rating, 
+                                                       comment: updatedRating.comment, 
+                                                       playStatus: updatedRating.playStatus, 
+                                                       completionStatus: updatedRating.completionStatus, 
+                                                       playtimeInMinutes: updatedRating.playtimeInMinutes,
+                                                       lastUpdatedDate: updatedRating.lastUpdatedDate, 
+                                                       // Keep existing profile info if available
+                                                       username: _currentUserReviewData?.username ?? 'You',
+                                                       profilePhotoUrl: _currentUserReviewData?.profilePhotoUrl, 
+                                                       profilePhotoType: _currentUserReviewData?.profilePhotoType,
+                                                    ); 
+                                                    print('Updated state from RatingModal (User Review Card)');
                                                   });
                                                   
-                                                  // HomeController'ı güncelle
+                                                  // HomeController update
                                                   if (_game.gameId != null) {
-                                                    _homeController.updateGameRatingState(_game.gameId!, rating > 0 ? rating : null);
-                                                    if (rating <= 0) {
-                                                      _homeController.updateGameComment(_game.gameId!, null);
-                                                    }
+                                                    _homeController.updateGameRatingState(_game.gameId!, updatedRating.rating);
+                                                    _homeController.updateGameComment(_game.gameId!, updatedRating.comment);
+                                                     // TODO: Update other Home Controller states
                                                   }
                                                   
-                                                  // Eğer geçerli bir rating verildiyse (0 değil), review modalını göster
-                                                  if (rating > 0) {
-                                                    // Kısa bir gecikme ekleyerek state güncellenmesini bekleyelim
+                                                  // Show Review Modal only if a valid rating exists *after* update
+                                                  if (updatedRating.rating != null && updatedRating.rating! > 0) {
                                                     Future.delayed(const Duration(milliseconds: 100), () {
-                                                      if (mounted) { // Widget hala ağaçta mı kontrol et
+                                                      if (mounted) {
                                                         ReviewModal.show(
                                                           context,
                                                           gameName: _game.name,
                                                           coverUrl: _game.coverUrl ?? '',
-                                                          initialReview: _game.userActions?.comment, // Mevcut yorumu ilet
+                                                          initialReview: updatedRating.comment, // Pass updated comment
                                                           onReviewSubmitted: _handleReviewSubmitted,
                                                         );
                                                       }
@@ -923,16 +954,18 @@ class _GameDetailPageState extends State<GameDetailPage> {
                                           },
                                           child: Container(
                                             width: 280,
-                                            margin: const EdgeInsets.only(right: 12),
-                                            padding: const EdgeInsets.all(16),
+                                            margin: const EdgeInsets.only(right: 12), // Original margin
+                                            padding: const EdgeInsets.all(16), // Original padding
+                                            constraints: const BoxConstraints(), // Remove max height constraint
                                             decoration: BoxDecoration(
                                               color: Colors.white.withOpacity(0.05),
-                                              borderRadius: BorderRadius.circular(12),
+                                              borderRadius: BorderRadius.circular(12), // Original border radius
                                               border: Border.all(
                                                 color: Colors.white.withOpacity(0.1),
                                               ),
                                             ),
                                             child: Column(
+                                              mainAxisSize: MainAxisSize.min,
                                               crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
                                                 Row(
@@ -946,7 +979,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
 
                                                         if (photoType == ProfilePhotoType.CUSTOM && photoUrl != null && photoUrl.isNotEmpty) {
                                                           userImageContent = CircleAvatar(
-                                                            radius: 16,
+                                                            radius: 16, // Original radius
                                                             backgroundColor: Colors.grey[700],
                                                             backgroundImage: CachedNetworkImageProvider(photoUrl),
                                                           );
@@ -954,21 +987,21 @@ class _GameDetailPageState extends State<GameDetailPage> {
                                                           final String? assetPath = photoType.assetPath;
                                                           if (assetPath != null) {
                                                             userImageContent = CircleAvatar(
-                                                              radius: 16,
+                                                              radius: 16, // Original radius
                                                               backgroundColor: Colors.grey[700],
                                                               backgroundImage: AssetImage(assetPath),
                                                             );
                                                           } else {
                                                             // Fallback: Use rating icon if rated, otherwise person icon
                                                             userImageContent = CircleAvatar(
-                                                              radius: 16,
+                                                              radius: 16, // Original radius
                                                               backgroundColor: Colors.grey[700],
                                                               child: Icon(
                                                                 _userRating != null && _userRating! > 0
                                                                     ? _getRatingIcon(_userRating!) // Rating icon
                                                                     : Icons.person, // Default person icon
                                                                 color: Colors.white,
-                                                                size: 20,
+                                                                size: 20, // Original size
                                                               ),
                                                             );
                                                           }
@@ -977,64 +1010,106 @@ class _GameDetailPageState extends State<GameDetailPage> {
                                                       }
                                                     ),
                                                     // --- End Updated CircleAvatar ---
-                                                    const SizedBox(width: 8),
-                                                    Column(
-                                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                                      children: [
-                                                        const Text(
-                                                          "Your Review",
-                                                          style: TextStyle(
-                                                            color: Colors.white,
-                                                            fontSize: 14,
-                                                            fontWeight: FontWeight.w500,
+                                                    const SizedBox(width: 8), // Original spacing
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          const Text(
+                                                            "Your Review",
+                                                            style: TextStyle(
+                                                              color: Colors.white,
+                                                              fontSize: 14, // Original font size
+                                                              fontWeight: FontWeight.w500,
+                                                            ),
+                                                            maxLines: 1,
+                                                            overflow: TextOverflow.ellipsis,
                                                           ),
-                                                        ),
-                                                        if (_userRating != null)
-                                                          Row(
-                                                            children: [
-                                                              Icon(
-                                                                Icons.star,
-                                                                color: Colors.amber[400],
-                                                                size: 14,
-                                                              ),
-                                                              const SizedBox(width: 4),
-                                                              Text(
-                                                                "$_userRating",
-                                                                style: TextStyle(
-                                                                  color: Colors.grey[400],
-                                                                  fontSize: 12,
+                                                          if (_userRating != null)
+                                                            Row(
+                                                              children: [
+                                                                Icon(
+                                                                  Icons.star,
+                                                                  color: Colors.amber[400],
+                                                                  size: 14, // Original size
                                                                 ),
-                                                              ),
-                                                            ],
-                                                          ),
-                                                      ],
+                                                                const SizedBox(width: 4), // Original spacing
+                                                                Text(
+                                                                  "$_userRating",
+                                                                  style: TextStyle(
+                                                                    color: Colors.grey[400],
+                                                                    fontSize: 12, // Original font size
+                                                                  ),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                        ],
+                                                      ),
                                                     ),
-                                                    const Spacer(),
                                                     const Icon(
                                                       Icons.edit,
                                                       color: Colors.white54,
-                                                      size: 16,
+                                                      size: 16, // Original size
                                                     ),
                                                   ],
                                                 ),
-                                                const SizedBox(height: 12),
-                                                Expanded(
-                                                  child: Text(
-                                                    _game.userActions?.comment ?? "Write your thoughts...",
-                                                    style: TextStyle(
-                                                      color: _game.userActions?.comment != null 
-                                                        ? Colors.white70 
-                                                        : Colors.grey[500],
-                                                      fontSize: 13,
-                                                      height: 1.5,
-                                                      fontStyle: _game.userActions?.comment != null 
-                                                        ? FontStyle.normal 
-                                                        : FontStyle.italic,
+                                                if (_game.userActions?.comment != null && _game.userActions!.comment!.isNotEmpty)
+                                                  Padding(
+                                                    padding: const EdgeInsets.only(top: 12), // Original padding
+                                                    child: Text(
+                                                      _game.userActions!.comment!,
+                                                      style: const TextStyle(
+                                                        color: Colors.white70,
+                                                        fontSize: 14, // Original font size
+                                                        height: 1.4, // Original line height
+                                                      ),
+                                                      maxLines: 3, // Original max lines
+                                                      overflow: TextOverflow.ellipsis,
                                                     ),
-                                                    maxLines: 3,
-                                                    overflow: TextOverflow.ellipsis,
                                                   ),
-                                                ),
+                                                // Keep the Wrap layout for game status chips but with original sizing
+                                                if (_game.userActions?.playStatus != null && _game.userActions!.playStatus != PlayStatus.notSet ||
+                                                    _game.userActions?.completionStatus != null && _game.userActions!.completionStatus != CompletionStatus.notSelected ||
+                                                    _game.userActions?.playtimeInMinutes != null && _game.userActions!.playtimeInMinutes! > 0)
+                                                  Align(
+                                                    alignment: Alignment.topLeft,
+                                                    child: Padding(
+                                                      padding: const EdgeInsets.only(top: 12), // Original padding
+                                                      child: Wrap(
+                                                        spacing: 8, // Original spacing
+                                                        runSpacing: 6, // Original spacing
+                                                        children: [
+                                                          if (_game.userActions?.playStatus != null && _game.userActions!.playStatus != PlayStatus.notSet)
+                                                            _buildIconChip(
+                                                              _getPlayStatusIcon(_game.userActions!.playStatus!),
+                                                              _getPlayStatusTooltip(_game.userActions!.playStatus!),
+                                                            ),
+                                                          if (_game.userActions?.completionStatus != null && _game.userActions!.completionStatus != CompletionStatus.notSelected)
+                                                            _buildIconChip(
+                                                              _getCompletionStatusIcon(_game.userActions!.completionStatus!),
+                                                              _getCompletionStatusText(_game.userActions!.completionStatus!),
+                                                            ),
+                                                          if (_game.userActions?.playtimeInMinutes != null && _game.userActions!.playtimeInMinutes! > 0)
+                                                            _buildInfoChip(
+                                                              Icons.timer_outlined,
+                                                              _formatPlaytime(_game.userActions!.playtimeInMinutes!),
+                                                            ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                if (_game.userActions?.comment == null || _game.userActions?.comment?.isEmpty == true)
+                                                  const Padding(
+                                                    padding: EdgeInsets.only(top: 12), // Original padding
+                                                    child: Text(
+                                                      'Tap to add your review', // Original text
+                                                      style: TextStyle(
+                                                        color: Colors.white38,
+                                                        fontSize: 14, // Original font size
+                                                        fontStyle: FontStyle.italic,
+                                                      ),
+                                                    ),
+                                                  ),
                                               ],
                                             ),
                                           ),
@@ -1081,16 +1156,18 @@ class _GameDetailPageState extends State<GameDetailPage> {
 
                                       return Container(
                                         width: 280,
-                                        margin: const EdgeInsets.only(right: 12),
-                                        padding: const EdgeInsets.all(16),
+                                        margin: const EdgeInsets.only(right: 12), // Original margin
+                                        padding: const EdgeInsets.all(16), // Original padding
+                                        constraints: const BoxConstraints(), // Remove max height constraint
                                         decoration: BoxDecoration(
                                           color: Colors.white.withOpacity(0.05),
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius: BorderRadius.circular(12), // Original border radius
                                           border: Border.all(
                                             color: Colors.white.withOpacity(0.1),
                                           ),
                                         ),
                                         child: Column(
+                                          mainAxisSize: MainAxisSize.min,
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             Row(
@@ -1129,7 +1206,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
                                                 ),
                                               ],
                                             ),
-                                            const SizedBox(height: 12),
+                                            const SizedBox(height: 8),
                                             Expanded(
                                               child: Text(
                                                 review.comment ?? "",
@@ -1165,7 +1242,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
                                       gameId: _game.gameId!,
                                       rating: _userRating!,
                                       comment: _game.userActions?.comment,
-                                      ratingDate: DateTime.now(), // Şu anki tarihi kullan
+                                      lastUpdatedDate: DateTime.now(), // Use lastUpdatedDate
                                     );
                                   }
                                   
@@ -1231,9 +1308,9 @@ class _GameDetailPageState extends State<GameDetailPage> {
                                     onTap: () => _openImageGallery(context, index),
                                     child: Container(
                                       width: 280,
-                                      margin: const EdgeInsets.only(right: 12),
+                                      margin: const EdgeInsets.only(right: 12), // Original margin
                                       child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(12),
+                                        borderRadius: BorderRadius.circular(8), // Smaller border radius
                                         child: CachedNetworkImage(
                                           imageUrl: screenshot,
                                           fit: BoxFit.cover,
@@ -1873,7 +1950,7 @@ class _GameDetailPageState extends State<GameDetailPage> {
       final String displayLabel = hasRating ? _getRatingLabel(_userRating!) : 'Seen';
       
       return InkWell(
-        onTap: _showRatingDialog,
+        onTap: _showRatingModal,
         splashColor: Colors.transparent,
         highlightColor: Colors.transparent,
         borderRadius: BorderRadius.circular(20),
@@ -2032,147 +2109,158 @@ class _GameDetailPageState extends State<GameDetailPage> {
     );
   }
 
-  void _showRatingDialog() {
+  void _showRatingModal() {
+    // Fetch the most recent full rating data before showing the modal
+    // Use the existing _game.userActions object as the source
+    UserGameRating? currentRatingData;
+    if (_game.userActions != null && _game.gameId != null) {
+         currentRatingData = UserGameRating(
+            // Try to get an ID if we have stored the full review data, otherwise 0
+            id: _currentUserReviewData?.id ?? 0, 
+            userId: _currentUserId ?? 0, // Use the loaded current user ID
+            gameId: _game.gameId!, 
+            rating: _game.userActions!.userRating,
+            comment: _game.userActions!.comment,
+            // Read existing values from userActions - debug loglarını ekleyelim
+            playStatus: _game.userActions!.playStatus, 
+            completionStatus: _game.userActions!.completionStatus,
+            playtimeInMinutes: _game.userActions!.playtimeInMinutes,
+            // We don't have lastUpdatedDate in userActions, pass null
+            lastUpdatedDate: null, 
+        );
+        print("Showing rating modal with: playStatus=${_game.userActions!.playStatus}, completionStatus=${_game.userActions!.completionStatus}, playtimeInMinutes=${_game.userActions!.playtimeInMinutes}");
+    } else if (_game.gameId != null) {
+      // If userActions is null, create a minimal object for the modal
+       currentRatingData = UserGameRating(
+          id: 0,
+          userId: _currentUserId ?? 0,
+          gameId: _game.gameId!,
+          rating: null,
+          comment: null,
+          playStatus: PlayStatus.notSet, // Default
+          completionStatus: CompletionStatus.notSelected, // Default
+          playtimeInMinutes: null,
+          lastUpdatedDate: null,
+      );
+    }
+    
+    // If gameId is null or something went wrong, don't show modal
+    if (currentRatingData == null) {
+      print("Error: Cannot show rating modal - currentRatingData is null.");
+      // Optionally show a message to the user
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not load rating details.')),
+      );
+      return;
+    }
+
+    // Show the updated modal
     RatingModal.show(
       context,
       gameName: _game.name,
       coverUrl: _game.coverUrl ?? '',
-      gameId: _game.gameId,
-      initialRating: _userRating != null && _userRating! > 0 ? _userRating : null,
-      onRatingSelected: (rating) async { // <-- Make callback async
-        print('Rating selected: $rating'); 
-        print('Previous userRating: $_userRating'); 
-        print('Previous isHidden: $_isHidden'); // Log previous hidden state
-        
-        final bool wasPreviouslyRated = _userRating != null && _userRating! > 0;
-        final bool isNowRated = rating > 0;
-        bool shouldUnhide = false;
+      gameId: _game.gameId!, // Ensure gameId is not null here
+      // Pass the correct parameter name and the correct data variable
+      initialUserGameRating: currentRatingData, 
+      // Updated callback
+      onUpdateComplete: (updatedRating) {
+         print('RatingModal Callback - Received updated rating: ${updatedRating.toJson()}');
 
         // --- Rule: Rating a game removes hidden status ---
-        if (isNowRated && _isHidden) {
+        bool shouldUnhide = false;
+        if ((updatedRating.rating != null && updatedRating.rating! > 0) && _isHidden) {
           shouldUnhide = true;
           print('Rating action is unhiding the game.');
         }
 
         setState(() {
-          _userRating = isNowRated ? rating : null;
+          // Update local state based on the returned full object
+          _userRating = updatedRating.rating;
+          final newComment = updatedRating.comment;
+          // TODO: Update local state for playStatus, completionStatus, playtime if needed
+          // --> No need for separate local state, update userActions directly
           
           // Unhide if necessary
           if (shouldUnhide) {
             _isHidden = false;
           }
 
-          // Update game's user actions
-          final currentActions = _game.userActions ?? UserGameActions();
-          UserGameActions updatedUserActions;
-
-          if (isNowRated) {
-            // Rating is being set or changed
-            updatedUserActions = currentActions.copyWith(
-              isRated: true,
-              userRating: rating,
-              isHidden: _isHidden, // Keep potentially updated hidden state
-              comment: currentActions.comment
-            );
-          } else {
-            // Rating is being removed (set to 0 or null)
-            // Explicitly create new actions with null rating/comment
-            updatedUserActions = UserGameActions(
-              isSaved: currentActions.isSaved,
-              isHidden: _isHidden, // Keep potentially updated hidden state
-              isRated: false,
-              userRating: null,
-              comment: null
-            );
-          }
-          
-          // Update game object
+          // Update the _game.userActions object comprehensively
           _game = _game.copyWith(
-            userActions: updatedUserActions
+            userActions: (_game.userActions ?? const UserGameActions()).copyWith(
+              isRated: _userRating != null && _userRating! > 0,
+              userRating: _userRating,
+              comment: newComment, // Update comment
+              isHidden: _isHidden, // Update hidden status
+              // Include the new fields
+              playStatus: updatedRating.playStatus, 
+              completionStatus: updatedRating.completionStatus,
+              playtimeInMinutes: updatedRating.playtimeInMinutes,
+            )
           );
           
-          print('Updated userRating: $_userRating'); 
+          // Use _userRating for printing
+          print('Updated _userRating: $_userRating'); 
           print('Updated isHidden: $_isHidden'); 
-          print('Updated userActions rating: ${_game.userActions?.userRating}'); 
-          print('Updated isRated: ${_game.userActions?.isRated}'); 
-          print('Updated userActions isHidden: ${_game.userActions?.isHidden}'); 
-          print('Updated comment: ${_game.userActions?.comment}'); 
+          print('Updated userActions: ${_game.userActions}'); 
         });
         
         // Update HomeController
         if (_game.gameId != null) {
-          _homeController.updateGameRatingState(_game.gameId!, isNowRated ? rating : null);
+          // Use _userRating here
+          _homeController.updateGameRatingState(_game.gameId!, _userRating);
+          _homeController.updateGameComment(_game.gameId!, updatedRating.comment);
+          // Update new fields in HomeController
+          _homeController.updateGamePlayStatus(_game.gameId!, updatedRating.playStatus);
+          _homeController.updateGameCompletionStatus(_game.gameId!, updatedRating.completionStatus);
+          _homeController.updateGamePlaytime(_game.gameId!, updatedRating.playtimeInMinutes);
+           
           if (shouldUnhide) {
-            // Call HomeController to update hidden status
             _homeController.updateGameHiddenState(_game.gameId!, false); 
             print('HomeController hidden state update needed for game ${_game.gameId}: false'); 
           }
-          if (!isNowRated) {
-            _homeController.updateGameComment(_game.gameId!, null);
-            print('Comment removed from HomeController because rating was removed.'); 
-          }
         }
 
-        // Call backend to unhide game if shouldUnhide is true
+        // Call backend to unhide game if necessary (redundant if updateRatingEntry handles it)
+        // Consider removing this if the main update endpoint handles unhiding implicitly
         if (shouldUnhide && _game.gameId != null) {
-           print('Backend call needed: unhideGame(${_game.gameId})');
-           try {
-             await _libraryRepository.unhideGame(_game.gameId!); // Now await is valid
-           } catch (e) {
-             print('Error unhiding game via rating: $e');
-             // Optionally show error to user
-           }
+           print('Backend call MAYBE needed: unhideGame(${_game.gameId}) - Check if update endpoint handles this');
+           // try {
+           //   await _libraryRepository.unhideGame(_game.gameId!); 
+           // } catch (e) {
+           //   print('Error unhiding game via rating: $e');
+           // }
         }
       },
     );
   }
 
   String _getRatingLabel(int rating) {
-    switch (rating) {
-      case 1:
-        return 'Awful';
-      case 2:
-        return 'Meh';
-      case 3:
-        return 'Good';
-      case 4:
-        return 'Amazing';
-      default:
-        return '';
-    }
+    // Adjust labels for 1-10 scale or remove if not needed
+    if (rating <= 2) return 'Awful';
+    if (rating <= 4) return 'Meh';
+    if (rating <= 7) return 'Good';
+    if (rating <= 9) return 'Great';
+    return 'Amazing'; // 10
   }
 
   IconData _getRatingIcon(int? rating) {
-    if (rating == null || rating == 0) {
-      return FontAwesomeIcons.star;  // Default star icon for not rated
-    }
-    switch (rating) {
-      case 1:
-        return FontAwesomeIcons.faceFrown;
-      case 2:
-        return FontAwesomeIcons.faceMeh;
-      case 3:
-        return FontAwesomeIcons.faceSmile;
-      case 4:
-        return FontAwesomeIcons.faceGrinStars;
-      default:
-        return FontAwesomeIcons.star;
-    }
+    // Adjust icons for 1-10 or remove if using numbered buttons only
+    if (rating == null || rating == 0) return FontAwesomeIcons.faceMeh;
+    if (rating <= 2) return FontAwesomeIcons.faceAngry;
+    if (rating <= 4) return FontAwesomeIcons.faceFrown;
+    if (rating <= 6) return FontAwesomeIcons.faceMeh;
+    if (rating <= 8) return FontAwesomeIcons.faceSmile;
+    return FontAwesomeIcons.faceGrinStars; // 9-10
   }
 
   Color _getRatingColor(int rating) {
-    switch (rating) {
-      case 1:
-        return const Color(0xFFE57373); // Soft Red
-      case 2:
-        return const Color(0xFFFFB74D); // Soft Orange
-      case 3:
-        return const Color(0xFF81C784); // Soft Green
-      case 4:
-        return const Color(0xFF9575CD); // Soft Purple
-      default:
-        return Colors.grey[400]!;
-    }
+     // Adjust colors for 1-10
+    if (rating <= 2) return Colors.redAccent.shade400;
+    if (rating <= 4) return Colors.orange.shade700;
+    if (rating <= 7) return Colors.amber.shade700;
+    if (rating <= 9) return Colors.lightGreen.shade600;
+    return Colors.teal.shade500; // 10
   }
 
   String _truncateText(String text, int maxLines) {
@@ -3217,9 +3305,12 @@ class _GameDetailPageState extends State<GameDetailPage> {
       UserGameRatingWithUser? currentUserReview;
       List<UserGameRatingWithUser> otherReviews = [];
 
-      for (final review in reviews) {
+      // Loop over the 'content' list inside the PagedResponse
+      for (final review in reviews.content) { 
         if (review.userId == _currentUserId) {
           currentUserReview = review;
+          // API'den gelen enum değerlerini hemen logla
+          print('Found user review in API response: playStatus=${review.playStatus}, completionStatus=${review.completionStatus}, playtimeInMinutes=${review.playtimeInMinutes}');
         } else {
           otherReviews.add(review);
         }
@@ -3230,18 +3321,69 @@ class _GameDetailPageState extends State<GameDetailPage> {
           // Update game actions with the fetched user review details (if found)
           if (currentUserReview != null) {
              print('User review found, updating _game.userActions and _currentUserReviewData');
+            
+            // Parse and handle nullable values
+            PlayStatus? updatedPlayStatus = currentUserReview.playStatus;
+            CompletionStatus? updatedCompletionStatus = currentUserReview.completionStatus;
+            
+            // Apply defaults if null
+            updatedPlayStatus ??= PlayStatus.notSet;
+            updatedCompletionStatus ??= CompletionStatus.notSelected;
+            
+            // Preserve meaningful values
+            if (updatedPlayStatus == PlayStatus.notSet && 
+                _game.userActions?.playStatus != null && 
+                _game.userActions!.playStatus != PlayStatus.notSet) {
+              print('Preserving existing playStatus: ${_game.userActions!.playStatus} instead of API value: $updatedPlayStatus');
+              updatedPlayStatus = _game.userActions!.playStatus;
+            }
+            
+            if (updatedCompletionStatus == CompletionStatus.notSelected && 
+                _game.userActions?.completionStatus != null && 
+                _game.userActions!.completionStatus != CompletionStatus.notSelected) {
+              print('Preserving existing completionStatus: ${_game.userActions!.completionStatus} instead of API value: $updatedCompletionStatus');
+              updatedCompletionStatus = _game.userActions!.completionStatus;
+            }
+            
             _game = _game.copyWith(
               userActions: (_game.userActions ?? UserGameActions()).copyWith(
                 isRated: true,
                 userRating: currentUserReview.rating,
                 comment: currentUserReview.comment,
+                // Using our properly parsed values that can't be null anymore
+                playStatus: updatedPlayStatus,
+                completionStatus: updatedCompletionStatus,
+                playtimeInMinutes: currentUserReview.playtimeInMinutes,
               ),
             );
+            
+             // Also update _currentUserReviewData with our corrected values
+             _currentUserReviewData = UserGameRatingWithUser(
+               id: currentUserReview.id,
+               userId: currentUserReview.userId,
+               gameId: currentUserReview.gameId,
+               rating: currentUserReview.rating,
+               comment: currentUserReview.comment,
+               playStatus: updatedPlayStatus,
+               completionStatus: updatedCompletionStatus,
+               playtimeInMinutes: currentUserReview.playtimeInMinutes,
+               lastUpdatedDate: currentUserReview.lastUpdatedDate,
+               username: currentUserReview.username,
+               profilePhotoUrl: currentUserReview.profilePhotoUrl,
+               profilePhotoType: currentUserReview.profilePhotoType,
+             );
+             
              // Also update local _userRating state if necessary for consistency
              _userRating = currentUserReview.rating;
-             _currentUserReviewData = currentUserReview; // <-- Store the fetched data
              print('Updated _userRating from fetched review: $_userRating');
              print('Updated _game.userActions.comment from fetched review: ${_game.userActions?.comment}');
+             print('Updated _game.userActions.playStatus from fetched review: ${_game.userActions?.playStatus}');
+             print('Updated _game.userActions.completionStatus from fetched review: ${_game.userActions?.completionStatus}');
+             print('Updated _game.userActions.playtimeInMinutes from fetched review: ${_game.userActions?.playtimeInMinutes}');
+             
+             // DEBUG: Diğer nesnelerin değerlerini kontrol et
+             print('_currentUserReviewData after update: playStatus=${_currentUserReviewData?.playStatus}, completionStatus=${_currentUserReviewData?.completionStatus}');
+             print('Direct _game.userActions check: ${_game.userActions}');
           } else {
             // If user's review wasn't in the fetched list (maybe they haven't reviewed)
             // Ensure local state reflects no rating/comment if it wasn't set initially
@@ -3314,5 +3456,115 @@ class _GameDetailPageState extends State<GameDetailPage> {
        }
        // Optionally revert the comment state here if needed
     }
+  }
+
+  IconData _getPlayStatusIcon(PlayStatus status) {
+    switch (status) {
+      case PlayStatus.notSet: return Icons.help_outline;
+      case PlayStatus.playing: return Icons.gamepad;
+      case PlayStatus.completed: return Icons.check_circle_outline;
+      case PlayStatus.dropped: return Icons.cancel_outlined;
+      case PlayStatus.onHold: return Icons.pause_circle_outline;
+      case PlayStatus.backlog: return Icons.pending_outlined;
+      case PlayStatus.skipped: return Icons.skip_next;
+    }
+  }
+
+  String _getPlayStatusText(PlayStatus status) {
+    switch (status) {
+      case PlayStatus.notSet: return "Not Started";
+      case PlayStatus.playing: return "Currently Playing";
+      case PlayStatus.completed: return "Completed";
+      case PlayStatus.dropped: return "Dropped";
+      case PlayStatus.onHold: return "On Hold";
+      case PlayStatus.backlog: return "In Backlog";
+      case PlayStatus.skipped: return "Skipped";
+    }
+  }
+
+  IconData _getCompletionStatusIcon(CompletionStatus status) {
+    switch (status) {
+      case CompletionStatus.notSelected: return Icons.help_outline;
+      case CompletionStatus.mainStory: return Icons.book_outlined;
+      case CompletionStatus.mainStoryPlusExtras: return Icons.extension_outlined;
+      case CompletionStatus.hundredPercent: return Icons.workspace_premium_outlined;
+    }
+  }
+
+  String _getCompletionStatusText(CompletionStatus status) {
+    switch (status) {
+      case CompletionStatus.notSelected: return "Not Selected";
+      case CompletionStatus.mainStory: return "Main Story";
+      case CompletionStatus.mainStoryPlusExtras: return "Main Story + Extras";
+      case CompletionStatus.hundredPercent: return "100% Completion";
+    }
+  }
+
+  String _formatPlaytime(int minutes) {
+    final hours = minutes ~/ 60;
+    final mins = minutes % 60;
+    
+    if (hours > 0) {
+      if (mins > 0) {
+        return "$hours hr $mins min";
+      } else {
+        return "$hours hr";
+      }
+    } else {
+      return "$mins min";
+    }
+  }
+
+  // Add this helper method to create compact info chips
+  Widget _buildInfoChip(IconData icon, String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), // Original padding
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(6), // Original radius
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: Colors.white70,
+            size: 14, // Original size
+          ),
+          const SizedBox(width: 4), // Original spacing
+          Text(
+            text,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 12, // Original font size
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Add a new method for icon-only chips
+  Widget _buildIconChip(IconData icon, String tooltip) {
+    return Tooltip(
+      message: tooltip,
+      child: Container(
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Icon(
+          icon,
+          color: Colors.white70,
+          size: 16,
+        ),
+      ),
+    );
+  }
+
+  // Return tooltip text for PlayStatus
+  String _getPlayStatusTooltip(PlayStatus status) {
+    return _getPlayStatusText(status);
   }
 }

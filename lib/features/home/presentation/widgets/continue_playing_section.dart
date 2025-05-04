@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:ludicapp/theme/app_theme.dart';
 // Remove provider import if not used elsewhere
 // import 'package:provider/provider.dart';
@@ -63,27 +64,27 @@ class _ContinuePlayingSectionState extends State<ContinuePlayingSection> {
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16.0),
-      // Padding'i Stack'in içine taşıyalım veya Stack'ten sonra uygulayalım.
-      // Şimdilik Stack'ten sonra uygulayalım.
       decoration: BoxDecoration(
-        color: AppTheme.surfaceDark,
+        // Use theme-aware Cupertino background
+        color: CupertinoTheme.of(context).brightness == Brightness.dark
+               ? CupertinoColors.darkBackgroundGray // Or secondarySystemGroupedBackground
+               : CupertinoColors.white, // Or secondarySystemGroupedBackground
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[850]!, width: 1.5),
+        // border: Border.all(color: Colors.grey[850]!, width: 1.5), // Remove border
       ),
       child: Stack( // Use Stack for positioning the counter
         children: [
           Padding( // Apply padding to the main content
-             padding: const EdgeInsets.only(top: 16.0, bottom: 16.0, left: 16.0),
+             padding: const EdgeInsets.only(top: 16.0, bottom: 16.0, left: 16.0, right: 16.0), // Add right padding too
              child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min, // Prevent column from taking full stack height
-      children: [
-                const Text(
-            'Continue Playing',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-                    fontSize: 18,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Use Cupertino Title Style directly, forcing color
+                Text(
+                  'Continue Playing',
+                  style: CupertinoTheme.of(context).textTheme.navTitleTextStyle.copyWith(
+                    color: CupertinoColors.label.resolveFrom(context),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -95,23 +96,25 @@ class _ContinuePlayingSectionState extends State<ContinuePlayingSection> {
           ),
           // Counter positioned at the top-right
           Positioned(
-            top: 10, 
-            right: 10,
+            top: 12, // Adjust position
+            right: 12,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3), // Adjust padding
               decoration: BoxDecoration(
-                 color: Colors.black.withOpacity(0.5),
-                 borderRadius: BorderRadius.circular(10),
+                 // Use lighter semi-transparent grey
+                 color: CupertinoColors.systemGrey.withOpacity(0.3),
+                 borderRadius: BorderRadius.circular(8), // Adjust radius
               ),
               child: Text(
                 '${currentlyPlayingGames.length}/$_maxGames',
                 style: TextStyle(
-                  color: Colors.grey[300], 
-                  fontSize: 11, 
+                  // Use theme-aware secondary label color
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                  fontSize: 11,
                   fontWeight: FontWeight.w600
+                ),
+              ),
             ),
-          ),
-        ),
           ),
         ],
       ),
@@ -120,40 +123,35 @@ class _ContinuePlayingSectionState extends State<ContinuePlayingSection> {
 
   Widget _buildEmptyState(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(right: 16.0, bottom: 8.0), // İçeriği ortalamak için padding
+      padding: const EdgeInsets.symmetric(vertical: 20.0, horizontal: 16.0), // Adjust padding
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const Text(
+              Text(
                 'Sign in to your accounts to sync the games you are currently playing.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-              fontSize: 14, // Biraz daha küçük metin
-                  color: Colors.grey,
-              height: 1.4, // Satır aralığı
+                // Use Cupertino text style with secondary color
+                style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                  height: 1.4,
                 ),
               ),
               const SizedBox(height: 20),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.play_arrow, size: 20),
-            label: const Text('Continue Playing'),
-                style: ElevatedButton.styleFrom(
-              // Arka plan rengini temadan al (opaklık ayarlı)
-              backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.9),
-              foregroundColor: Theme.of(context).colorScheme.onPrimary, // Metin/ikon rengi
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8.0),
+              // Use Cupertino Button
+              CupertinoButton.filled(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(CupertinoIcons.add, size: 20), // Use Cupertino icon
+                    SizedBox(width: 8),
+                    Text('Add Games'), // Update text
+                  ],
+                ),
+                onPressed: widget.onAddGamesPressed,
               ),
-              textStyle: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontFamily: 'LeagueSpartan',
-              ),
-            ),
-            onPressed: widget.onAddGamesPressed,
+            ],
           ),
-        ],
-      ),
     );
   }
 
@@ -200,7 +198,8 @@ class _ContinuePlayingSectionState extends State<ContinuePlayingSection> {
                     }
                     Navigator.push(
                        context,
-                       MaterialPageRoute(
+                       // Use CupertinoPageRoute here as well
+                       CupertinoPageRoute(
                           builder: (context) => GameDetailPage(
                             // Pass the full Game object
                             game: game, 
@@ -210,26 +209,31 @@ class _ContinuePlayingSectionState extends State<ContinuePlayingSection> {
                     );
                   },
                   child: Container(
-                    width: cardWidth, 
+                    width: cardWidth,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                       boxShadow: [ // Daha belirgin gölge
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.6),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                      // Apply same style as GameSection cards
+                      color: CupertinoTheme.of(context).brightness == Brightness.dark
+                             ? CupertinoColors.darkBackgroundGray
+                             : CupertinoColors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      // boxShadow: [ // Remove shadow
+                      //   ...
+                      // ],
                     ),
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(8),
                       child: CachedNetworkImage(
                         imageUrl: game.coverUrl ?? '',
                         fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(color: Colors.grey[850]),
+                        // Use Cupertino placeholder/error
+                        placeholder: (context, url) => Container(color: CupertinoTheme.of(context).brightness == Brightness.dark
+                                                                      ? CupertinoColors.systemGrey6.darkColor
+                                                                      : CupertinoColors.systemGrey6.color),
                         errorWidget: (context, url, error) => Container(
-                            color: Colors.grey[850],
-                            child: const Center(child: Icon(Icons.image_not_supported_outlined, color: Colors.grey))), // Hata ikonu
+                            color: CupertinoTheme.of(context).brightness == Brightness.dark
+                                   ? CupertinoColors.systemGrey6.darkColor
+                                   : CupertinoColors.systemGrey6.color,
+                            child: const Center(child: Icon(CupertinoIcons.photo, color: CupertinoColors.systemGrey))),
                       ),
                     ),
                   ),
@@ -237,8 +241,8 @@ class _ContinuePlayingSectionState extends State<ContinuePlayingSection> {
 
                 // Remove Button ('X')
                 Positioned(
-                  top: -6, 
-                  right: -6, 
+                  top: -8, // Adjust position
+                  right: -8,
                   child: GestureDetector(
                     onTap: () {
                       if (game.gameId != null) {
@@ -247,16 +251,16 @@ class _ContinuePlayingSectionState extends State<ContinuePlayingSection> {
                       }
                     },
                     child: Container(
-                      padding: const EdgeInsets.all(3),
+                      padding: const EdgeInsets.all(4), // Adjust padding
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.65), // Daha görünür arkaplan
+                        // Use semi-transparent grey circle
+                        color: CupertinoColors.systemGrey.withOpacity(0.8),
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white.withOpacity(0.5), width: 1) // İnce border
                       ),
                       child: const Icon(
-                        Icons.close_rounded, // Daha yuvarlak ikon
-                        color: Colors.white,
-                        size: 15,
+                        CupertinoIcons.xmark, // Use Cupertino icon
+                        color: CupertinoColors.white,
+                        size: 12, // Adjust size
                       ),
                     ),
                   ),
@@ -269,27 +273,33 @@ class _ContinuePlayingSectionState extends State<ContinuePlayingSection> {
     );
   }
 
-  // New helper method for the "Add New" card
+  // Style the "Add New" card to look like a tappable area
   Widget _buildAddNewCard(BuildContext context, double width, double height) {
+    final bool isDarkMode = CupertinoTheme.of(context).brightness == Brightness.dark;
+    final Color backgroundColor = isDarkMode
+        ? CupertinoColors.darkBackgroundGray // Slightly darker than main background
+        : CupertinoColors.systemGrey6; // Light grey
+    final Color iconColor = CupertinoColors.secondaryLabel.resolveFrom(context);
+
     return GestureDetector(
-      onTap: widget.onAddGamesPressed, // Trigger the add games action
+      onTap: widget.onAddGamesPressed,
       child: Container(
         width: width,
         height: height,
         decoration: BoxDecoration(
-          color: Colors.transparent, // Transparent background
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all( // Dashed border for distinction
-            color: Colors.grey[700]!, 
-            width: 1.5,
-            // Consider using a dashed border package if needed for true dashes
-          ),
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(8),
+          // Optionally add a very subtle border if needed for contrast
+          // border: Border.all(
+          //   color: CupertinoColors.systemGrey4,
+          //   width: 0.5,
+          // ),
         ),
         child: Center(
           child: Icon(
-            Icons.add_rounded,
-            color: Colors.grey[500],
-            size: 40,
+            CupertinoIcons.add,
+            color: iconColor,
+            size: 35, // Slightly larger icon
           ),
         ),
       ),

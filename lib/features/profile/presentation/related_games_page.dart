@@ -809,85 +809,57 @@ class _RelatedGamesPageState extends State<RelatedGamesPage> {
   }
 
   void _showRatingDialog(GameSummary game) {
+    // Pass null for initial data as it's not readily available here
+    // Or fetch it like in library_detail_page if needed
     RatingModal.show(
       context,
       gameName: game.name,
       coverUrl: game.coverUrl ?? '',
       gameId: game.id,
-      initialRating: userRatings[game.id],
-      onRatingSelected: (rating) {
+      // Pass the correct parameter name
+      initialUserGameRating: null, // Or fetch data first
+      onUpdateComplete: (updatedRating) {
+        if (mounted) {
         setState(() {
-          if (rating > 0) {
-            userRatings[game.id] = rating;
+            // Update local state maps
+            if (updatedRating.rating != null) {
+              userRatings[game.id] = updatedRating.rating!;
             ratedGames.add(game.id);
-            
-            // Update game detail if exists
-            if (gameDetailsMap.containsKey(game.id)) {
-              final existingGameDetail = gameDetailsMap[game.id]!;
-              final updatedActions = existingGameDetail.userActions?.copyWith(
-                isRated: true,
-                userRating: rating,
-                isInCustomList: existingGameDetail.userActions?.isInCustomList,
-              ) ?? UserGameActions(
-                isRated: true,
-                userRating: rating,
-                isSaved: existingGameDetail.userActions?.isSaved ?? false,
-                isInCustomList: existingGameDetail.userActions?.isInCustomList,
-              );
-              
-              gameDetailsMap[game.id] = GameDetailWithUserInfo(
-                gameDetails: existingGameDetail.gameDetails,
-                userActions: updatedActions,
-              );
-            }
           } else {
-            // Ensure complete cleanup when rating is removed
             userRatings.remove(game.id);
             ratedGames.remove(game.id);
-            
-            // Update game detail if exists
-            if (gameDetailsMap.containsKey(game.id)) {
-              final existingGameDetail = gameDetailsMap[game.id]!;
-              final updatedActions = existingGameDetail.userActions?.copyWith(
-                isRated: false,
-                userRating: null,
-                isInCustomList: existingGameDetail.userActions?.isInCustomList,
-              ) ?? UserGameActions(
-                isRated: false,
-                userRating: null,
-                isSaved: existingGameDetail.userActions?.isSaved ?? false,
-                isInCustomList: existingGameDetail.userActions?.isInCustomList,
-              );
-              
-              gameDetailsMap[game.id] = GameDetailWithUserInfo(
-                gameDetails: existingGameDetail.gameDetails,
-                userActions: updatedActions,
-              );
-
-              // Force rebuild of the GameCard
-              final gameIndex = games.indexWhere((g) => g.id == game.id);
-              if (gameIndex != -1) {
-                games[gameIndex] = GameSummary(
-                  id: games[gameIndex].id,
-                  name: games[gameIndex].name,
-                  coverUrl: games[gameIndex].coverUrl,
-                  totalRating: games[gameIndex].totalRating,
-                  screenshots: games[gameIndex].screenshots,
-                  slug: games[gameIndex].slug,
-                  genres: games[gameIndex].genres,
-                  themes: games[gameIndex].themes,
-                  platforms: games[gameIndex].platforms,
-                  companies: games[gameIndex].companies,
-                  gameVideos: games[gameIndex].gameVideos,
-                  franchises: games[gameIndex].franchises,
-                  gameModes: games[gameIndex].gameModes,
-                  playerPerspectives: games[gameIndex].playerPerspectives,
-                  languageSupports: games[gameIndex].languageSupports,
-                );
-              }
             }
-          }
-        });
+            // Update other local states if needed (e.g., comment)
+            
+            // Find the game in the gameDetailsMap and update its userActions
+            if (gameDetailsMap.containsKey(game.id)) {
+                // Get existing details
+                final existingDetails = gameDetailsMap[game.id]!;
+                 // Create updated actions using copyWith on existing actions (or create new)
+                final updatedUserActions = (existingDetails.userActions ?? const UserGameActions()).copyWith(
+                    userRating: updatedRating.rating,
+                    comment: updatedRating.comment,
+                    isSaved: savedGames.contains(game.id), // Keep local saved status
+                    isRated: updatedRating.rating != null, // Update isRated based on new rating
+                    playStatus: updatedRating.playStatus,
+                    completionStatus: updatedRating.completionStatus,
+                    playtimeInMinutes: updatedRating.playtimeInMinutes,
+                    // Keep other fields like isHidden, isInCustomList from existing if needed
+                    isHidden: existingDetails.userActions?.isHidden,
+                    isInCustomList: existingDetails.userActions?.isInCustomList,
+              );
+                // Update the map with the original gameDetails and the new userActions
+              gameDetailsMap[game.id] = GameDetailWithUserInfo(
+                    gameDetails: existingDetails.gameDetails,
+                    userActions: updatedUserActions,
+              );
+            }
+
+          });
+          // Update HomeController if necessary
+          _homeController.updateGameRatingState(game.id, updatedRating.rating);
+          _homeController.updateGameComment(game.id, updatedRating.comment);
+              }
       },
     );
   }

@@ -21,6 +21,8 @@ import 'package:ludicapp/features/profile/presentation/followers_page.dart';
 import 'package:ludicapp/core/enums/display_mode.dart';
 import 'package:ludicapp/features/profile/presentation/profile_page.dart';
 import 'package:ludicapp/core/enums/profile_photo_type.dart';
+import 'package:ludicapp/services/model/response/user_game_rating.dart';
+import 'package:ludicapp/services/repository/rating_repository.dart';
 
 class LibraryDetailPage extends StatefulWidget {
   final LibrarySummaryResponse librarySummary;
@@ -45,6 +47,7 @@ class _LibraryDetailPageState extends State<LibraryDetailPage> {
   final BlurredBackgroundProvider _backgroundProvider = BlurredBackgroundProvider();
   final TokenService _tokenService = TokenService();
   final TextEditingController _titleController = TextEditingController();
+  final RatingRepository _ratingRepository = RatingRepository();
   
   List<GameSummary> games = [];
   Map<int, GameDetailWithUserInfo> gameDetailsMap = {};
@@ -298,61 +301,67 @@ class _LibraryDetailPageState extends State<LibraryDetailPage> {
     }
   }
 
-  void _showRatingDialog(GameSummary game) {
+  Future<void> _fetchRatingAndShowModal(GameSummary game) async {
+    if (_currentUserId == null) {
+      print("Cannot fetch rating: User ID not loaded.");
+      return;
+    }
+
+    UserGameRating? initialData;
+    try {
+      initialData = await _ratingRepository.getRating(game.id);
+      print("Fetched initial data for modal: ${initialData?.toJson()}");
+    } catch (e) {
+      print("Error fetching initial rating for modal: $e");
+      initialData = UserGameRating(
+          id: 0, 
+          userId: _currentUserId!, 
+          gameId: game.id,
+          rating: userRatings[game.id],
+          comment: null,
+      );
+    }
+
+    if (!mounted) return;
+
     RatingModal.show(
       context,
       gameName: game.name,
       coverUrl: game.coverUrl ?? '',
       gameId: game.id,
-      initialRating: userRatings[game.id],
-      onRatingSelected: (rating) {
+      initialUserGameRating: initialData,
+      onUpdateComplete: (updatedRating) {
+        if (mounted) {
         setState(() {
-          if (rating > 0) {
-            userRatings[game.id] = rating;
+            if (updatedRating.rating != null) {
+              userRatings[game.id] = updatedRating.rating!;
             ratedGames.add(game.id);
-            
-            if (gameDetailsMap.containsKey(game.id)) {
-              final existingGameDetail = gameDetailsMap[game.id]!;
-              final updatedActions = existingGameDetail.userActions?.copyWith(
-                isRated: true,
-                userRating: rating,
-                isInCustomList: existingGameDetail.userActions?.isInCustomList,
-              ) ?? UserGameActions(
-                isRated: true,
-                userRating: rating,
-                isSaved: existingGameDetail.userActions?.isSaved ?? false,
-                isInCustomList: existingGameDetail.userActions?.isInCustomList,
-              );
-              
-              gameDetailsMap[game.id] = GameDetailWithUserInfo(
-                gameDetails: existingGameDetail.gameDetails,
-                userActions: updatedActions,
-              );
-            }
           } else {
             userRatings.remove(game.id);
             ratedGames.remove(game.id);
-            
-            if (gameDetailsMap.containsKey(game.id)) {
-              final existingGameDetail = gameDetailsMap[game.id]!;
-              final updatedActions = existingGameDetail.userActions?.copyWith(
-                isRated: false,
-                userRating: null,
-                isInCustomList: existingGameDetail.userActions?.isInCustomList,
-              ) ?? UserGameActions(
-                isRated: false,
-                userRating: null,
-                isSaved: existingGameDetail.userActions?.isSaved ?? false,
-                isInCustomList: existingGameDetail.userActions?.isInCustomList,
-              );
-              
-              gameDetailsMap[game.id] = GameDetailWithUserInfo(
-                gameDetails: existingGameDetail.gameDetails,
-                userActions: updatedActions,
-              );
             }
+            if (gameDetailsMap.containsKey(game.id)) {
+              final existingDetails = gameDetailsMap[game.id]!;
+              final updatedUserActions = (existingDetails.userActions ?? const UserGameActions()).copyWith(
+                 userRating: updatedRating.rating,
+                 comment: updatedRating.comment,
+                 isSaved: savedGames.contains(game.id),
+                 isRated: updatedRating.rating != null,
+                 playStatus: updatedRating.playStatus,
+                 completionStatus: updatedRating.completionStatus,
+                 playtimeInMinutes: updatedRating.playtimeInMinutes,
+                 isHidden: existingDetails.userActions?.isHidden,
+                 isInCustomList: existingDetails.userActions?.isInCustomList,
+              );
+              gameDetailsMap[game.id] = GameDetailWithUserInfo(
+                 gameDetails: existingDetails.gameDetails,
+                 userActions: updatedUserActions,
+              );
           }
         });
+          _homeController.updateGameRatingState(game.id, updatedRating.rating);
+          _homeController.updateGameComment(game.id, updatedRating.comment);
+        }
       },
     );
   }

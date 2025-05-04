@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:ludicapp/core/models/game.dart';
 import 'package:ludicapp/core/providers/blurred_background_provider.dart';
@@ -85,18 +86,15 @@ class _GameSectionState extends State<GameSection> {
         children: [
           // Section Title
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            padding: const EdgeInsets.symmetric(horizontal: 20.0),
             child: Text(
               widget.title,
-              style: TextStyle(
-                // Temaya göre renk seçimi
-                color: Theme.of(context).textTheme.titleMedium?.color,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+              style: CupertinoTheme.of(context).textTheme.navTitleTextStyle.copyWith(
+                color: CupertinoColors.label.resolveFrom(context),
               ),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
 
           // Horizontally Scrolling Game Cards
           SizedBox(
@@ -104,7 +102,7 @@ class _GameSectionState extends State<GameSection> {
             child: ListView.builder(
               controller: _scrollController,
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              padding: const EdgeInsets.symmetric(horizontal: 20.0),
               itemCount: widget.games.length,
               itemBuilder: (context, index) {
                 final game = widget.games[index];
@@ -143,28 +141,28 @@ class _GameSectionState extends State<GameSection> {
                   },
                   child: Container(
                     margin: EdgeInsets.only(
-                      right: index != widget.games.length - 1 ? 12.0 : 0,
+                      right: index != widget.games.length - 1 ? 15.0 : 0,
                     ),
                     width: MediaQuery.of(context).size.width * 0.30,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.5),
-                          blurRadius: 5,
-                          offset: const Offset(0, 5),
-                        ),
-                      ],
+                      color: CupertinoTheme.of(context).brightness == Brightness.dark 
+                             ? CupertinoColors.darkBackgroundGray 
+                             : CupertinoColors.white,
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(8),
                       child: CachedNetworkImage(
                         imageUrl: game.coverUrl ?? '',
                         fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(color: Colors.grey[900]),
+                        placeholder: (context, url) => Container(color: CupertinoTheme.of(context).brightness == Brightness.dark 
+                                                                      ? CupertinoColors.systemGrey6.darkColor 
+                                                                      : CupertinoColors.systemGrey6.color),
                         errorWidget: (context, url, error) => Container(
-                          color: Colors.grey[900],
-                          child: const Icon(Icons.error, color: Colors.white),
+                          color: CupertinoTheme.of(context).brightness == Brightness.dark 
+                                 ? CupertinoColors.systemGrey6.darkColor 
+                                 : CupertinoColors.systemGrey6.color,
+                          child: const Icon(CupertinoIcons.exclamationmark_circle, color: CupertinoColors.systemGrey),
                         ),
                         fadeInDuration: const Duration(milliseconds: 100),
                         fadeOutDuration: const Duration(milliseconds: 100),

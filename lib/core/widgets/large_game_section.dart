@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:ludicapp/core/models/game.dart';
 import 'package:ludicapp/core/widgets/large_game_card.dart';
@@ -134,60 +135,66 @@ class _LargeGameSectionState extends State<LargeGameSection> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           child: Text(
             widget.title,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+            style: CupertinoTheme.of(context).textTheme.navLargeTitleTextStyle.copyWith(
+                  color: CupertinoColors.label.resolveFrom(context),
+            ),
           ),
         ),
         SizedBox(
           height: 270,
           child: ListView.builder(
             controller: _scrollController,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             scrollDirection: Axis.horizontal,
             itemCount: widget.games.length,
             itemBuilder: (context, index) {
               final game = widget.games[index];
-              return LargeGameCard(
-                game: game,
-                onTap: () {
-                  ImageProvider? coverProvider;
-                  
-                  // Yüksek öncelikli ön belleğe alma - iki kere ön belleğe alıyoruz
-                  // ama bu tıklama anında gerçekleşecek ve kullanıcı görsel yüklenmesini beklemeyecek
-                  
-                  // 1. Kapak görselini ön belleğe al
-                  if (game.coverUrl != null && game.coverUrl!.isNotEmpty) {
-                    // CachedNetworkImageProvider kullan - bu Flutter'ın önbellek sisteminden faydalanır
-                    coverProvider = CachedNetworkImageProvider(game.coverUrl!);
-                    try {
-                      // Yüksek öncelikli ön belleğe alma (yükleme sırasını değiştirmez)
-                      precacheImage(coverProvider, context, onError: (e, stackTrace) {
-                        print('Error pre-caching cover during tap: $e');
-                      });
-                    } catch (e) {
-                      print('Sync error initiating cover pre-cache during tap: $e');
+              return Padding(
+                padding: EdgeInsets.only(
+                  left: index == 0 ? 8 : 4,
+                  right: index == widget.games.length - 1 ? 8 : 4,
+                ),
+                child: LargeGameCard(
+                  game: game,
+                  onTap: () {
+                    ImageProvider? coverProvider;
+                    
+                    // Yüksek öncelikli ön belleğe alma - iki kere ön belleğe alıyoruz
+                    // ama bu tıklama anında gerçekleşecek ve kullanıcı görsel yüklenmesini beklemeyecek
+                    
+                    // 1. Kapak görselini ön belleğe al
+                    if (game.coverUrl != null && game.coverUrl!.isNotEmpty) {
+                      // CachedNetworkImageProvider kullan - bu Flutter'ın önbellek sisteminden faydalanır
+                      coverProvider = CachedNetworkImageProvider(game.coverUrl!);
+                      try {
+                        // Yüksek öncelikli ön belleğe alma (yükleme sırasını değiştirmez)
+                        precacheImage(coverProvider, context, onError: (e, stackTrace) {
+                          print('Error pre-caching cover during tap: $e');
+                        });
+                      } catch (e) {
+                        print('Sync error initiating cover pre-cache during tap: $e');
+                      }
                     }
-                  }
-                  
-                  // 2. İlk ekran görüntüsünü ön belleğe al
-                  if (game.screenshots != null && game.screenshots!.isNotEmpty) {
-                    try {
-                      // Yüksek öncelikli ön belleğe alma
-                      precacheImage(CachedNetworkImageProvider(game.screenshots![0]), context, onError: (e, stackTrace) {
-                        print('Error pre-caching screenshot during tap: $e');
-                      });
-                    } catch (e) {
-                      print('Sync error initiating screenshot pre-cache during tap: $e');
+                    
+                    // 2. İlk ekran görüntüsünü ön belleğe al
+                    if (game.screenshots != null && game.screenshots!.isNotEmpty) {
+                      try {
+                        // Yüksek öncelikli ön belleğe alma
+                        precacheImage(CachedNetworkImageProvider(game.screenshots![0]), context, onError: (e, stackTrace) {
+                          print('Error pre-caching screenshot during tap: $e');
+                        });
+                      } catch (e) {
+                        print('Sync error initiating screenshot pre-cache during tap: $e');
+                      }
                     }
-                  }
-                  
-                  // 3. Hemen yönlendirme yap - ön belleğe alma işlemi arka planda devam eder
-                  widget.onGameTap(game, coverProvider);
-                },
+                    
+                    // 3. Hemen yönlendirme yap - ön belleğe alma işlemi arka planda devam eder
+                    widget.onGameTap(game, coverProvider);
+                  },
+                ),
               );
             },
           ),

@@ -16,6 +16,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:ludicapp/services/repository/library_repository.dart';
 import 'package:ludicapp/features/home/presentation/widgets/add_game_to_library_modal.dart';
 import 'package:ludicapp/core/enums/library_type.dart';
+import 'package:flutter/cupertino.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -353,7 +354,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
                   onGameTap: (game, coverProvider) { 
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
+                      CupertinoPageRoute(
                         builder: (context) => GameDetailPage(
                           game: game,
                           initialCoverProvider: coverProvider,
@@ -363,61 +364,61 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
                   },
                 ),
 
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              // Continue Playing Section
-              _buildCurrentlyPlayingSection(),
+                // Continue Playing Section
+                _buildCurrentlyPlayingSection(),
 
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              // Top Rated Section
-              if (_controller.topRatedGames.isNotEmpty)
-                GameSection(
-                  title: 'Top Rated',
-                  games: _controller.topRatedGames.map((game) {
-                    final gameWithActions = _controller.getGameWithUserActions(game);
-                    return gameWithActions;
-                  }).toList(),
-                  onGameTap: (game, coverProvider) { 
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => GameDetailPage(
-                          game: game, 
-                          initialCoverProvider: coverProvider, 
+                // Top Rated Section
+                if (_controller.topRatedGames.isNotEmpty)
+                  GameSection(
+                    title: 'Top Rated',
+                    games: _controller.topRatedGames.map((game) {
+                      final gameWithActions = _controller.getGameWithUserActions(game);
+                      return gameWithActions;
+                    }).toList(),
+                    onGameTap: (game, coverProvider) { 
+                      Navigator.push(
+                        context,
+                        CupertinoPageRoute(
+                          builder: (context) => GameDetailPage(
+                            game: game, 
+                            initialCoverProvider: coverProvider, 
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                ),
+                      );
+                    },
+                  ),
 
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              // Follow Us Section (New)
-              const FollowUsSection(),
+                // Follow Us Section (New)
+                const FollowUsSection(),
 
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              // Coming Soon Section
-              if (_controller.comingSoonGames.isNotEmpty)
-                GameSection(
-                  title: 'Coming Soon',
-                  games: _controller.comingSoonGames.map((game) => _controller.getGameWithUserActions(game)).toList(),
-                  onGameTap: (game, coverProvider) { 
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => GameDetailPage(
-                          game: game,
-                          initialCoverProvider: coverProvider,
+                // Coming Soon Section
+                if (_controller.comingSoonGames.isNotEmpty)
+                  GameSection(
+                    title: 'Coming Soon',
+                    games: _controller.comingSoonGames.map((game) => _controller.getGameWithUserActions(game)).toList(),
+                    onGameTap: (game, coverProvider) { 
+                      Navigator.push(
+                        context,
+                        CupertinoPageRoute(
+                          builder: (context) => GameDetailPage(
+                            game: game,
+                            initialCoverProvider: coverProvider,
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                ),
+                      );
+                    },
+                  ),
 
-              // Additional popularity type sections
-              ..._buildAllPopularitySections(),
+                // Additional popularity type sections
+                ..._buildAllPopularitySections(),
             ],
           ),
         ),
@@ -427,7 +428,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
 
   Widget _buildLoadingScreen() {
     return const Center(
-      child: CircularProgressIndicator(),
+      child: CupertinoActivityIndicator(),
     );
   }
 
@@ -466,7 +467,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
           // Navigate immediately, passing the provider
           Navigator.push(
             context,
-            MaterialPageRoute(
+            CupertinoPageRoute(
               builder: (context) => GameDetailPage(
                 game: game,
                 initialCoverProvider: coverProvider, // Pass provider
@@ -579,7 +580,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
             onGameTap: (game, coverProvider) {
               Navigator.push(
                 context,
-                MaterialPageRoute(
+                CupertinoPageRoute(
                   builder: (context) => GameDetailPage(
                     game: game,
                     initialCoverProvider: coverProvider,
@@ -596,7 +597,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
             onGameTap: (game, coverProvider) { 
               Navigator.push(
                 context,
-                MaterialPageRoute(
+                CupertinoPageRoute(
                   builder: (context) => GameDetailPage(
                     game: game,
                     initialCoverProvider: coverProvider,

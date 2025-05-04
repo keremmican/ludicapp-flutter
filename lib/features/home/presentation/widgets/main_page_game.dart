@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:ludicapp/core/utils/date_formatter.dart';
 import 'package:ludicapp/services/model/response/game_summary.dart';
@@ -34,15 +35,10 @@ class _MainPageGameState extends State<MainPageGame> with AutomaticKeepAliveClie
           width: MediaQuery.of(context).size.width - 32,
           height: (MediaQuery.of(context).size.width - 32) * (1942 / 1559),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            color: Colors.grey[900],
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 15,
-                offset: const Offset(0, 5),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(16),
+            color: CupertinoTheme.of(context).brightness == Brightness.dark
+                   ? CupertinoColors.darkBackgroundGray
+                   : CupertinoColors.systemGrey6,
           ),
           child: Stack(
             fit: StackFit.expand,
@@ -51,7 +47,7 @@ class _MainPageGameState extends State<MainPageGame> with AutomaticKeepAliveClie
               Hero(
                 tag: 'main_game_cover_${widget.game.id}',
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(16),
                   child: widget.initialCoverProvider != null
                     ? Image(
                         image: widget.initialCoverProvider!,
@@ -76,17 +72,17 @@ class _MainPageGameState extends State<MainPageGame> with AutomaticKeepAliveClie
               // Gradient Overlay
               Container(
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(16),
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.transparent,
-                      Colors.black.withOpacity(0.5),
-                      Colors.black.withOpacity(0.8),
-                      Colors.black.withOpacity(0.9),
+                      CupertinoColors.black.withOpacity(0.0),
+                      CupertinoColors.black.withOpacity(0.4),
+                      CupertinoColors.black.withOpacity(0.7),
+                      CupertinoColors.black.withOpacity(0.8),
                     ],
-                    stops: const [0.5, 0.7, 0.85, 1.0],
+                    stops: const [0.4, 0.6, 0.8, 1.0],
                   ),
                 ),
               ),
@@ -97,65 +93,47 @@ class _MainPageGameState extends State<MainPageGame> with AutomaticKeepAliveClie
                 left: 0,
                 right: 0,
                 child: Container(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         widget.game.name,
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.5,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black.withOpacity(0.7),
-                              blurRadius: 12,
-                              offset: const Offset(0, 2),
-                            ),
-                            Shadow(
-                              color: Colors.black.withOpacity(0.5),
-                              blurRadius: 8,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
+                        style: CupertinoTheme.of(context).textTheme.navLargeTitleTextStyle.copyWith(
+                          color: CupertinoColors.white,
+                          fontWeight: FontWeight.w700,
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(4),
+                            padding: const EdgeInsets.all(5),
                             decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.3),
-                              borderRadius: BorderRadius.circular(4),
+                              color: CupertinoColors.systemGrey.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(5),
                             ),
                             child: const Icon(
-                              Icons.calendar_today,
-                              color: Colors.white70,
-                              size: 16,
+                              CupertinoIcons.calendar,
+                              color: CupertinoColors.lightBackgroundGray,
+                              size: 15,
                             ),
                           ),
                           const SizedBox(width: 8),
                           Text(
                             DateFormatter.formatDate(widget.game.releaseDate),
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              shadows: [
-                                Shadow(
-                                  color: Colors.black.withOpacity(0.7),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
+                            style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+                              color: CupertinoColors.white,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 13,
                             ),
                           ),
                         ],
                       ),
+                      const SizedBox(height: 4),
                     ],
                   ),
                 ),
@@ -168,22 +146,23 @@ class _MainPageGameState extends State<MainPageGame> with AutomaticKeepAliveClie
   }
 
   Widget _buildCachedImageFallback() {
+    final bool isDarkMode = CupertinoTheme.of(context).brightness == Brightness.dark;
     return CachedNetworkImage(
       imageUrl: widget.game.coverUrl ?? '',
       fit: BoxFit.cover,
       fadeInDuration: const Duration(milliseconds: 150),
       fadeOutDuration: const Duration(milliseconds: 150),
       placeholder: (context, url) => Container(
-        color: Colors.grey[900],
-        child: const Center(child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white70)),
+        color: isDarkMode ? CupertinoColors.darkBackgroundGray : CupertinoColors.systemGrey6,
+        child: const Center(child: CupertinoActivityIndicator(radius: 12)),
       ),
       errorWidget: (context, url, error) => Container(
-        color: Colors.grey[900],
-        child: const Center(
+        color: isDarkMode ? CupertinoColors.darkBackgroundGray : CupertinoColors.systemGrey6,
+        child: Center(
           child: Icon(
-            Icons.error_outline,
-            color: Colors.white54,
-            size: 48,
+            CupertinoIcons.exclamationmark_circle_fill,
+            color: CupertinoColors.secondaryLabel,
+            size: 40,
           ),
         ),
       ),

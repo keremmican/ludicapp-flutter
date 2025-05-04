@@ -72,7 +72,7 @@ class _UserRatingsPageState extends State<UserRatingsPage> {
         size: _pageSize,
       );
       
-      if (ratings.isEmpty) {
+      if (ratings.empty) {
         setState(() {
           _hasMore = false;
           _isLoading = false;
@@ -82,7 +82,7 @@ class _UserRatingsPageState extends State<UserRatingsPage> {
       
       // Fetch game details for each rating
       final ratingItems = <UserRatingItem>[];
-      for (final rating in ratings) {
+      for (final rating in ratings.content) {
         try {
           final game = await _gameRepository.fetchGameDetails(rating.gameId);
           ratingItems.add(UserRatingItem(
@@ -90,7 +90,7 @@ class _UserRatingsPageState extends State<UserRatingsPage> {
             gameName: game.name,
             coverUrl: game.coverUrl,
             rating: rating.rating,
-            date: rating.ratingDate,
+            date: rating.lastUpdatedDate,
             comment: rating.comment,
           ));
         } catch (e) {
@@ -105,7 +105,7 @@ class _UserRatingsPageState extends State<UserRatingsPage> {
           } else {
             _ratingItems.addAll(ratingItems);
           }
-          _hasMore = ratings.length == _pageSize;
+          _hasMore = ratings.content.length == _pageSize;
           _isLoading = false;
         });
       }
@@ -287,15 +287,33 @@ class _UserRatingsPageState extends State<UserRatingsPage> {
                     // Rating stars
                     Row(
                       children: [
+                        if (item.rating != null && item.rating! > 0)
                         ...List.generate(
                           5,
-                          (i) => Icon(
-                            i < item.rating ? Icons.star : Icons.star_border,
-                            color: i < item.rating ? Colors.amber : Colors.grey[600],
+                            (i) {
+                               double starValue = (item.rating! / 2.0);
+                               IconData iconData = i < starValue
+                                ? (i + 0.5 == starValue ? Icons.star_half : Icons.star)
+                                : Icons.star_border;
+                                return Icon(
+                                  iconData,
+                                  color: Colors.amber,
                             size: 20,
+                               );
+                            }
+                          )
+                        else 
+                          Text(
+                            'Not Rated',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 14,
+                              fontStyle: FontStyle.italic,
                           ),
                         ),
                         const SizedBox(width: 8),
+                        // Show rating number only if it exists
+                        if (item.rating != null && item.rating! > 0)
                         Text(
                           item.rating.toString(),
                           style: const TextStyle(
@@ -323,9 +341,9 @@ class _UserRatingsPageState extends State<UserRatingsPage> {
                     
                     const SizedBox(height: 4),
                     
-                    // Rating date
+                    // Rating date (handle null)
                     Text(
-                      _formatDate(item.date),
+                      item.date != null ? _formatDate(item.date!) : 'Date unknown',
                       style: TextStyle(
                         color: Colors.grey[400],
                         fontSize: 12,
@@ -385,16 +403,16 @@ class UserRatingItem {
   final int gameId;
   final String gameName;
   final String? coverUrl;
-  final int rating;
-  final DateTime date;
+  final int? rating;
+  final DateTime? date;
   final String? comment;
   
   UserRatingItem({
     required this.gameId,
     required this.gameName,
     this.coverUrl,
-    required this.rating,
-    required this.date,
+    this.rating,
+    this.date,
     this.comment,
   });
 } 

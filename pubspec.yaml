@@ -52,7 +52,6 @@ dependencies:
   shared_preferences: ^2.5.3
   flutter_staggered_animations: ^1.1.1
   flutter_animate: ^4.5.2
-  timeago: ^3.6.1
 
 dev_dependencies:
   flutter_test:

@@ -10,6 +10,8 @@ import 'package:ludicapp/services/model/response/user_game_info.dart';
 import 'package:ludicapp/services/model/response/user_game_actions.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:ludicapp/core/enums/play_status.dart';
+import 'package:ludicapp/core/enums/completion_status.dart';
 
 // ChangeNotifier'dan extend edelim
 class HomeController extends ChangeNotifier {
@@ -36,6 +38,11 @@ class HomeController extends ChangeNotifier {
   Set<int> hiddenGames = {}; // gameIds that are hidden
   Map<int, int?> gameRatings = {}; // Rating null olabilir
   Map<int, String?> gameComments = {}; // Comment null olabilir
+  
+  // Oyun durumlarını saklamak için yeni haritalar ekle
+  Map<int, PlayStatus?> gamePlayStatuses = {}; // PlayStatus null olabilir
+  Map<int, CompletionStatus?> gameCompletionStatuses = {}; // CompletionStatus null olabilir
+  Map<int, int?> gamePlaytimes = {}; // Playtime null olabilir
   
   // savedGamesList değişkenini tanımlayalım
   List<Game> savedGamesList = [];
@@ -92,6 +99,10 @@ class HomeController extends ChangeNotifier {
         isHidden: hiddenGames.contains(gameId),
         userRating: gameRatings[gameId],
         comment: gameComments[gameId],
+        // Yeni alanları da ekle
+        playStatus: gamePlayStatuses[gameId],
+        completionStatus: gameCompletionStatuses[gameId],
+        playtimeInMinutes: gamePlaytimes[gameId],
       );
     }
     return game;
@@ -113,6 +124,17 @@ class HomeController extends ChangeNotifier {
       }
       if (actions.comment != null) {
         gameComments[gameId] = actions.comment;
+      }
+      
+      // Yeni eklenen alanları da sakla
+      if (actions.playStatus != null) {
+        gamePlayStatuses[gameId] = actions.playStatus;
+      }
+      if (actions.completionStatus != null) {
+        gameCompletionStatuses[gameId] = actions.completionStatus;
+      }
+      if (actions.playtimeInMinutes != null) {
+        gamePlaytimes[gameId] = actions.playtimeInMinutes;
       }
     }
   }
@@ -376,5 +398,92 @@ class HomeController extends ChangeNotifier {
       hiddenGames.remove(gameId);
     }
     notifyListeners();
+  }
+  
+  // Update game play status
+  void updateGamePlayStatus(int gameId, PlayStatus? playStatus) {
+    // Global haritaya kaydet
+    if (playStatus != null) {
+      gamePlayStatuses[gameId] = playStatus;
+    } else {
+      gamePlayStatuses.remove(gameId);
+    }
+    
+    // Popularity tipi oyunlarda güncelle
+    for (var entry in popularityTypeGames.entries) {
+      int popularityTypeId = entry.key;
+      List<GameDetailWithUserInfo> games = entry.value;
+      
+      for (int i = 0; i < games.length; i++) {
+        if (games[i].gameDetails.id == gameId && games[i].userActions != null) {
+          // Yeni bir GameDetailWithUserInfo nesnesi oluştur
+          popularityTypeGames[popularityTypeId]![i] = GameDetailWithUserInfo(
+            gameDetails: games[i].gameDetails,
+            userActions: games[i].userActions!.copyWith(playStatus: playStatus),
+          );
+        }
+      }
+    }
+    
+    notifyListeners();
+    print('HomeController - Updated playStatus for $gameId: $playStatus');
+  }
+  
+  // Update game completion status
+  void updateGameCompletionStatus(int gameId, CompletionStatus? completionStatus) {
+    // Global haritaya kaydet
+    if (completionStatus != null) {
+      gameCompletionStatuses[gameId] = completionStatus;
+    } else {
+      gameCompletionStatuses.remove(gameId);
+    }
+    
+    // Popularity tipi oyunlarda güncelle
+    for (var entry in popularityTypeGames.entries) {
+      int popularityTypeId = entry.key;
+      List<GameDetailWithUserInfo> games = entry.value;
+      
+      for (int i = 0; i < games.length; i++) {
+        if (games[i].gameDetails.id == gameId && games[i].userActions != null) {
+          // Yeni bir GameDetailWithUserInfo nesnesi oluştur
+          popularityTypeGames[popularityTypeId]![i] = GameDetailWithUserInfo(
+            gameDetails: games[i].gameDetails,
+            userActions: games[i].userActions!.copyWith(completionStatus: completionStatus),
+          );
+        }
+      }
+    }
+    
+    notifyListeners();
+    print('HomeController - Updated completionStatus for $gameId: $completionStatus');
+  }
+  
+  // Update game playtime
+  void updateGamePlaytime(int gameId, int? playtimeInMinutes) {
+    // Global haritaya kaydet
+    if (playtimeInMinutes != null) {
+      gamePlaytimes[gameId] = playtimeInMinutes;
+    } else {
+      gamePlaytimes.remove(gameId);
+    }
+    
+    // Popularity tipi oyunlarda güncelle
+    for (var entry in popularityTypeGames.entries) {
+      int popularityTypeId = entry.key;
+      List<GameDetailWithUserInfo> games = entry.value;
+      
+      for (int i = 0; i < games.length; i++) {
+        if (games[i].gameDetails.id == gameId && games[i].userActions != null) {
+          // Yeni bir GameDetailWithUserInfo nesnesi oluştur
+          popularityTypeGames[popularityTypeId]![i] = GameDetailWithUserInfo(
+            gameDetails: games[i].gameDetails,
+            userActions: games[i].userActions!.copyWith(playtimeInMinutes: playtimeInMinutes),
+          );
+        }
+      }
+    }
+    
+    notifyListeners();
+    print('HomeController - Updated playtimeInMinutes for $gameId: $playtimeInMinutes');
   }
 } 

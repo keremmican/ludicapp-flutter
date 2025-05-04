@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class BottomNavBar extends StatelessWidget {
@@ -12,35 +13,50 @@ class BottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Tema renklerini al
-    final theme = Theme.of(context);
-    
-    return BottomNavigationBar(
+    final CupertinoThemeData theme = CupertinoTheme.of(context);
+    // final bool isDark = theme.brightness == Brightness.dark; // No longer needed for background
+
+    // Set background color directly from theme's scaffold background color
+    final Color backgroundColor = theme.scaffoldBackgroundColor;
+
+    // Use the theme's primary color for active items
+    final Color activeColor = theme.primaryColor;
+    // Use secondary label color for inactive items
+    final Color inactiveColor = CupertinoColors.secondaryLabel.resolveFrom(context);
+
+    return CupertinoTabBar(
       currentIndex: currentIndex,
       onTap: onTap,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      // Accent rengi temadan al
-      selectedItemColor: theme.colorScheme.primary, // Tema accent rengi
-      // Temaya göre seçilmemiş item rengi (açık/koyu temada farklı)
-      unselectedItemColor: theme.brightness == Brightness.dark 
-          ? Colors.white54 // Koyu temada açık gri
-          : Colors.grey[700], // Açık temada koyu gri
-      showSelectedLabels: false,
-      showUnselectedLabels: false,
+      // Use the theme's scaffold background color directly
+      backgroundColor: backgroundColor,
+      activeColor: activeColor,
+      inactiveColor: inactiveColor,
+      iconSize: 26.0,
+      border: null, // No border
       items: const [
         BottomNavigationBarItem(
-          icon: Icon(Icons.home),
-          label: '',
+          icon: Icon(CupertinoIcons.home),
+          activeIcon: Icon(CupertinoIcons.house_fill),
+          label: 'Home', // Change label to English
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.swipe),
-          label: '',
+          icon: Icon(CupertinoIcons.compass),
+          activeIcon: Icon(CupertinoIcons.compass_fill),
+          label: 'Explore', // Change label to English
         ),
+        // Remove the "Haberler" item
+        // BottomNavigationBarItem(
+        //   icon: Icon(CupertinoIcons.bolt_fill),
+        //   activeIcon: Icon(CupertinoIcons.bolt_fill),
+        //   label: 'Haberler',
+        // ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.person),
-          label: '',
+          icon: Icon(CupertinoIcons.person),
+          activeIcon: Icon(CupertinoIcons.person_fill),
+          label: 'Profile', // Change label to English
         ),
       ],
     );
   }
 }
+
